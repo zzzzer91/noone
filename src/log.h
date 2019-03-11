@@ -19,36 +19,36 @@ extern LogLevel g_log_level;
 
 void set_log_level(LogLevel level);
 
-#define logger_print(log_level, s) \
+#define LOGGER_PRINT(log_level, fmt, args...) \
     do { \
-        fprintf(stderr, "[%s]%s\n", log_level, s); \
+        fprintf(stderr, "[" log_level "] " fmt "\n", ##args); \
     } while (0)
 
-#define logger_debug(s) \
+#define LOGGER_DEBUG(fmt, args...) \
     do { \
         if (g_log_level <= DEBUG) { \
-            logger_print("DEBUG", s); \
+            LOGGER_PRINT("DEBUG", fmt, ##args); \
         } \
     } while (0)
 
-#define logger_info(s) \
+#define LOGGER_INFO(fmt, args...) \
     do { \
         if (g_log_level <= INFO) { \
-            logger_print("INFO", s); \
+            LOGGER_PRINT("INFO", fmt, ##args); \
         } \
     } while (0)
 
-#define logger_warning(s) \
+#define LOGGER_WARNING(fmt, args...) \
     do { \
         if (g_log_level <= WARNING) { \
-            logger_print("WARNING", s); \
+            LOGGER_PRINT("WARNING", fmt, ##args); \
         } \
     } while (0)
 
-#define logger_error(s) \
+#define LOGGER_ERROR(fmt, args...) \
     do { \
         if (g_log_level <= ERROR) { \
-            logger_print("ERROR", s); \
+            LOGGER_PRINT("ERROR", fmt, ##args); \
         } \
     } while (0)
 

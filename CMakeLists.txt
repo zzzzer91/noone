@@ -18,5 +18,11 @@ add_executable(noone ${SRCS})
 target_link_libraries(noone crypto)
 
 # 测试
-add_executable(test ./tests/test.c src/cryptor.c)
+add_executable(
+    test
+    ./tests/test.c
+    ./tests/helper.c
+    ./src/cryptor.c
+    ./src/log.c
+)
 target_link_libraries(test crypto)

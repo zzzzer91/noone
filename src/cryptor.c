@@ -14,7 +14,7 @@ crypto_md5(const unsigned char *data, size_t data_len, unsigned char *buf)
 }
 
 /*
- * shadowsocks 采用的将 passwd 转为 key 和 iv 的方法
+ * shadowsocks 采用的将 PASSWD 转为 key 和 iv 的方法
  *
  *   指 cfb，ctr
  *   aes-128 的 key 为 16 字节，iv 为 16 字节
