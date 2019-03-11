@@ -1,5 +1,9 @@
-#ifndef __LOG_H__
-#define __LOG_H__
+/*
+ * Created by zzzzer on 2/11/19.
+ */
+
+#ifndef _NOONE_LOG_H_
+#define _NOONE_LOG_H_
 
 #include <stdio.h>
 #include <time.h>
@@ -48,4 +52,4 @@ void set_log_level(LogLevel level);
         } \
     } while (0)
 
-#endif  /* __LOG_H__ */
+#endif  /* _NOONE_LOG_H_ */

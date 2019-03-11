@@ -1,6 +1,10 @@
-#ifndef __ERROR_H__
-#define __ERROR_H__
+/*
+ * Created by zzzzer on 2/11/19.
+ */
+
+#ifndef _NOONE_ERROR_H_
+#define _NOONE_ERROR_H_
 
 void panic(const char *s);
 
-#endif  /* __ERROR_H__ */
+#endif  /* _NOONE_ERROR_H_ */

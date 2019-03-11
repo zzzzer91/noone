@@ -1,3 +1,7 @@
+/*
+ * Created by zzzzer on 2/11/19.
+ */
+
 #include "log.h"
 
 LogLevel g_log_level = INFO;
