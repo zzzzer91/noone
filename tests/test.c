@@ -9,6 +9,8 @@ int
 main(void)
 {
     test_cryptor();
-    summary();
-    return 0;
+
+    SUMMARY();
+
+    return main_ret;
 }

@@ -5,13 +5,12 @@
 #ifndef _NOONE_HELPER_H_
 #define _NOONE_HELPER_H_
 
+#include "log.h"
 #include <stdio.h>
 
-extern int main_ret;    /* 测试结果，0 成功，1 失败 */
-extern int test_count;  /* 总测试用例 */
-extern int test_pass;   /* 测试通过用例 */
-
-void summary();
+int main_ret;    /* 测试结果，0 成功，1 失败 */
+int test_count;  /* 总测试用例 */
+int test_pass;   /* 测试通过用例 */
 
 #define EXPECT_EQ_BASE(equality, expect, actual, format) \
     do {\
@@ -19,7 +18,7 @@ void summary();
         if (equality) {\
             test_pass++;\
         } else {\
-            fprintf(stderr, "%s:%d: expect: " format " actual: " format "\n",\
+            LOGGER_ERROR("%s:%d: expect: " format " actual: " format,\
                     __FILE__, __LINE__, expect, actual);\
             main_ret = 1;\
         }\
@@ -33,5 +32,9 @@ void summary();
         sizeof(expect) - 1 == alength && memcmp(expect, actual, alength) == 0, \
         expect, actual, "%s" \
     )
+
+#define SUMMARY() \
+    LOGGER_INFO("%d/%d (%3.2f%%) passed\n", \
+        test_pass, test_count, test_pass * 100.0 / test_count);
 
 #endif /* _NOONE_HELPER_H_ */
