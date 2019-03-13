@@ -35,7 +35,7 @@ main(int argc, char *argv[])
 
     AeEventLoop *ae_ev_loop = ae_create_event_loop(AE_MAX_EVENTS);
 
-    ae_create_file_event(ae_ev_loop, server_fd, AE_READABLE, accept_conn, NULL);
+    ae_register_file_event(ae_ev_loop, server_fd, AE_READABLE, accept_conn, NULL);
 
     ae_run_loop(ae_ev_loop);
 

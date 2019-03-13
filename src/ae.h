@@ -10,8 +10,6 @@
 #include <time.h>
 
 #define AE_MAX_EVENTS 8192
-#define AE_OPEN_FD_MAX AE_MAX_EVENTS
-#define BUFFER_LEN 16 * 1024
 
 /*
  * 事件执行状态
@@ -44,8 +42,7 @@ typedef void AeBeforeSleepProc(AeEventLoop *event_loop);
 typedef struct AeFileEvent {
 
     // 监听事件类型掩码，
-    // 值可以是 AE_READABLE 或 AE_WRITABLE ，
-    // 或者 AE_READABLE | AE_WRITABLE
+    // 值可以是 AE_READABLE 或 AE_WRITABLE，不能同时
     int mask;
 
     // 读事件处理器
@@ -110,11 +107,10 @@ void ae_run_loop(AeEventLoop *event_loop);
 void ae_stop_event_loop(AeEventLoop *event_loop);
 int ae_get_set_size(AeEventLoop *event_loop);
 
-int ae_wait(int fd, int mask, int timeout);
-int ae_create_file_event(AeEventLoop *event_loop, int fd, int mask,
-        AeFileProc *proc, void *client_data);
-void ae_delete_file_event(AeEventLoop *event_loop, int fd, int mask);
-int ae_get_file_events(AeEventLoop *event_loop, int fd);
+int ae_register_file_event(AeEventLoop *event_loop, int fd, int mask,
+                           AeFileProc *proc, void *client_data);
+void ae_unregister_file_event(AeEventLoop *event_loop, int fd);
+int ae_get_file_events_mask(AeEventLoop *event_loop, int fd);
 int ae_process_events(AeEventLoop *event_loop);
 
 #endif  /* _NOONE_AE_H_ */

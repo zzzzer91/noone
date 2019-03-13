@@ -8,6 +8,8 @@
 #include "ae.h"
 #include <openssl/evp.h>
 
+#define BUFFER_LEN 16 * 1024
+
 typedef enum SsStageType {
     STAGE_INIT = 0,
     STAGE_ADDR,
