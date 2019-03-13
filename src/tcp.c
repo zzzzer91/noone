@@ -27,36 +27,53 @@ accept_conn(AeEventLoop *event_loop, int fd, void *client_data)
     );
     if (conn_fd < 0) {
         if (errno != EAGAIN && errno != EINTR) {
+            LOGGER_ERROR("accept_conn");
             /* 暂不做出错处理 */
         }
     }
 
-    setnonblock(conn_fd);
+    if (setnonblock(conn_fd) < 0) {
+        LOGGER_ERROR("setnonblock");
+    }
+
+    StreamData *stream_data = malloc(sizeof(StreamData));
+    stream_data->ss_stage = STAGE_INIT;
+    ae_register_file_event(event_loop, conn_fd, AE_IN, read_ssclient, stream_data);
 }
 
 void
 read_ssclient(AeEventLoop *event_loop, int fd, void *client_data)
 {
-//    int ret = (int)read(
-//        self->fd,
-//        self->ciphertext,
-//        sizeof(self->ciphertext)
-//    );
-//    if (ret == 0) {  /* 对端关闭 */
-//
-//    }
-//    if (ret < 0) {
-//        /* 错误处理 */
-//        PANIC("read");
-//    }
-//
-//    self->ciphertext_len = ret;
-//    printf("%d\n", self->ciphertext_len);
-//    // crypto_aes256cfb_decrypt();
-//    // printf("%s\n", self->plaintext);
-//    printf("%d\n", self->plaintext_len);
-//    exit(1);
-    // ep_modify(self->fd, EPOLLOUT, write_ssclient);
+    CryptorInfo *cryptor_info = event_loop->extra_data;
+    int iv_len = cryptor_info->iv_len;
+    StreamData *sd = client_data;
+    int ret = (int)read(
+        fd,
+        sd->iv,
+        (size_t)iv_len
+    );
+    if (ret == 0) {  /* 对端关闭 */
+
+    }
+    if (ret < 0) {
+        /* 错误处理 */
+        PANIC("read");
+    }
+
+
+    ret = (int)read(
+            fd,
+            sd->ciphertext,
+            sizeof(sd->ciphertext)
+    );
+    sd->ciphertext_len = ret;
+    printf("%d\n", sd->ciphertext_len);
+    sd->decrypt_ctx = INIT_AES128CTR_DECRYPT_CTX(cryptor_info->key, sd->iv);
+    sd->plaintext_len = decrypt(sd->decrypt_ctx,
+            sd->ciphertext, sd->ciphertext_len, sd->plaintext);
+    printf("%s\n", sd->plaintext);
+    printf("%d\n", sd->plaintext_len);
+    exit(1);
 }
 
 void

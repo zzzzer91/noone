@@ -13,7 +13,7 @@
  * 关联给定事件到 fd，默认 ET 模式
  */
 static int
-ae_api_add_event(AeEventLoop *event_loop, int fd, int mask)
+ae_api_add_event(AeEventLoop *event_loop, int fd, uint32_t mask)
 {
     struct epoll_event ee;
 
@@ -27,15 +27,7 @@ ae_api_add_event(AeEventLoop *event_loop, int fd, int mask)
     int op = event_loop->events[fd].mask == AE_NONE ?
              EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
-    // 注册事件到 epoll
-    if (mask & AE_READABLE) {
-        ee.events = EPOLLIN | EPOLLET;
-    } else if (mask & AE_WRITABLE) {
-        ee.events = EPOLLOUT | EPOLLET;
-    } else {
-        return -1;
-    }
-
+    ee.events = mask | EPOLLET;
     ee.data.u64 = 0; /* avoid valgrind warning */
     ee.data.fd = fd;
 
@@ -65,41 +57,18 @@ ae_api_del_event(AeEventLoop *event_loop, int fd)
 static int
 ae_api_poll(AeEventLoop *event_loop, int timeout)
 {
-    int numevents;
-
     // 等待时间
-    numevents = epoll_wait(event_loop->epfd, event_loop->ready_events,
+    return epoll_wait(event_loop->epfd, event_loop->ready_events,
             event_loop->event_set_size, timeout);
+}
 
-    // 有至少一个事件就绪？
-    if (numevents > 0) {
-        int j;
+/*
+ * 检查所有时间的最后激活时间，踢掉超时的时间
+ */
+static void
+check_last_active(AeEventLoop *event_loop)
+{
 
-        // 为已就绪事件设置相应的模式
-        // 并加入到 event_loop 的 fired 数组中
-        int mask;
-        for (j = 0; j < numevents; j++) {
-            mask = 0;
-
-            struct epoll_event *e = event_loop->ready_events+j;
-
-            if (e->events & EPOLLIN) {
-                mask = AE_READABLE;
-            } else if (e->events & EPOLLOUT) {
-                mask = AE_WRITABLE;
-            } else if (e->events & EPOLLERR) {
-                mask = AE_WRITABLE;
-            } else if (e->events & EPOLLHUP) {
-                mask = AE_WRITABLE;
-            }
-
-            event_loop->fired[j].fd = e->data.fd;
-            event_loop->fired[j].mask = mask;
-        }
-    }
-
-    // 返回已就绪事件个数
-    return numevents;
 }
 
 /*
@@ -140,13 +109,6 @@ ae_create_event_loop(int event_set_size)
         event_loop->events[i].mask = AE_NONE;
     }
 
-    // 初始化已就绪文件事件结构数组
-    event_loop->fired = malloc(sizeof(AeEventLoop)*event_set_size);
-    if (event_loop->fired == NULL) {
-        ae_delete_event_loop(event_loop);
-        return NULL;
-    }
-
     // 设置数组大小
     event_loop->event_set_size = event_set_size;
 
@@ -166,7 +128,6 @@ ae_delete_event_loop(AeEventLoop *event_loop)
     if (event_loop->epfd != -1) close(event_loop->epfd);
     if (event_loop->ready_events != NULL) free(event_loop->ready_events);
     if (event_loop->events != NULL) free(event_loop->events);
-    if (event_loop->fired != NULL) free(event_loop->fired);
 
     free(event_loop);
 }
@@ -184,7 +145,7 @@ ae_stop(AeEventLoop *event_loop)
  * 返回当前事件槽大小。
  */
 int
-ae_get_set_size(AeEventLoop *event_loop)
+ae_get_event_set_size(AeEventLoop *event_loop)
 {
     return event_loop->event_set_size;
 }
@@ -198,13 +159,11 @@ ae_run_loop(AeEventLoop *event_loop)
     event_loop->stop = 0;
 
     while (!event_loop->stop) {
-
-        // 如果有需要在事件处理前执行的函数，那么运行它
-        if (event_loop->before_sleep != NULL)
-            event_loop->before_sleep(event_loop);
-
         // 开始处理事件
         ae_process_events(event_loop);
+
+        // 检查所有时间的最后激活时间，踢掉超时的时间
+        check_last_active(event_loop);
     }
 }
 
@@ -213,23 +172,28 @@ ae_run_loop(AeEventLoop *event_loop)
  * 当 fd 可用时，执行 proc 函数
  */
 int
-ae_register_file_event(AeEventLoop *event_loop, int fd, int mask,
+ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
                        AeFileProc *proc, void *client_data)
 {
-    if (fd >= event_loop->event_set_size) return AE_ERR;
+    if (fd >= event_loop->event_set_size) return -1;
 
     // 取出文件事件结构
     AeFileEvent *fe = &event_loop->events[fd];
 
     // 监听指定 fd 的指定事件
     if (ae_api_add_event(event_loop, fd, mask) == -1) {
-        return AE_ERR;
+        return -1;
     }
 
+    fe->last_active = time(NULL);
+
     // 设置文件事件类型，以及事件的处理器
-    fe->mask |= mask;
-    if (mask & AE_READABLE) fe->rfile_proc = proc;
-    if (mask & AE_WRITABLE) fe->wfile_proc = proc;
+    fe->mask = mask;
+    if (mask & AE_IN) {
+        fe->rfile_proc = proc;
+    } else if (mask & AE_OUT) {
+        fe->wfile_proc = proc;
+    }
 
     // 私有数据
     fe->client_data = client_data;
@@ -239,7 +203,7 @@ ae_register_file_event(AeEventLoop *event_loop, int fd, int mask,
         event_loop->maxfd = fd;
     }
 
-    return AE_OK;
+    return 0;
 }
 
 /*
@@ -266,6 +230,8 @@ ae_unregister_file_event(AeEventLoop *event_loop, int fd)
 
         event_loop->maxfd = j;
     }
+
+    fe->mask = AE_NONE;
 
     // 取消对给定 fd 的给定事件的监视
     ae_api_del_event(event_loop, fd);
@@ -305,15 +271,18 @@ ae_process_events(AeEventLoop *event_loop)
         // 处理文件事件
         int numevents = ae_api_poll(event_loop, -1);
         for (j = 0; j < numevents; j++) {
+            int fd = event_loop->ready_events[j].data.fd;
+
             // 从已就绪数组中获取事件
-            AeFileEvent *fe = &event_loop->events[event_loop->fired[j].fd];
+            AeFileEvent *fe = &event_loop->events[fd];
 
-            int mask = event_loop->fired[j].mask;
-            int fd = event_loop->fired[j].fd;
-
-            if (fe->mask & mask & AE_READABLE) {
+            if (fe->mask & AE_IN) {
                 fe->rfile_proc(event_loop, fd, fe->client_data);
-            } else if (fe->mask & mask & AE_WRITABLE) {
+            } else if (fe->mask & AE_OUT) {
+                fe->wfile_proc(event_loop, fd, fe->client_data);
+            } else if (fe->mask & EPOLLHUP) {
+                fe->wfile_proc(event_loop, fd, fe->client_data);
+            } else if (fe->mask & EPOLLERR) {
                 fe->wfile_proc(event_loop, fd, fe->client_data);
             }
 

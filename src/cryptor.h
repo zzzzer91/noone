@@ -10,6 +10,12 @@
 
 #define MD5_LEN 16
 
+typedef struct CryptorInfo{
+    unsigned char key[33];
+    int key_len;
+    int iv_len;
+} CryptorInfo;
+
 void crypto_md5(const unsigned char *data, size_t data_len, unsigned char *buf);
 
 int bytes_to_key(const unsigned char *passwd,
@@ -24,8 +30,6 @@ EVP_CIPHER_CTX *init_cipher_ctx(const EVP_CIPHER *cipher,
 
 #define INIT_AES128CTR_DECRYPT_CTX(key, iv) \
     init_cipher_ctx(EVP_aes_128_ctr(), key, iv, 0)
-
-int crypto_init(const unsigned char *key, const unsigned char *iv);
 
 int encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
         int plaintext_len, unsigned char *ciphertext);

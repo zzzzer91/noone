@@ -61,12 +61,6 @@ init_cipher_ctx(const EVP_CIPHER *cipher,
 }
 
 int
-crypto_init(const unsigned char *key, const unsigned char *iv)
-{
-    return 0;
-}
-
-int
 encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
         int plaintext_len, unsigned char *ciphertext)
 {
