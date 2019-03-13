@@ -4,11 +4,13 @@
 
 #include "helper.h"
 #include "test_cryptor.c"
+#include "test_ae.c"
 
 int
 main(void)
 {
     test_cryptor();
+    test_ae();
 
     SUMMARY();
 

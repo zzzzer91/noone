@@ -24,7 +24,7 @@ main(int argc, char *argv[])
     LOGGER_INFO("Noone started!");
 
     int server_fd = server_fd_init(SERVER_ADDR, SERVER_PORT);
-    if (server_fd > 0) {
+    if (server_fd < 0) {
         PANIC("init_server_fd");
     }
 
@@ -33,6 +33,13 @@ main(int argc, char *argv[])
         PANIC("setnonblock");
     }
 
+    AeEventLoop *ae_ev_loop = ae_create_event_loop(AE_MAX_EVENTS);
+
+    ae_create_file_event(ae_ev_loop, server_fd, AE_READABLE, accept_conn, NULL);
+
+    ae_run_loop(ae_ev_loop);
+
+    ae_delete_event_loop(ae_ev_loop);
 
     return 0;
 }

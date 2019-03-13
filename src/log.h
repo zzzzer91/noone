@@ -15,7 +15,7 @@ typedef enum {
     ERROR
 } LogLevel;
 
-LogLevel g_log_level = INFO;
+extern LogLevel g_log_level;
 
 #define SET_LOG_LEVEL(level) \
     do { \

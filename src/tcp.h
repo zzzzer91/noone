@@ -1,16 +1,31 @@
-#ifndef __TCP_H__
-#define __TCP_H__
+/*
+ * Created by zzzzer on 2/11/19.
+ */
 
-#include "epoll.h"
+#ifndef _NOONE_TCP_H_
+#define _NOONE_TCP_H_
 
-void accept_conn(ep_event_ex *self);
+#include "ae.h"
+#include <openssl/evp.h>
 
-void read_ssclient(ep_event_ex *self);
+typedef enum SsStageType {
+    STAGE_INIT = 0,
+    STAGE_ADDR,
+    STAGE_UDP_ASSOC,
+    STAGE_DNS,
+    STAGE_CONNECTING,
+    STAGE_STREAM,
+    STAGE_DESTROYED = -1
+} SsStageType;
 
-void write_ssclient(ep_event_ex *self);
+void accept_conn(AeEventLoop *event_loop, int fd, void *client_data);
 
-void read_remote(ep_event_ex *self);
+void read_ssclient(AeEventLoop *event_loop, int fd, void *client_data);
 
-void write_remote(ep_event_ex *self);
+void write_ssclient(AeEventLoop *event_loop, int fd, void *client_data);
 
-#endif  /* __TCP_H__ */
+void read_remote(AeEventLoop *event_loop, int fd, void *client_data);
+
+void write_remote(AeEventLoop *event_loop, int fd, void *client_data);
+
+#endif  /* _NOONE_TCP_H_ */
