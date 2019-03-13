@@ -21,7 +21,6 @@ target_link_libraries(noone crypto)
 add_executable(
     test
     ./tests/test.c
-        ./src/cryptor.c
-    ./src/log.c
+    ./src/cryptor.c
 )
 target_link_libraries(test crypto)

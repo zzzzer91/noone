@@ -15,9 +15,12 @@ typedef enum {
     ERROR
 } LogLevel;
 
-extern LogLevel g_log_level;
+LogLevel g_log_level = INFO;
 
-void set_log_level(LogLevel level);
+#define SET_LOG_LEVEL(level) \
+    do { \
+        g_log_level = level;\
+    } while (0)
 
 #define LOGGER_PRINT(log_level, fmt, args...) \
     do { \
