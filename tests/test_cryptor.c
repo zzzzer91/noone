@@ -21,9 +21,9 @@ bytes_to_hex(unsigned char *data, int len, char *buf)
 {
     int i;
     for (i = 0; i < len; i++) {
-        sprintf(buf+i*2, "%02x", data[i]);
+        // snprintf() 会在最后加个 '\0'
+        snprintf(buf+i*2, 3, "%02x", data[i]);
     }
-    buf[i*2] = '\0';
 
     return i*2;
 }

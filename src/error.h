@@ -11,8 +11,12 @@
 
 #define PANIC(s) \
     do { \
-        char *err_msg = strerror(errno); \
-        LOGGER_ERROR(s ": %s", err_msg); \
+        if (errno != 0) { \
+            char *err_msg = strerror(errno); \
+            LOGGER_ERROR(s ": %s", err_msg); \
+        } else {\
+            LOGGER_ERROR(s); \
+        } \
         exit(1); \
     } while(0)
 
