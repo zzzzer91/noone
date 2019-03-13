@@ -3,7 +3,6 @@
  */
 
 #include "cryptor.h"
-#include "log.h"
 #include "helper.h"
 #include <stdio.h>
 #include <stdlib.h>

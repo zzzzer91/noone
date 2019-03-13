@@ -7,7 +7,7 @@
 static void
 test_logger()
 {
-    set_log_level(DEBUG);
+    SET_LOG_LEVEL(DEBUG);
     LOGGER_PRINT("LOGGER_PRINT", "%s%d", "你好", 123);
     LOGGER_INFO("LOGGER_INFO");
     LOGGER_DEBUG("LOGGER_DEBUG");

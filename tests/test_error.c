@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-void
+static void
 test_panic()
 {
     int fd = open("不存在.txt", O_RDONLY);

@@ -29,12 +29,12 @@ int test_pass;   /* 测试通过用例 */
 
 #define EXPECT_EQ_STRING(expect, actual, alength) \
     EXPECT_EQ_BASE( \
-        sizeof(expect) - 1 == alength && memcmp(expect, actual, alength) == 0, \
+        sizeof(expect)-1 == (alength) && memcmp(expect, actual, alength) == 0, \
         expect, actual, "%s" \
     )
 
 #define SUMMARY() \
     LOGGER_INFO("%d/%d (%3.2f%%) passed\n", \
-        test_pass, test_count, test_pass * 100.0 / test_count);
+        test_pass, test_count, test_pass * 100.0 / test_count)
 
 #endif /* _NOONE_HELPER_H_ */

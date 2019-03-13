@@ -18,6 +18,6 @@
             LOGGER_ERROR(s); \
         } \
         exit(1); \
-    } while(0)
+    } while (0)
 
 #endif  /* _NOONE_ERROR_H_ */
