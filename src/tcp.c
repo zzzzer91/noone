@@ -4,6 +4,7 @@
 
 #include "tcp.h"
 #include "socket.h"
+#include "rio.h"
 #include "ae.h"
 #include "error.h"
 #include "cryptor.h"
@@ -20,48 +21,52 @@ accept_conn(AeEventLoop *event_loop, int fd, void *client_data)
 {
     struct sockaddr_in conn_addr;
     socklen_t conn_addr_len = sizeof(conn_addr);
-    int conn_fd = accept(
-        fd,
-        (struct sockaddr *)&conn_addr,
-        &conn_addr_len
-    );
+    int conn_fd = accept(fd, (struct sockaddr *)&conn_addr, &conn_addr_len);
     if (conn_fd < 0) {
-        if (errno != EAGAIN && errno != EINTR) {
-            LOGGER_ERROR("accept_conn");
-            /* 暂不做出错处理 */
-        }
+        LOGGER_ERROR("accept_conn");
+        return;
     }
 
     if (setnonblock(conn_fd) < 0) {
         LOGGER_ERROR("setnonblock");
+        close(conn_fd);
+        return;
     }
 
     StreamData *stream_data = malloc(sizeof(StreamData));
     stream_data->ss_stage = STAGE_INIT;
+    stream_data->is_get_iv = 0;
+    event_loop->events[fd].client_data = stream_data;
     ae_register_file_event(event_loop, conn_fd, AE_IN, read_ssclient, stream_data);
 }
 
 void
 read_ssclient(AeEventLoop *event_loop, int fd, void *client_data)
 {
-    CryptorInfo *cryptor_info = event_loop->extra_data;
-    size_t iv_len = cryptor_info->iv_len;
+    CryptorInfo *ci = event_loop->extra_data;
+    size_t iv_len = ci->iv_len;
     StreamData *sd = client_data;
-    ssize_t ret = read(fd, sd->iv, iv_len);
-    if (ret == 0) {  /* 对端关闭 */
-
-    }
+    errno = 0;
+    ssize_t ret = rio_readn(fd, sd->iv, iv_len);
     if (ret < 0) {
-        /* 错误处理 */
-        PANIC("read");
+        LOGGER_ERROR("rio_readn");
+        return;
     }
 
+    if (errno != EAGAIN) { // 对端关闭
+        ae_unregister_file_event(event_loop, fd);
+        close(fd);
+        free(sd);
+    }
 
+    /* 正常读完 */
     ret = read(fd, sd->ciphertext, sizeof(sd->ciphertext));
 
     sd->ciphertext_len = (size_t)ret;
     printf("%ld\n", sd->ciphertext_len);
-    sd->decrypt_ctx = INIT_DECRYPT_CTX(EVP_aes_128_ctr(), cryptor_info->key, sd->iv);
+
+    const EVP_CIPHER *cipher = get_cipher(ci->cipher_name);
+    sd->decrypt_ctx = INIT_DECRYPT_CTX(cipher, ci->key, sd->iv);
     sd->plaintext_len = decrypt(sd->decrypt_ctx,
             sd->ciphertext, sd->ciphertext_len, sd->plaintext);
     printf("%ld\n", sd->plaintext_len);
@@ -80,8 +85,6 @@ read_ssclient(AeEventLoop *event_loop, int fd, void *client_data)
      *     DST.PORT 字段：目的服务器的端口
      */
     printf("%s\n", sd->plaintext);
-
-    exit(1);
 }
 
 void

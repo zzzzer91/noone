@@ -22,8 +22,9 @@ typedef enum SsStageType {
 
 typedef struct StreamData {
     SsStageType ss_stage;
-    EVP_CIPHER_CTX *encrypt_ctx;
+    int is_get_iv;  /* 1 代表是，0 代表否 */
     unsigned char iv[33];
+    EVP_CIPHER_CTX *encrypt_ctx;
     size_t ciphertext_len;
     unsigned char ciphertext[BUFFER_LEN];
     EVP_CIPHER_CTX *decrypt_ctx;

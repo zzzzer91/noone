@@ -12,6 +12,7 @@
 #define IV_LEN 16
 
 #define PASSWD "abc123"
+// aes-128-ctr
 #define PASSWD_TO_KEY "e99a18c428cb38d5f260853678922e0388fc221acae10caf2921f7435051325c"
 #define PASSWD_TO_IV "1243734da46f16a118114ad51cfd48e2"
 
@@ -67,6 +68,8 @@ test_encrypt_and_decrypt()
     plaintext_len = decrypt(decrypt_ctx, ciphertext, ciphertext_len, plaintext);
     EXPECT_EQ_INT(6, (int)plaintext_len);
     EXPECT_EQ_STRING("你好", plaintext, plaintext_len);
+
+    free(ci);
 }
 
 void
