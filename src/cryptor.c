@@ -50,6 +50,20 @@ bytes_to_key(const unsigned char *passwd,
     return 0;
 }
 
+CryptorInfo *
+init_cryptor_info(const char *name,
+                  const unsigned char *passwd, size_t key_len, size_t iv_len)
+{
+    CryptorInfo *ci = malloc(sizeof(CryptorInfo));
+    if (ci == NULL) return NULL;
+    strncpy(ci->cipher_name, name, sizeof(ci->cipher_name));
+    ci->key_len = key_len;
+    ci->iv_len = iv_len;
+    bytes_to_key(passwd, ci->key, key_len, NULL, iv_len);
+
+    return ci;
+}
+
 const EVP_CIPHER *
 get_cipher(const char *cipher_name) {
     if (!strncmp(cipher_name, "aes-128-ctr", CIPHER_NAME_LEN)) {

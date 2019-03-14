@@ -32,14 +32,14 @@ typedef struct StreamData {
     unsigned char plaintext[BUFFER_LEN];
 } StreamData;
 
-void accept_conn(AeEventLoop *event_loop, int fd, void *client_data);
+void accept_conn(AeEventLoop *event_loop, int fd, void *data);
 
-void read_ssclient(AeEventLoop *event_loop, int fd, void *client_data);
+void read_ssclient(AeEventLoop *event_loop, int fd, void *data);
 
-void write_ssclient(AeEventLoop *event_loop, int fd, void *client_data);
+void write_ssclient(AeEventLoop *event_loop, int fd, void *data);
 
-void read_remote(AeEventLoop *event_loop, int fd, void *client_data);
+void read_remote(AeEventLoop *event_loop, int fd, void *data);
 
-void write_remote(AeEventLoop *event_loop, int fd, void *client_data);
+void write_remote(AeEventLoop *event_loop, int fd, void *data);
 
 #endif  /* _NOONE_TCP_H_ */

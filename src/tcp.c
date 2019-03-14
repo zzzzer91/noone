@@ -16,8 +16,20 @@
 #include <sys/socket.h>  /* accept() */
 #include <netinet/in.h>  /* struct sockaddr_in */
 
+static StreamData *
+init_stream_data()
+{
+    StreamData *stream_data = malloc(sizeof(StreamData));
+    if (stream_data == NULL) return NULL:
+
+    stream_data->ss_stage = STAGE_INIT;
+    stream_data->is_get_iv = 0;
+
+    return stream_data;
+}
+
 void
-accept_conn(AeEventLoop *event_loop, int fd, void *client_data)
+accept_conn(AeEventLoop *event_loop, int fd, void *data)
 {
     struct sockaddr_in conn_addr;
     socklen_t conn_addr_len = sizeof(conn_addr);
@@ -33,19 +45,18 @@ accept_conn(AeEventLoop *event_loop, int fd, void *client_data)
         return;
     }
 
-    StreamData *stream_data = malloc(sizeof(StreamData));
-    stream_data->ss_stage = STAGE_INIT;
-    stream_data->is_get_iv = 0;
-    event_loop->events[fd].client_data = stream_data;
-    ae_register_file_event(event_loop, conn_fd, AE_IN, read_ssclient, stream_data);
+    StreamData *sd = init_stream_data();
+    if (sd == NULL) PANIC("init_stream_data");
+    ae_register_file_event(event_loop, conn_fd, AE_IN,
+            read_ssclient, write_ssclient, sd);
 }
 
 void
-read_ssclient(AeEventLoop *event_loop, int fd, void *client_data)
+read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
     CryptorInfo *ci = event_loop->extra_data;
     size_t iv_len = ci->iv_len;
-    StreamData *sd = client_data;
+    StreamData *sd = data;
     errno = 0;
     ssize_t ret = rio_readn(fd, sd->iv, iv_len);
     if (ret < 0) {
@@ -88,7 +99,7 @@ read_ssclient(AeEventLoop *event_loop, int fd, void *client_data)
 }
 
 void
-write_ssclient(AeEventLoop *event_loop, int fd, void *client_data)
+write_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
     // int ret = write(self->fd, self->buffer, self->len);
     // if (ret == 0) {  /* 对端关闭 */
@@ -104,13 +115,13 @@ write_ssclient(AeEventLoop *event_loop, int fd, void *client_data)
 }
 
 void
-read_remote(AeEventLoop *event_loop, int fd, void *client_data)
+read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
 
 }
 
 void
-write_remote(AeEventLoop *event_loop, int fd, void *client_data)
+write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
 
 }

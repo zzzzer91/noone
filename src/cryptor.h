@@ -26,6 +26,9 @@ int bytes_to_key(const unsigned char *passwd,
              unsigned char *key, size_t key_len,
              unsigned char *iv, size_t iv_len);
 
+CryptorInfo *init_cryptor_info(const char *name,
+        const unsigned char *passwd, size_t key_len, size_t iv_len);
+
 const EVP_CIPHER *get_cipher(const char *cipher_name);
 
 EVP_CIPHER_CTX *init_cipher_ctx(const EVP_CIPHER *cipher,

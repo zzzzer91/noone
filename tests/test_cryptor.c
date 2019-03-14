@@ -11,7 +11,7 @@
 #define KEY_LEN 32
 #define IV_LEN 16
 
-#define PASSWD "abc123"
+#define PASSWD (unsigned char *)"abc123"
 // aes-128-ctr
 #define PASSWD_TO_KEY "e99a18c428cb38d5f260853678922e0388fc221acae10caf2921f7435051325c"
 #define PASSWD_TO_IV "1243734da46f16a118114ad51cfd48e2"
@@ -33,7 +33,7 @@ test_bytes_to_key()
 {
     unsigned char key[KEY_LEN+1];
     unsigned char iv[IV_LEN+1];
-    bytes_to_key((unsigned char *)PASSWD, key, KEY_LEN, iv, IV_LEN);
+    bytes_to_key(PASSWD, key, KEY_LEN, iv, IV_LEN);
 
     char *key_hex = (char *)malloc(KEY_LEN*2+1);
     size_t key_hex_len = bytes_to_hex(key, KEY_LEN, key_hex);
@@ -49,13 +49,10 @@ test_bytes_to_key()
 static void
 test_encrypt_and_decrypt()
 {
-    CryptorInfo *ci = malloc(sizeof(CryptorInfo));
-    strncpy(ci->cipher_name, "aes-128-ctr", sizeof(ci->cipher_name));
-    ci->key_len = 32;
-    ci->iv_len = 16;
+    CryptorInfo *ci = init_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
     unsigned char iv[IV_LEN+1];
 
-    bytes_to_key((unsigned char *)PASSWD, ci->key, ci->key_len, iv, ci->iv_len);
+    bytes_to_key(PASSWD, ci->key, ci->key_len, iv, ci->iv_len);
 
     const EVP_CIPHER *cipher = get_cipher(ci->cipher_name);
     EVP_CIPHER_CTX *encrypt_ctx = INIT_ENCRYPT_CTX(cipher, ci->key, iv);

@@ -168,32 +168,28 @@ ae_run_loop(AeEventLoop *event_loop)
 }
 
 /*
- * 根据 mask 参数的值，监听 fd 文件的状态，
- * 当 fd 可用时，执行 proc 函数
+ * 注册 fd
  */
 int
 ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-                       AeFileProc *proc, void *client_data)
+        AeFileProc *rfile_proc, AeFileProc *wfile_proc, void *client_data)
 {
     if (fd >= event_loop->event_set_size) return -1;
-
-    // 取出文件事件结构
-    AeFileEvent *fe = &event_loop->events[fd];
 
     // 监听指定 fd 的指定事件
     if (ae_api_add_event(event_loop, fd, mask) == -1) {
         return -1;
     }
 
+    // 取出文件事件结构
+    AeFileEvent *fe = &event_loop->events[fd];
+
     fe->last_active = time(NULL);
 
     // 设置文件事件类型，以及事件的处理器
     fe->mask = mask;
-    if (mask & AE_IN) {
-        fe->rfile_proc = proc;
-    } else if (mask & AE_OUT) {
-        fe->wfile_proc = proc;
-    }
+    fe->rfile_proc = rfile_proc;
+    fe->wfile_proc = wfile_proc;
 
     // 私有数据
     fe->client_data = client_data;
@@ -207,7 +203,31 @@ ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
 }
 
 /*
- * 将 fd 从 mask 指定的监听队列中删除
+ * 修改 fd 监听事件
+ */
+int
+ae_modify_file_event(AeEventLoop *event_loop, int fd, uint32_t mask)
+{
+    if (fd >= event_loop->event_set_size) return -1;
+
+    // 取出文件事件结构
+    AeFileEvent *fe = &event_loop->events[fd];
+
+    if (fe->mask == AE_NONE) return -1;
+
+    // 监听指定 fd 的指定事件
+    if (ae_api_add_event(event_loop, fd, mask) == -1) return -1;
+
+    fe->last_active = time(NULL);
+
+    // 设置文件事件类型，以及事件的处理器
+    fe->mask = mask;
+
+    return 0;
+}
+
+/*
+ * 将 fd 从监听队列中删除
  */
 void
 ae_unregister_file_event(AeEventLoop *event_loop, int fd)

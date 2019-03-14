@@ -35,14 +35,11 @@ main(int argc, char *argv[])
 
     AeEventLoop *ae_ev_loop = ae_create_event_loop(AE_MAX_EVENTS);
 
-    CryptorInfo *ci = malloc(sizeof(CryptorInfo));
-    strncpy(ci->cipher_name, "aes-128-ctr", sizeof(ci->cipher_name));
-    ci->key_len = 32;
-    ci->iv_len = 16;
-    bytes_to_key(PASSWD, ci->key, 32, NULL, 16);
+    CryptorInfo *ci = init_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
+    if (ci == NULL) PANIC("init_cryptor_info");
     ae_ev_loop->extra_data = ci;
 
-    ae_register_file_event(ae_ev_loop, server_fd, AE_IN, accept_conn, NULL);
+    ae_register_file_event(ae_ev_loop, server_fd, AE_IN, accept_conn, NULL, NULL);
 
     ae_run_loop(ae_ev_loop);
 

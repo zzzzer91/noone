@@ -24,19 +24,19 @@ typedef struct AeEventLoop AeEventLoop;
 /*
  * 事件接口
  */
-typedef void AeFileProc(AeEventLoop *event_loop, int fd, void *client_data);
+typedef void AeFileProc(AeEventLoop *event_loop, int fd, void *data);
 
 /*
  * File event structure
  */
 typedef struct AeFileEvent {
 
+    // 最后激活时间，用于踢掉超时连接
+    time_t last_active;
+
     // 监听事件类型掩码，
     // 值可以是 AE_IN 或 AE_OUT，不能同时
     int mask;
-
-    // 最后激活时间，用于踢掉超时连接
-    time_t last_active;
 
     // 读事件处理器
     AeFileProc *rfile_proc;
@@ -83,7 +83,8 @@ void ae_stop_event_loop(AeEventLoop *event_loop);
 int ae_get_event_set_size(AeEventLoop *event_loop);
 
 int ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-                           AeFileProc *proc, void *client_data);
+        AeFileProc *rfile_proc, AeFileProc *wfile_proc, void *client_data);
+int ae_modify_file_event(AeEventLoop *event_loop, int fd, uint32_t mask);
 void ae_unregister_file_event(AeEventLoop *event_loop, int fd);
 int ae_get_file_events_mask(AeEventLoop *event_loop, int fd);
 int ae_process_events(AeEventLoop *event_loop);
