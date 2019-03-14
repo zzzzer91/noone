@@ -45,13 +45,9 @@ void
 read_ssclient(AeEventLoop *event_loop, int fd, void *client_data)
 {
     CryptorInfo *cryptor_info = event_loop->extra_data;
-    int iv_len = cryptor_info->iv_len;
+    size_t iv_len = cryptor_info->iv_len;
     StreamData *sd = client_data;
-    int ret = (int)read(
-        fd,
-        sd->iv,
-        (size_t)iv_len
-    );
+    ssize_t ret = read(fd, sd->iv, iv_len);
     if (ret == 0) {  /* 对端关闭 */
 
     }
@@ -61,18 +57,30 @@ read_ssclient(AeEventLoop *event_loop, int fd, void *client_data)
     }
 
 
-    ret = (int)read(
-            fd,
-            sd->ciphertext,
-            sizeof(sd->ciphertext)
-    );
-    sd->ciphertext_len = ret;
-    printf("%d\n", sd->ciphertext_len);
-    sd->decrypt_ctx = INIT_AES128CTR_DECRYPT_CTX(cryptor_info->key, sd->iv);
+    ret = read(fd, sd->ciphertext, sizeof(sd->ciphertext));
+
+    sd->ciphertext_len = (size_t)ret;
+    printf("%ld\n", sd->ciphertext_len);
+    sd->decrypt_ctx = INIT_DECRYPT_CTX(EVP_aes_128_ctr(), cryptor_info->key, sd->iv);
     sd->plaintext_len = decrypt(sd->decrypt_ctx,
             sd->ciphertext, sd->ciphertext_len, sd->plaintext);
+    printf("%ld\n", sd->plaintext_len);
+    /*
+     * 开头有两个字段
+     * - ATYP 字段：address type 的缩写，取值为：
+     *     0x01：IPv4
+     *     0x03：域名
+     *     0x04：IPv6
+     *
+     * - DST.ADDR 字段：destination address 的缩写，取值随 ATYP 变化：
+     *
+     *     ATYP == 0x01：4 个字节的 IPv4 地址
+     *     ATYP == 0x03：1 个字节表示域名长度，紧随其后的是对应的域名
+     *     ATYP == 0x04：16 个字节的 IPv6 地址
+     *     DST.PORT 字段：目的服务器的端口
+     */
     printf("%s\n", sd->plaintext);
-    printf("%d\n", sd->plaintext_len);
+
     exit(1);
 }
 

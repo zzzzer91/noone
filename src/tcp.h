@@ -23,12 +23,12 @@ typedef enum SsStageType {
 typedef struct StreamData {
     SsStageType ss_stage;
     EVP_CIPHER_CTX *encrypt_ctx;
-    int ciphertext_len;
+    unsigned char iv[33];
+    size_t ciphertext_len;
     unsigned char ciphertext[BUFFER_LEN];
     EVP_CIPHER_CTX *decrypt_ctx;
-    int plaintext_len;
+    size_t plaintext_len;
     unsigned char plaintext[BUFFER_LEN];
-    unsigned char iv[33];
 } StreamData;
 
 void accept_conn(AeEventLoop *event_loop, int fd, void *client_data);

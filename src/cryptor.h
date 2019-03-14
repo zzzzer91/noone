@@ -8,12 +8,16 @@
 #include <stddef.h>
 #include <openssl/evp.h>
 
+#define KEY_LEN 32
+#define CIPHER_NAME_LEN 32
+
 #define MD5_LEN 16
 
 typedef struct CryptorInfo{
-    unsigned char key[33];
-    int key_len;
-    int iv_len;
+    char cipher_name[CIPHER_NAME_LEN];
+    unsigned char key[KEY_LEN+1];
+    size_t key_len;
+    size_t iv_len;
 } CryptorInfo;
 
 void crypto_md5(const unsigned char *data, size_t data_len, unsigned char *buf);
@@ -22,19 +26,21 @@ int bytes_to_key(const unsigned char *passwd,
              unsigned char *key, size_t key_len,
              unsigned char *iv, size_t iv_len);
 
+const EVP_CIPHER *get_cipher(const char *cipher_name);
+
 EVP_CIPHER_CTX *init_cipher_ctx(const EVP_CIPHER *cipher,
         const unsigned char *key, const unsigned char *iv, int op);
 
-#define INIT_AES128CTR_ENCRYPT_CTX(key, iv) \
-    init_cipher_ctx(EVP_aes_128_ctr(), key, iv, 1)
+#define INIT_ENCRYPT_CTX(cipher, key, iv) \
+    init_cipher_ctx(cipher, key, iv, 1)
 
-#define INIT_AES128CTR_DECRYPT_CTX(key, iv) \
-    init_cipher_ctx(EVP_aes_128_ctr(), key, iv, 0)
+#define INIT_DECRYPT_CTX(cipher, key, iv) \
+    init_cipher_ctx(cipher, key, iv, 0)
 
-int encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
-        int plaintext_len, unsigned char *ciphertext);
+size_t encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
+        size_t plaintext_len, unsigned char *ciphertext);
 
-int decrypt(EVP_CIPHER_CTX *ctx, unsigned char *ciphertext,
-        int ciphertext_len, unsigned char *plaintext);
+size_t decrypt(EVP_CIPHER_CTX *ctx, unsigned char *ciphertext,
+        size_t ciphertext_len, unsigned char *plaintext);
 
 #endif  /* _NOONE_CRYPTO_H_ */

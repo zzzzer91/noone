@@ -50,6 +50,15 @@ bytes_to_key(const unsigned char *passwd,
     return 0;
 }
 
+const EVP_CIPHER *
+get_cipher(const char *cipher_name) {
+    if (!strncmp(cipher_name, "aes-128-ctr", CIPHER_NAME_LEN)) {
+        return EVP_aes_128_ctr();
+    }
+
+    return NULL;
+}
+
 EVP_CIPHER_CTX *
 init_cipher_ctx(const EVP_CIPHER *cipher,
         const unsigned char *key, const unsigned char *iv, int op)
@@ -60,15 +69,15 @@ init_cipher_ctx(const EVP_CIPHER *cipher,
     return ctx;
 }
 
-int
+size_t
 encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
-        int plaintext_len, unsigned char *ciphertext)
+        size_t plaintext_len, unsigned char *ciphertext)
 {
-    int ciphertext_len;
+    size_t ciphertext_len;
     int outlen;
 
-    EVP_EncryptUpdate(ctx, ciphertext, &outlen, plaintext, plaintext_len);
-    ciphertext_len = outlen;
+    EVP_EncryptUpdate(ctx, ciphertext, &outlen, plaintext, (int)plaintext_len);
+    ciphertext_len = (size_t)outlen;
 
     EVP_EncryptFinal_ex(ctx, ciphertext+outlen, &outlen);
     ciphertext_len += outlen;
@@ -76,15 +85,15 @@ encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
     return ciphertext_len;
 }
 
-int
+size_t
 decrypt(EVP_CIPHER_CTX *ctx, unsigned char *ciphertext,
-        int ciphertext_len, unsigned char *plaintext)
+        size_t ciphertext_len, unsigned char *plaintext)
 {
-    int plaintext_len;
+    size_t plaintext_len;
     int outlen;
 
-    EVP_DecryptUpdate(ctx, plaintext, &outlen, ciphertext, ciphertext_len);
-    plaintext_len = outlen;
+    EVP_DecryptUpdate(ctx, plaintext, &outlen, ciphertext, (int)ciphertext_len);
+    plaintext_len = (size_t)outlen;
 
     EVP_DecryptFinal_ex(ctx, plaintext+outlen, &outlen);
     plaintext_len += outlen;
