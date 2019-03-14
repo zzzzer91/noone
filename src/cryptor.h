@@ -8,14 +8,15 @@
 #include <stddef.h>
 #include <openssl/evp.h>
 
-#define KEY_LEN 32
-#define CIPHER_NAME_LEN 32
+#define MAX_KEY_LEN 32
+#define MAX_IV_LEN 32
+#define MAX_CIPHER_NAME_LEN 32
 
 #define MD5_LEN 16
 
 typedef struct CryptorInfo{
-    char cipher_name[CIPHER_NAME_LEN];
-    unsigned char key[KEY_LEN+1];
+    const EVP_CIPHER *cipher;
+    unsigned char key[MAX_KEY_LEN+1];
     size_t key_len;
     size_t iv_len;
 } CryptorInfo;
@@ -26,10 +27,10 @@ int bytes_to_key(const unsigned char *passwd,
              unsigned char *key, size_t key_len,
              unsigned char *iv, size_t iv_len);
 
+const EVP_CIPHER *get_cipher(const char *cipher_name);
+
 CryptorInfo *init_cryptor_info(const char *name,
         const unsigned char *passwd, size_t key_len, size_t iv_len);
-
-const EVP_CIPHER *get_cipher(const char *cipher_name);
 
 EVP_CIPHER_CTX *init_cipher_ctx(const EVP_CIPHER *cipher,
         const unsigned char *key, const unsigned char *iv, int op);

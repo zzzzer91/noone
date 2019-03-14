@@ -16,11 +16,11 @@
 #include <sys/socket.h>  /* accept() */
 #include <netinet/in.h>  /* struct sockaddr_in */
 
-static StreamData *
+StreamData *
 init_stream_data()
 {
     StreamData *stream_data = malloc(sizeof(StreamData));
-    if (stream_data == NULL) return NULL:
+    if (stream_data == NULL) return NULL;
 
     stream_data->ss_stage = STAGE_INIT;
     stream_data->is_get_iv = 0;
@@ -55,31 +55,28 @@ void
 read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
     CryptorInfo *ci = event_loop->extra_data;
-    size_t iv_len = ci->iv_len;
     StreamData *sd = data;
-    errno = 0;
-    ssize_t ret = rio_readn(fd, sd->iv, iv_len);
-    if (ret < 0) {
-        LOGGER_ERROR("rio_readn");
-        return;
+
+    ssize_t ret;
+    if (!sd->is_get_iv) {
+        ret = rio_readn(fd, sd->iv, ci->iv_len);
+        if (ret < 0) {
+            LOGGER_ERROR("rio_readn");
+            return;
+        }
+        sd->is_get_iv = 1;
     }
 
-    if (errno != EAGAIN) { // 对端关闭
-        ae_unregister_file_event(event_loop, fd);
-        close(fd);
-        free(sd);
-    }
-
-    /* 正常读完 */
-    ret = read(fd, sd->ciphertext, sizeof(sd->ciphertext));
+    ret = rio_readn(fd, sd->ciphertext, sizeof(sd->ciphertext));
+//    if (errno == EAGAIN) {  /* 正常读完 */
+//    }
 
     sd->ciphertext_len = (size_t)ret;
     printf("%ld\n", sd->ciphertext_len);
 
-    const EVP_CIPHER *cipher = get_cipher(ci->cipher_name);
-    sd->decrypt_ctx = INIT_DECRYPT_CTX(cipher, ci->key, sd->iv);
+    sd->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher, ci->key, sd->iv);
     sd->plaintext_len = decrypt(sd->decrypt_ctx,
-            sd->ciphertext, sd->ciphertext_len, sd->plaintext);
+                                sd->ciphertext, sd->ciphertext_len, sd->plaintext);
     printf("%ld\n", sd->plaintext_len);
     /*
      * 开头有两个字段
@@ -96,6 +93,13 @@ read_ssclient(AeEventLoop *event_loop, int fd, void *data)
      *     DST.PORT 字段：目的服务器的端口
      */
     printf("%s\n", sd->plaintext);
+
+    free(sd->decrypt_ctx);
+
+    // 对端关闭
+    ae_unregister_file_event(event_loop, fd);
+    close(fd);
+    free(sd);
 }
 
 void

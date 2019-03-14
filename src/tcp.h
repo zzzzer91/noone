@@ -6,7 +6,7 @@
 #define _NOONE_TCP_H_
 
 #include "ae.h"
-#include <openssl/evp.h>
+#include "cryptor.h"
 
 #define BUFFER_LEN 16 * 1024
 
@@ -23,7 +23,7 @@ typedef enum SsStageType {
 typedef struct StreamData {
     SsStageType ss_stage;
     int is_get_iv;  /* 1 代表是，0 代表否 */
-    unsigned char iv[33];
+    unsigned char iv[MAX_IV_LEN+1];
     EVP_CIPHER_CTX *encrypt_ctx;
     size_t ciphertext_len;
     unsigned char ciphertext[BUFFER_LEN];
@@ -31,6 +31,8 @@ typedef struct StreamData {
     size_t plaintext_len;
     unsigned char plaintext[BUFFER_LEN];
 } StreamData;
+
+StreamData *init_stream_data();
 
 void accept_conn(AeEventLoop *event_loop, int fd, void *data);
 

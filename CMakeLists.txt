@@ -19,10 +19,13 @@ target_link_libraries(noone crypto)
 
 # 测试
 add_executable(
-    test
-    ./tests/test.c
-    ./src/log.c
-    ./src/cryptor.c
-    ./src/ae.c
+        test
+        ./tests/test.c
+        ./src/log.c
+        ./src/cryptor.c
+        ./src/tcp.c
+        ./src/rio.c
+        ./src/socket.c
+        ./src/ae.c
 )
 target_link_libraries(test crypto)
