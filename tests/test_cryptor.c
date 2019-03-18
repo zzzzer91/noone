@@ -4,7 +4,7 @@
 
 #include "helper.h"
 #include "cryptor.h"
-#include "tcp.h"
+#include "transport.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +30,7 @@ static void
 test_encrypt_and_decrypt()
 {
     CryptorInfo *ci = init_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
-    StreamData *sd = init_stream_data();
+    NetData *sd = init_net_data();
 
     bytes_to_key(PASSWD, ci->key, ci->key_len, sd->iv, ci->iv_len);
 

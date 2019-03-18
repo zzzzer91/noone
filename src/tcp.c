@@ -3,6 +3,7 @@
  */
 
 #include "tcp.h"
+#include "transport.h"
 #include "socket.h"
 #include "rio.h"
 #include "ae.h"
@@ -16,35 +17,14 @@
 #include <sys/socket.h>  /* accept() */
 #include <netinet/in.h>  /* struct sockaddr_in */
 
-#define ENCRYPT(sd) \
-    encrypt((sd)->encrypt_ctx, (sd)->plaintext_p, (sd)->plaintext_len, (sd)->ciphertext)
-
-#define DECRYPT(sd) \
-    decrypt((sd)->decrypt_ctx, (sd)->ciphertext_p, (sd)->ciphertext_len, (sd)->plaintext)
-
-StreamData *
-init_stream_data()
-{
-    StreamData *stream_data = malloc(sizeof(StreamData));
-    if (stream_data == NULL) return NULL;
-
-    stream_data->ss_stage = STAGE_INIT;
-    stream_data->ciphertext_len = 0;
-    stream_data->ciphertext_p = stream_data->ciphertext;
-    stream_data->plaintext_len = 0;
-    stream_data->plaintext_p = stream_data->plaintext;
-
-    return stream_data;
-}
-
 void
-accept_conn(AeEventLoop *event_loop, int fd, void *data)
+tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 {
     struct sockaddr_in conn_addr;
     socklen_t conn_addr_len = sizeof(conn_addr);
     int conn_fd = accept(fd, (struct sockaddr *)&conn_addr, &conn_addr_len);
     if (conn_fd < 0) {
-        LOGGER_ERROR("accept_conn");
+        LOGGER_ERROR("tcp_accept_conn");
         return;
     }
 
@@ -54,17 +34,17 @@ accept_conn(AeEventLoop *event_loop, int fd, void *data)
         return;
     }
 
-    StreamData *sd = init_stream_data();
-    if (sd == NULL) PANIC("init_stream_data");
+    NetData *sd = init_net_data();
+    if (sd == NULL) PANIC("init_net_data");
 
     ae_register_file_event(event_loop, conn_fd, AE_IN,
-            read_ssclient, write_ssclient, sd);
+                           tcp_read_ssclient, tcp_write_ssclient, sd);
 }
 
 void
-read_ssclient(AeEventLoop *event_loop, int fd, void *data)
+tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
-    StreamData *sd = data;
+    NetData *sd = data;
 
     ssize_t ret = rio_readn(fd, sd->ciphertext, sizeof(sd->ciphertext));
     if (ret == 0) {
@@ -114,12 +94,12 @@ read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     if (sd->ss_stage == STAGE_DNS) {
         size_t domain_len = sd->plaintext_p[0];  // 域名长度
         sd->plaintext_p += 1;
-
-        memcpy(sd->domain, sd->plaintext_p, domain_len);
-        sd->domain[domain_len] = 0;  // 加上 '\0'
+        char domain[65];
+        memcpy(domain, sd->plaintext_p, domain_len);
+        domain[domain_len] = 0;  // 加上 '\0'
         sd->plaintext_p += domain_len;
         sd->plaintext_len -= domain_len;
-        LOGGER_DEBUG("%s", sd->domain);
+        LOGGER_DEBUG("%s", domain);
 
         memcpy(&sd->port, sd->plaintext_p, 2);
         sd->port = ntohs(sd->port);  // 转换字节序
@@ -145,7 +125,7 @@ read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 }
 
 void
-write_ssclient(AeEventLoop *event_loop, int fd, void *data)
+tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
     // int ret = write(self->fd, self->buffer, self->len);
     // if (ret == 0) {  /* 对端关闭 */
@@ -161,13 +141,13 @@ write_ssclient(AeEventLoop *event_loop, int fd, void *data)
 }
 
 void
-read_remote(AeEventLoop *event_loop, int fd, void *data)
+tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
 
 }
 
 void
-write_remote(AeEventLoop *event_loop, int fd, void *data)
+tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
 
 }

@@ -23,6 +23,7 @@ add_executable(
         ./tests/test.c
         ./src/log.c
         ./src/cryptor.c
+        ./src/transport.c
         ./src/tcp.c
         ./src/rio.c
         ./src/socket.c

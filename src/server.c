@@ -9,8 +9,6 @@
 #include "cryptor.h"
 #include "error.h"
 #include "log.h"
-#include <unistd.h>      /* close() */
-#include <sys/epoll.h>
 
 /* test */
 #define SERVER_ADDR "127.0.0.1"
@@ -24,12 +22,6 @@ main(int argc, char *argv[])
 
     LOGGER_INFO("Noone started!");
 
-    int server_fd = server_fd_init(SERVER_ADDR, SERVER_PORT);
-    if (server_fd < 0) PANIC("init_server_fd");
-
-    /* 设置非阻塞 */
-    if (setnonblock(server_fd) < 0) PANIC("setnonblock");
-
     AeEventLoop *ae_ev_loop = ae_create_event_loop(AE_MAX_EVENTS);
     if (ae_ev_loop == NULL) PANIC("ae_create_event_loop");
 
@@ -37,8 +29,25 @@ main(int argc, char *argv[])
     if (ci == NULL) PANIC("init_cryptor_info");
     ae_ev_loop->extra_data = ci;
 
-    int ret = ae_register_file_event(ae_ev_loop, server_fd, AE_IN, accept_conn, NULL, NULL);
-    if (ret == -1) PANIC("ae_register_file_event");
+    // tcp
+    int tcp_server_fd = tcp_server_fd_init(SERVER_ADDR, SERVER_PORT);
+    if (tcp_server_fd < 0) PANIC("tcp_server_fd_init");
+
+    /* 设置非阻塞 */
+    if (setnonblock(tcp_server_fd) < 0) PANIC("setnonblock");
+
+    int ret = ae_register_file_event(ae_ev_loop, tcp_server_fd, AE_IN, tcp_accept_conn, NULL, NULL);
+    if (ret  < 0) PANIC("ae_register_file_event");
+
+    // udp 可以和 tcp 绑定同一端口
+    int udp_server_fd = udp_server_fd_init(SERVER_ADDR, SERVER_PORT);
+    if (udp_server_fd < 0) PANIC("udp_server_fd_init");
+
+    /* 设置非阻塞 */
+    if (setnonblock(udp_server_fd) < 0) PANIC("setnonblock");
+
+    ret = ae_register_file_event(ae_ev_loop, udp_server_fd, AE_IN, tcp_accept_conn, NULL, NULL);
+    if (ret < 0) PANIC("ae_register_file_event");
 
     ae_run_loop(ae_ev_loop);
 

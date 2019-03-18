@@ -8,7 +8,9 @@
 /* Maximum queue length specifiable by listen.  */
 #define SOMAXCONN	128
 
-int server_fd_init(const char *addr, unsigned short port);
+int tcp_server_fd_init(const char *addr, unsigned short port);
+
+int udp_server_fd_init(const char *addr, unsigned short port);
 
 int setnonblock(int sockfd);
 
