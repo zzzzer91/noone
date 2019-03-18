@@ -84,7 +84,8 @@ int ae_get_event_set_size(AeEventLoop *event_loop);
 
 int ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         AeFileProc *rfile_proc, AeFileProc *wfile_proc, void *client_data);
-int ae_modify_file_event(AeEventLoop *event_loop, int fd, uint32_t mask);
+int ae_modify_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
+        AeFileProc *rfile_proc, AeFileProc *wfile_proc, void *client_data);
 void ae_unregister_file_event(AeEventLoop *event_loop, int fd);
 int ae_get_file_events_mask(AeEventLoop *event_loop, int fd);
 int ae_process_events(AeEventLoop *event_loop);

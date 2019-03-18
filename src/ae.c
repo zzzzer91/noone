@@ -11,28 +11,28 @@
 
 /*
  * 关联给定事件到 fd，默认 ET 模式
+ *
+ * 如果 fd 没有关联任何事件，那么这是一个 ADD 操作。
+ *
+ * 如果已经关联了某个/某些事件，那么这是一个 MOD 操作。
  */
 static int
 ae_api_add_event(AeEventLoop *event_loop, int fd, uint32_t mask)
 {
-    struct epoll_event ee;
+    int fe_mask = event_loop->events[fd].mask;
 
-    /* If the fd was already monitored for some event, we need a MOD
-     * operation. Otherwise we need an ADD operation.
-     *
-     * 如果 fd 没有关联任何事件，那么这是一个 ADD 操作。
-     *
-     * 如果已经关联了某个/某些事件，那么这是一个 MOD 操作。
-     */
-    int op = event_loop->events[fd].mask == AE_NONE ?
-             EPOLL_CTL_ADD : EPOLL_CTL_MOD;
+    if (fe_mask != mask) {
+        int op = fe_mask == AE_NONE ?
+                 EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
-    ee.events = mask | EPOLLET;
-    ee.data.u64 = 0; /* avoid valgrind warning */
-    ee.data.fd = fd;
+        struct epoll_event ee;
+        ee.events = mask | EPOLLET;
+        ee.data.u64 = 0; /* avoid valgrind warning */
+        ee.data.fd = fd;
 
-    if (epoll_ctl(event_loop->epfd, op, fd, &ee) == -1) {
-        return -1;
+        if (epoll_ctl(event_loop->epfd, op, fd, &ee) == -1) {
+            return -1;
+        }
     }
 
     return 0;
@@ -188,6 +188,8 @@ ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
 
     // 设置文件事件类型，以及事件的处理器
     fe->mask = mask;
+
+    // 读写事件
     fe->rfile_proc = rfile_proc;
     fe->wfile_proc = wfile_proc;
 
@@ -206,24 +208,14 @@ ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
  * 修改 fd 监听事件
  */
 int
-ae_modify_file_event(AeEventLoop *event_loop, int fd, uint32_t mask)
+ae_modify_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
+        AeFileProc *rfile_proc, AeFileProc *wfile_proc, void *client_data)
 {
-    if (fd >= event_loop->event_set_size) return -1;
-
-    // 取出文件事件结构
     AeFileEvent *fe = &event_loop->events[fd];
+    if (fe->mask == AE_NONE) return 0;
 
-    if (fe->mask == AE_NONE) return -1;
-
-    // 监听指定 fd 的指定事件
-    if (ae_api_add_event(event_loop, fd, mask) == -1) return -1;
-
-    fe->last_active = time(NULL);
-
-    // 设置文件事件类型，以及事件的处理器
-    fe->mask = mask;
-
-    return 0;
+    return ae_register_file_event(event_loop, fd, mask,
+            rfile_proc, wfile_proc, client_data);
 }
 
 /*

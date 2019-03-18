@@ -58,12 +58,11 @@ test_encrypt_and_decrypt()
             sd->ciphertext, sd->ciphertext_len, sd->plaintext);
     free(sd->decrypt_ctx);
 
-    free(ci);
-
     EXPECT_EQ_INT(6, (int)sd->plaintext_len);
     EXPECT_EQ_STRING("你好", sd->plaintext, sd->plaintext_len);
 
     free(sd);
+    free(ci);
 }
 
 void

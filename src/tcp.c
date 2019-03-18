@@ -16,6 +16,12 @@
 #include <sys/socket.h>  /* accept() */
 #include <netinet/in.h>  /* struct sockaddr_in */
 
+#define ENCRYPT(sd) \
+    encrypt((sd)->encrypt_ctx, (sd)->plaintext_p, (sd)->plaintext_len, (sd)->ciphertext)
+
+#define DECRYPT(sd) \
+    decrypt((sd)->decrypt_ctx, (sd)->ciphertext_p, (sd)->ciphertext_len, (sd)->plaintext)
+
 StreamData *
 init_stream_data()
 {
@@ -23,7 +29,10 @@ init_stream_data()
     if (stream_data == NULL) return NULL;
 
     stream_data->ss_stage = STAGE_INIT;
-    stream_data->is_get_iv = 0;
+    stream_data->ciphertext_len = 0;
+    stream_data->ciphertext_p = stream_data->ciphertext;
+    stream_data->plaintext_len = 0;
+    stream_data->plaintext_p = stream_data->plaintext;
 
     return stream_data;
 }
@@ -47,6 +56,7 @@ accept_conn(AeEventLoop *event_loop, int fd, void *data)
 
     StreamData *sd = init_stream_data();
     if (sd == NULL) PANIC("init_stream_data");
+
     ae_register_file_event(event_loop, conn_fd, AE_IN,
             read_ssclient, write_ssclient, sd);
 }
@@ -54,30 +64,17 @@ accept_conn(AeEventLoop *event_loop, int fd, void *data)
 void
 read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
-    CryptorInfo *ci = event_loop->extra_data;
     StreamData *sd = data;
 
-    ssize_t ret;
-    if (!sd->is_get_iv) {
-        ret = rio_readn(fd, sd->iv, ci->iv_len);
-        if (ret < 0) {
-            LOGGER_ERROR("rio_readn");
-            return;
-        }
-        sd->is_get_iv = 1;
+    ssize_t ret = rio_readn(fd, sd->ciphertext, sizeof(sd->ciphertext));
+    if (ret == 0) {
+        // clear(fd);
+    } else if (ret < 0) {
+        LOGGER_ERROR("rio_readn");
+        return;
     }
-
-    ret = rio_readn(fd, sd->ciphertext, sizeof(sd->ciphertext));
-//    if (errno == EAGAIN) {  /* 正常读完 */
-//    }
-
     sd->ciphertext_len = (size_t)ret;
-    printf("%ld\n", sd->ciphertext_len);
 
-    sd->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher, ci->key, sd->iv);
-    sd->plaintext_len = decrypt(sd->decrypt_ctx,
-                                sd->ciphertext, sd->ciphertext_len, sd->plaintext);
-    printf("%ld\n", sd->plaintext_len);
     /*
      * 开头有两个字段
      * - ATYP 字段：address type 的缩写，取值为：
@@ -92,14 +89,59 @@ read_ssclient(AeEventLoop *event_loop, int fd, void *data)
      *     ATYP == 0x04：16 个字节的 IPv6 地址
      *     DST.PORT 字段：目的服务器的端口
      */
-    printf("%s\n", sd->plaintext);
+    if (sd->ss_stage == STAGE_INIT) {
+        CryptorInfo *ci = event_loop->extra_data;
+        memcpy(sd->iv, sd->ciphertext, ci->iv_len);
+        sd->ciphertext_p += ci->iv_len;
+        sd->ciphertext_len -= ci->iv_len;
+        sd->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher, ci->key, sd->iv);
+        sd->plaintext_len = DECRYPT(sd);
+        int atty = sd->plaintext_p[0];
+        sd->plaintext_p += 1;
+        if (atty == ATYP_DOMAIN) {
+            sd->ss_stage = STAGE_DNS;
+        } else if (atty == ATYP_IPV4) {
+            sd->ss_stage = STAGE_CONNECTING;
+        } else if (atty == ATYP_IPV6) {
+            sd->ss_stage = STAGE_CONNECTING;
+        } else {
+            LOGGER_ERROR("ATYP error！");
+        }
+    } else {
+        sd->plaintext_len = DECRYPT(sd);
+    }
 
-    free(sd->decrypt_ctx);
+    if (sd->ss_stage == STAGE_DNS) {
+        size_t domain_len = sd->plaintext_p[0];  // 域名长度
+        sd->plaintext_p += 1;
+
+        memcpy(sd->domain, sd->plaintext_p, domain_len);
+        sd->domain[domain_len] = 0;  // 加上 '\0'
+        sd->plaintext_p += domain_len;
+        sd->plaintext_len -= domain_len;
+        LOGGER_DEBUG("%s", sd->domain);
+
+        memcpy(&sd->port, sd->plaintext_p, 2);
+        sd->port = ntohs(sd->port);  // 转换字节序
+        sd->plaintext_p += 2;
+        sd->plaintext_len -= 2;
+        LOGGER_DEBUG("%d", sd->port);
+
+        sd->ss_stage = STAGE_CONNECTING;
+    }
+
+    if (sd->ss_stage == STAGE_CONNECTING) {
+
+    }
+
+    exit(1);
+
+    // free(sd->decrypt_ctx);
 
     // 对端关闭
-    ae_unregister_file_event(event_loop, fd);
-    close(fd);
-    free(sd);
+//    ae_unregister_file_event(event_loop, fd);
+//    close(fd);
+//    free(sd);
 }
 
 void

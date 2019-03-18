@@ -2,17 +2,16 @@
  * Created by zzzzer on 3/14/19.
  */
 
+#include "rio.h"
+#include "error.h"
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
 
-#include "rio.h"
-#include "error.h"
-
 /*
  * 当对端套接字已关闭，read() 会返回 0。
- * (read() == -1 && errno == EAGAIN) 时数据读完。
- * EPOLLET 模式应该
+ * （read() == -1 && errno == EAGAIN）时，
+ *  代表 EPOLLET 模式的 socket 数据读完。
  */
 ssize_t
 rio_readn(int fd, void *usrbuf, size_t n)
