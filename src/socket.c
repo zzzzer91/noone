@@ -46,13 +46,6 @@ udp_server_fd_init(const char *addr, unsigned short port)
         return -1;
     }
 
-    /* 端口复用, 本方主动关闭后, 不进行TIME_WAIT,
-     * TIME_WAIT原因是等待对方的ACK, 防止对方未收到FIN包 */
-    int on = 1;
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
-        return -1;
-    }
-
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = inet_addr(addr);
@@ -61,7 +54,7 @@ udp_server_fd_init(const char *addr, unsigned short port)
         return -1;
     }
 
-    // 注意 udp 不需要 listen()
+    // 注意 udp 不需要 listen()，也不需要设置端口复用
 
     return server_fd;
 }

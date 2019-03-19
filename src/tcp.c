@@ -127,17 +127,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 void
 tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
-    // int ret = write(self->fd, self->buffer, self->len);
-    // if (ret == 0) {  /* 对端关闭 */
 
-    // }
-    // if (ret < 0) {
-    //     PANIC("write");
-    //     close(self->fd);
-    //     ep_unregister(self->fd);
-    // }
-    // self->len = 0;
-    // ep_modify(self->fd, EPOLLIN, read_ssclient);
 }
 
 void

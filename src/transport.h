@@ -25,26 +25,39 @@ typedef enum SsStageType {
 } SsStageType;
 
 typedef struct NetData {
+
     SsStageType ss_stage;
+
     char ip[16];
+
     uint16_t port;
+
     unsigned char iv[MAX_IV_LEN+1];
+
     EVP_CIPHER_CTX *encrypt_ctx;
+
     size_t ciphertext_len;
+
     unsigned char ciphertext[BUFFER_LEN];
+
     unsigned char *ciphertext_p;
+
     EVP_CIPHER_CTX *decrypt_ctx;
+
     size_t plaintext_len;
+
     unsigned char plaintext[BUFFER_LEN];
+
     unsigned char *plaintext_p;
+
 } NetData;
 
 NetData *init_net_data();
 
-#define ENCRYPT(sd) \
-    encrypt((sd)->encrypt_ctx, (sd)->plaintext_p, (sd)->plaintext_len, (sd)->ciphertext)
+#define ENCRYPT(nd) \
+    encrypt((nd)->encrypt_ctx, (nd)->plaintext_p, (nd)->plaintext_len, (nd)->ciphertext)
 
-#define DECRYPT(sd) \
-    decrypt((sd)->decrypt_ctx, (sd)->ciphertext_p, (sd)->ciphertext_len, (sd)->plaintext)
+#define DECRYPT(nd) \
+    decrypt((nd)->decrypt_ctx, (nd)->ciphertext_p, (nd)->ciphertext_len, (nd)->plaintext)
 
 #endif /* _NOONE_TRANSPORT_H_ */
