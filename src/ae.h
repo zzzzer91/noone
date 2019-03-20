@@ -1,6 +1,4 @@
 /*
- * 源自 Redis 。
- *
  * Created by zzzzer on 2/11/19.
  */
 
@@ -24,12 +22,12 @@ typedef struct AeEventLoop AeEventLoop;
 /*
  * 事件接口
  */
-typedef void AeFileProc(AeEventLoop *event_loop, int fd, void *data);
+typedef void AeCallback(AeEventLoop *event_loop, int fd, void *data);
 
 /*
  * File event structure
  */
-typedef struct AeFileEvent {
+typedef struct AeEvent {
 
     // 最后激活时间，用于踢掉超时连接
     time_t last_active;
@@ -38,16 +36,16 @@ typedef struct AeFileEvent {
     // 值可以是 AE_IN 或 AE_OUT，不能同时
     int mask;
 
-    // 读事件处理器
-    AeFileProc *rfile_proc;
+    // 读事件
+    AeCallback *rcallback;
 
-    // 写事件处理器
-    AeFileProc *wfile_proc;
+    // 写事件
+    AeCallback *wcallback;
 
     // 多路复用库的私有数据
     void *client_data;
 
-} AeFileEvent;
+} AeEvent;
 
 /*
  * 事件处理器的状态
@@ -66,7 +64,7 @@ struct AeEventLoop {
     int event_set_size; /* max number of file descriptors tracked */
 
     // 已注册的文件事件
-    AeFileEvent *events; /* Registered events */
+    AeEvent *events; /* Registered events */
 
     // 事件处理器的开关
     int stop;
@@ -82,12 +80,11 @@ void ae_run_loop(AeEventLoop *event_loop);
 void ae_stop_event_loop(AeEventLoop *event_loop);
 int ae_get_event_set_size(AeEventLoop *event_loop);
 
-int ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-        AeFileProc *rfile_proc, AeFileProc *wfile_proc, void *client_data);
-int ae_modify_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-        AeFileProc *rfile_proc, AeFileProc *wfile_proc, void *client_data);
-void ae_unregister_file_event(AeEventLoop *event_loop, int fd);
-int ae_get_file_events_mask(AeEventLoop *event_loop, int fd);
+int ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
+        AeCallback *rcallback, AeCallback *wcallback, void *client_data);
+int ae_modify_event(AeEventLoop *event_loop, int fd, uint32_t mask,
+        AeCallback *rcallback, AeCallback *wcallback, void *client_data);
+void ae_unregister_event(AeEventLoop *event_loop, int fd);
 int ae_process_events(AeEventLoop *event_loop);
 
 #endif  /* _NOONE_AE_H_ */

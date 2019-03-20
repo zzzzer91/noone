@@ -1,6 +1,4 @@
 /*
- * 源自 Redis 。
- *
  * Created by zzzzer on 2/11/19.
  */
 
@@ -171,8 +169,8 @@ ae_run_loop(AeEventLoop *event_loop)
  * 注册 fd
  */
 int
-ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-        AeFileProc *rfile_proc, AeFileProc *wfile_proc, void *client_data)
+ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
+        AeCallback *rcallback, AeCallback *wcallback, void *client_data)
 {
     if (fd >= event_loop->event_set_size) return -1;
 
@@ -182,7 +180,7 @@ ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
     }
 
     // 取出文件事件结构
-    AeFileEvent *fe = &event_loop->events[fd];
+    AeEvent *fe = &event_loop->events[fd];
 
     fe->last_active = time(NULL);
 
@@ -190,8 +188,8 @@ ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
     fe->mask = mask;
 
     // 读写事件
-    fe->rfile_proc = rfile_proc;
-    fe->wfile_proc = wfile_proc;
+    fe->rcallback = rcallback;
+    fe->wcallback = wcallback;
 
     // 私有数据
     fe->client_data = client_data;
@@ -208,26 +206,25 @@ ae_register_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
  * 修改 fd 监听事件
  */
 int
-ae_modify_file_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-        AeFileProc *rfile_proc, AeFileProc *wfile_proc, void *client_data)
+ae_modify_event(AeEventLoop *event_loop, int fd, uint32_t mask,
+        AeCallback *rcallback, AeCallback *wcallback, void *client_data)
 {
-    AeFileEvent *fe = &event_loop->events[fd];
+    AeEvent *fe = &event_loop->events[fd];
     if (fe->mask == AE_NONE) return 0;
 
-    return ae_register_file_event(event_loop, fd, mask,
-            rfile_proc, wfile_proc, client_data);
+    return ae_register_event(event_loop, fd, mask, rcallback, wcallback, client_data);
 }
 
 /*
  * 将 fd 从监听队列中删除
  */
 void
-ae_unregister_file_event(AeEventLoop *event_loop, int fd)
+ae_unregister_event(AeEventLoop *event_loop, int fd)
 {
     if (fd >= event_loop->event_set_size) return;
 
     // 取出文件事件结构
-    AeFileEvent *fe = &event_loop->events[fd];
+    AeEvent *fe = &event_loop->events[fd];
 
     // 未设置监听的事件类型，直接返回
     if (fe->mask == AE_NONE) return;
@@ -247,21 +244,6 @@ ae_unregister_file_event(AeEventLoop *event_loop, int fd)
 
     // 取消对给定 fd 的给定事件的监视
     ae_api_del_event(event_loop, fd);
-}
-
-/*
- * 获取给定 fd 正在监听的事件类型
- */
-int
-ae_get_file_events_mask(AeEventLoop *event_loop, int fd)
-{
-    if (fd >= event_loop->event_set_size) {
-        return 0;
-    }
-
-    AeFileEvent *fe = &event_loop->events[fd];
-
-    return fe->mask;
 }
 
 /* Process every pending time event, then every pending file event
@@ -286,16 +268,16 @@ ae_process_events(AeEventLoop *event_loop)
             int fd = event_loop->ready_events[j].data.fd;
 
             // 从已就绪数组中获取事件
-            AeFileEvent *fe = &event_loop->events[fd];
+            AeEvent *fe = &event_loop->events[fd];
 
             if (fe->mask & AE_IN) {
-                fe->rfile_proc(event_loop, fd, fe->client_data);
+                fe->rcallback(event_loop, fd, fe->client_data);
             } else if (fe->mask & AE_OUT) {
-                fe->wfile_proc(event_loop, fd, fe->client_data);
+                fe->wcallback(event_loop, fd, fe->client_data);
             } else if (fe->mask & EPOLLHUP) {
-                fe->wfile_proc(event_loop, fd, fe->client_data);
+                fe->wcallback(event_loop, fd, fe->client_data);
             } else if (fe->mask & EPOLLERR) {
-                fe->wfile_proc(event_loop, fd, fe->client_data);
+                fe->wcallback(event_loop, fd, fe->client_data);
             }
 
             processed++;

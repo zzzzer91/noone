@@ -3,10 +3,12 @@
  */
 
 #include "socket.h"
+#include <stdio.h>
 #include <fcntl.h>       /* fcntl() */
 #include <sys/socket.h>  /* socket(), setsockopt() */
 #include <netinet/in.h>  /* struct sockaddr_in */
 #include <arpa/inet.h>   /* inet_addr() */
+#include <netdb.h>       /* getaddrinfo(), gai_strerror() */
 
 int
 tcp_server_fd_init(const char *addr, unsigned short port)

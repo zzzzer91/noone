@@ -26,9 +26,13 @@ typedef enum SsStageType {
 
 typedef struct NetData {
 
+    int ssclient_fd;
+
+    int remote_fd;
+
     SsStageType ss_stage;
 
-    char ip[16];
+    struct addrinfo *addr_list_p;
 
     uint16_t port;
 
@@ -36,25 +40,31 @@ typedef struct NetData {
 
     EVP_CIPHER_CTX *encrypt_ctx;
 
-    size_t ciphertext_len;
+    EVP_CIPHER_CTX *decrypt_ctx;
 
     unsigned char ciphertext[BUFFER_LEN];
 
     unsigned char *ciphertext_p;
 
-    EVP_CIPHER_CTX *decrypt_ctx;
-
-    size_t plaintext_len;
+    size_t ciphertext_len;
 
     unsigned char plaintext[BUFFER_LEN];
 
     unsigned char *plaintext_p;
 
+    size_t plaintext_len;
+
+    unsigned char remote_buf[BUFFER_LEN];
+
+    unsigned char *remote_buf_p;
+
+    size_t remote_buf_len;
+
 } NetData;
 
 NetData *init_net_data();
 
-#define ENCRYPT(nd) \
+#define ENCRYPT_ALIAS(nd) \
     encrypt((nd)->encrypt_ctx, (nd)->plaintext_p, (nd)->plaintext_len, (nd)->ciphertext)
 
 #define DECRYPT(nd) \

@@ -15,6 +15,8 @@ init_net_data()
     stream_data->ciphertext_p = stream_data->ciphertext;
     stream_data->plaintext_len = 0;
     stream_data->plaintext_p = stream_data->plaintext;
+    stream_data->remote_buf_len = 0;
+    stream_data->remote_buf_p = stream_data->remote_buf;
 
     return stream_data;
 }

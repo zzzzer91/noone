@@ -35,8 +35,8 @@ main(int argc, char *argv[])
 
     if (setnonblock(tcp_server_fd) < 0) PANIC("setnonblock");
 
-    int ret = ae_register_file_event(ae_ev_loop, tcp_server_fd, AE_IN, tcp_accept_conn, NULL, NULL);
-    if (ret  < 0) PANIC("ae_register_file_event");
+    int ret = ae_register_event(ae_ev_loop, tcp_server_fd, AE_IN, tcp_accept_conn, NULL, NULL);
+    if (ret  < 0) PANIC("ae_register_event");
 
     // udp 可以和 tcp 绑定同一端口
     int udp_server_fd = udp_server_fd_init(SERVER_ADDR, SERVER_PORT);
@@ -44,8 +44,8 @@ main(int argc, char *argv[])
 
     if (setnonblock(udp_server_fd) < 0) PANIC("setnonblock");
 
-    ret = ae_register_file_event(ae_ev_loop, udp_server_fd, AE_IN, udp_accept_conn, NULL, NULL);
-    if (ret < 0) PANIC("ae_register_file_event");
+    ret = ae_register_event(ae_ev_loop, udp_server_fd, AE_IN, udp_accept_conn, NULL, NULL);
+    if (ret < 0) PANIC("ae_register_event");
 
     ae_run_loop(ae_ev_loop);
 
