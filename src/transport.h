@@ -90,7 +90,7 @@ NetData *init_net_data();
  *    因为前面可能读了数据。
  *    WRITEN() 同理。
  */
-#define READN(fd, buf, n) \
+#define READN(fd, buf, n, close_flag) \
     ({ \
         size_t nleft = n; \
         ssize_t nread; \
@@ -99,7 +99,7 @@ NetData *init_net_data();
             nread = read(fd, bufp, nleft); \
             if (nread == 0) {  \
                 LOGGER_DEBUG("fd: %d, READN, connect close!", fd); \
-                close(fd); \
+                close_flag = 1; \
                 break; \
             } else if (nread < 0) { \
                 if (errno == EAGAIN) { \
@@ -119,7 +119,7 @@ NetData *init_net_data();
         n - nleft; \
     })
 
-#define WRITEN(fd, buf, n) \
+#define WRITEN(fd, buf, n, close_flag) \
     ({ \
         size_t nleft = n; \
         ssize_t nwritten; \
@@ -128,7 +128,7 @@ NetData *init_net_data();
             nwritten = write(fd, bufp, nleft); \
             if (nwritten == 0) { \
                 LOGGER_DEBUG("fd: %d, WRITEN, connect close!", fd); \
-                close(fd); \
+                close_flag = 1; \
                 break; \
             } else if (nwritten < 0) { \
                 if (errno == EINTR) { \

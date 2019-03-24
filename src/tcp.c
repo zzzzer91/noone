@@ -57,8 +57,14 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
 
-    size_t n = READN(fd, nd->ciphertext_p, sizeof(nd->ciphertext));
+    int close_flag = 0;
+    size_t n = READN(fd, nd->ciphertext_p, sizeof(nd->ciphertext), close_flag);
     nd->ciphertext_len += n;
+    if (close_flag == 1) {  // 对端关闭
+        close(fd);
+        free(nd);
+        ae_unregister_event(event_loop, fd);
+    }
 
 
     /*
@@ -90,6 +96,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
         }
         int atty = nd->plaintext_p[0];
         nd->plaintext_p += 1;
+        nd->plaintext_len -= 1;
         if (atty == ATYP_DOMAIN) {
             size_t domain_len = nd->plaintext_p[0];  // 域名长度
             nd->plaintext_p += 1;
@@ -145,19 +152,21 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->ss_stage == STAGE_CONNECTING) {
         LOGGER_DEBUG("fd: %d, STAGE_CONNECTING", fd);
-        int remote_fd = socket(nd->sockaddr.sin_family, SOCK_STREAM, 0);
-        if (remote_fd < 0) {
+        nd->remote_fd = socket(nd->sockaddr.sin_family, SOCK_STREAM, 0);
+        if (nd->remote_fd < 0) {
             PANIC("remote_fd");
         }
-        setnonblock(remote_fd);
+        setnonblock(nd->remote_fd);
 
-        nd->remote_fd = remote_fd;
-
-        connect(remote_fd, (struct sockaddr *)&nd->sockaddr, nd->sockaddr_len);
-
-        ae_register_event(event_loop, remote_fd, AE_OUT, NULL, tcp_write_remote, nd);
+        connect(nd->remote_fd, (struct sockaddr *)&nd->sockaddr, nd->sockaddr_len);
 
         nd->ss_stage = STAGE_STREAM;
+    }
+
+    if (nd->plaintext_len > 0) {
+        ae_register_event(event_loop, nd->remote_fd , AE_OUT, NULL, tcp_write_remote, nd);
+    } else {
+        nd->plaintext_p = nd->plaintext;
     }
 }
 
@@ -175,7 +184,8 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
         nd->is_iv_send = 1;
     }
 
-    size_t n = WRITEN(fd, nd->remote_buf_cipher_p, nd->remote_buf_cipher_len);
+    int close_flag = 0;
+    size_t n = WRITEN(fd, nd->remote_buf_cipher_p, nd->remote_buf_cipher_len, close_flag);
     nd->remote_buf_cipher_len -= n;
     if (nd->remote_buf_cipher_len == 0) {
         nd->remote_buf_cipher_p = nd->remote_buf_cipher;
@@ -189,7 +199,8 @@ void
 tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    nd->remote_buf_len = READN(fd, nd->remote_buf_p, sizeof(nd->remote_buf));
+    int close_flag = 0;
+    nd->remote_buf_len = READN(fd, nd->remote_buf_p, sizeof(nd->remote_buf), close_flag);
 
     ae_modify_event(event_loop, nd->ssclient_fd, AE_OUT, NULL, tcp_write_ssclient, nd);
 }
@@ -198,7 +209,8 @@ void
 tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    size_t n = WRITEN(fd, nd->plaintext_p, nd->plaintext_len);
+    int close_flag = 0;
+    size_t n = WRITEN(fd, nd->plaintext_p, nd->plaintext_len, close_flag);
     nd->plaintext_len -= n;
     if (nd->plaintext_len == 0) {
         nd->plaintext_p = nd->plaintext;
