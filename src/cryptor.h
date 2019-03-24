@@ -35,11 +35,11 @@ CryptorInfo *init_cryptor_info(const char *name,
 EVP_CIPHER_CTX *init_cipher_ctx(const EVP_CIPHER *cipher,
         const unsigned char *key, const unsigned char *iv, int op);
 
-#define INIT_ENCRYPT_CTX(cipher, key, iv) \
-    init_cipher_ctx(cipher, key, iv, 1)
+#define INIT_ENCRYPT_CTX(cipher_name, key, iv) \
+    init_cipher_ctx(get_cipher(cipher_name), key, iv, 1)
 
-#define INIT_DECRYPT_CTX(cipher, key, iv) \
-    init_cipher_ctx(cipher, key, iv, 0)
+#define INIT_DECRYPT_CTX(cipher_name, key, iv) \
+    init_cipher_ctx(get_cipher(cipher_name), key, iv, 0)
 
 size_t encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
         size_t plaintext_len, unsigned char *ciphertext);

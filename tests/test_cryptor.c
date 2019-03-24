@@ -45,7 +45,7 @@ test_encrypt_and_decrypt()
     free(iv_hex);
 
     // 加密
-    sd->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher, ci->key, sd->iv);
+    sd->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, sd->iv);
     strcpy((char *)sd->plaintext, "你好");
     sd->plaintext_len = (int)strlen((char *)sd->plaintext);
     sd->ciphertext_len = encrypt(sd->encrypt_ctx,
@@ -53,7 +53,7 @@ test_encrypt_and_decrypt()
     free(sd->encrypt_ctx);
 
     // 解密
-    sd->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher, ci->key, sd->iv);
+    sd->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, sd->iv);
     sd->plaintext_len = decrypt(sd->decrypt_ctx,
             sd->ciphertext, sd->ciphertext_len, sd->plaintext);
     free(sd->decrypt_ctx);

@@ -25,7 +25,6 @@ add_executable(
         ./src/cryptor.c
         ./src/transport.c
         ./src/tcp.c
-        ./src/rio.c
         ./src/socket.c
         ./src/ae.c
 )

@@ -5,7 +5,6 @@
 #include "tcp.h"
 #include "transport.h"
 #include "socket.h"
-#include "rio.h"
 #include "ae.h"
 #include "error.h"
 #include "cryptor.h"
@@ -45,7 +44,6 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->ssclient_fd = conn_fd;
 
-
     if (ae_register_event(event_loop, conn_fd, AE_IN, tcp_read_ssclient, NULL, nd) < 0) {
         LOGGER_ERROR("init_net_data");
         free(nd);
@@ -59,16 +57,9 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
 
-    ssize_t ret = rio_readn(fd, nd->ciphertext, sizeof(nd->ciphertext));
-    if (ret == 0) {
-        LOGGER_DEBUG("ss_client close!");
-        exit(1);
-        // clear(fd);
-    } else if (ret < 0) {
-        LOGGER_ERROR("rio_readn");
-        return;
-    }
-    nd->ciphertext_len = (size_t)ret;
+    size_t n = READN(fd, nd->ciphertext_p, sizeof(nd->ciphertext));
+    nd->ciphertext_len += n;
+
 
     /*
      * 开头有两个字段
@@ -85,16 +76,17 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
      *     DST.PORT 字段：目的服务器的端口
      */
     if (nd->ss_stage == STAGE_INIT) {
+        LOGGER_DEBUG("fd: %d, STAGE_INIT", fd);
         CryptorInfo *ci = event_loop->extra_data;
         nd->iv_len = ci->iv_len;
-        memcpy(nd->iv, nd->ciphertext, ci->iv_len);
+        memcpy(nd->iv, nd->ciphertext_p, ci->iv_len);
         nd->ciphertext_p += ci->iv_len;
         nd->ciphertext_len -= ci->iv_len;
-        nd->encrypt_ctx = INIT_ENCRYPT_CTX(get_cipher("aes-128-ctr"), ci->key, nd->iv);
-        nd->decrypt_ctx = INIT_DECRYPT_CTX(get_cipher("aes-128-ctr"), ci->key, nd->iv);
+        nd->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->iv);
+        nd->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->iv);
         nd->plaintext_len = DECRYPT(nd);
         if (nd->plaintext_len < 0) {
-            //
+            // TODO
         }
         int atty = nd->plaintext_p[0];
         nd->plaintext_p += 1;
@@ -133,10 +125,11 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
             nd->sockaddr_len = sizeof(nd->sockaddr);
             nd->ss_stage = STAGE_CONNECTING;
         } else if (atty == ATYP_IPV6) {
-//          // TODO
+            // TODO
             nd->ss_stage = STAGE_CONNECTING;
         } else {
             LOGGER_ERROR("ATYP error！");
+            return;
         }
 
         memcpy(&nd->sockaddr.sin_port, nd->plaintext_p, 2);
@@ -149,9 +142,9 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 
     nd->ciphertext_p = nd->ciphertext;
     nd->ciphertext_len = 0;
-    if (nd->ss_stage == STAGE_CONNECTING) {
 
-        LOGGER_DEBUG("STAGE_CONNECTING");
+    if (nd->ss_stage == STAGE_CONNECTING) {
+        LOGGER_DEBUG("fd: %d, STAGE_CONNECTING", fd);
         int remote_fd = socket(nd->sockaddr.sin_family, SOCK_STREAM, 0);
         if (remote_fd < 0) {
             PANIC("remote_fd");
@@ -162,17 +155,10 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 
         connect(remote_fd, (struct sockaddr *)&nd->sockaddr, nd->sockaddr_len);
 
-        ae_register_event(event_loop, remote_fd,
-                AE_OUT, NULL, tcp_write_remote, nd);
+        ae_register_event(event_loop, remote_fd, AE_OUT, NULL, tcp_write_remote, nd);
 
         nd->ss_stage = STAGE_STREAM;
     }
-    // free(nd->decrypt_ctx);
-
-    // 对端关闭
-//    ae_unregister_event(event_loop, fd);
-//    close(fd);
-//    free(nd);
 }
 
 void
@@ -180,14 +166,22 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
 
     NetData *nd = data;
-    ssize_t len = ENCRYPT(nd);
-    ssize_t ret;
+    nd->remote_buf_cipher_len = ENCRYPT(nd);
+    nd->remote_buf_len = 0;
+    nd->remote_buf_p = nd->remote_buf;
+
     if (nd->is_iv_send == 0) {
-        ret = rio_writen(fd, nd->iv, nd->iv_len);
+        write(fd, nd->iv, nd->iv_len);
         nd->is_iv_send = 1;
     }
-    ret = rio_writen(fd, nd->remote_buf, len);
-    LOGGER_DEBUG("tcp_write_ssclient->rio_writen: %ld", ret);
+
+    size_t n = WRITEN(fd, nd->remote_buf_cipher_p, nd->remote_buf_cipher_len);
+    nd->remote_buf_cipher_len -= n;
+    if (nd->remote_buf_cipher_len == 0) {
+        nd->remote_buf_cipher_p = nd->remote_buf_cipher;
+    } else {
+        nd->remote_buf_cipher_p += n;
+    }
     ae_modify_event(event_loop, fd, AE_IN, tcp_read_ssclient, NULL, nd);
 }
 
@@ -195,16 +189,7 @@ void
 tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    ssize_t ret = rio_readn(fd, nd->remote_buf, sizeof(nd->remote_buf));
-    if (ret == 0) {
-        LOGGER_DEBUG("remote close!");
-        exit(1);
-        // clear(fd);
-    } else if (ret < 0) {
-        LOGGER_ERROR("rio_readn");
-        return;
-    }
-    nd->remote_buf_len = (size_t)ret;
+    nd->remote_buf_len = READN(fd, nd->remote_buf_p, sizeof(nd->remote_buf));
 
     ae_modify_event(event_loop, nd->ssclient_fd, AE_OUT, NULL, tcp_write_ssclient, nd);
 }
@@ -213,17 +198,12 @@ void
 tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-
-    ssize_t ret = rio_writen(fd, nd->plaintext_p, nd->plaintext_len);
-    if (ret < 0) {
-        PANIC("rio_writen");
-    }
-    LOGGER_DEBUG("tcp_write_remote->rio_writen: %ld", ret);
-    nd->plaintext_len -= ret;
+    size_t n = WRITEN(fd, nd->plaintext_p, nd->plaintext_len);
+    nd->plaintext_len -= n;
     if (nd->plaintext_len == 0) {
         nd->plaintext_p = nd->plaintext;
     } else {
-        nd->plaintext_p += ret;
+        nd->plaintext_p += n;
     }
     ae_modify_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd);
 }
