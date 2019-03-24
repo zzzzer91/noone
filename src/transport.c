@@ -7,16 +7,17 @@
 NetData *
 init_net_data()
 {
-    NetData *stream_data = malloc(sizeof(NetData));
-    if (stream_data == NULL) return NULL;
+    NetData *nd = malloc(sizeof(NetData));
+    if (nd == NULL) return NULL;
 
-    stream_data->ss_stage = STAGE_INIT;
-    stream_data->ciphertext_len = 0;
-    stream_data->ciphertext_p = stream_data->ciphertext;
-    stream_data->plaintext_len = 0;
-    stream_data->plaintext_p = stream_data->plaintext;
-    stream_data->remote_buf_len = 0;
-    stream_data->remote_buf_p = stream_data->remote_buf;
+    nd->ss_stage = STAGE_INIT;
+    nd->ciphertext_len = 0;
+    nd->ciphertext_p = nd->ciphertext;
+    nd->plaintext_len = 0;
+    nd->plaintext_p = nd->plaintext;
+    nd->remote_buf_len = 0;
+    nd->remote_buf_p = nd->remote_buf;
+    nd->is_iv_send = 0;
 
-    return stream_data;
+    return nd;
 }

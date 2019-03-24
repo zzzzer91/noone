@@ -15,7 +15,7 @@
 #define MD5_LEN 16
 
 typedef struct CryptorInfo{
-    const EVP_CIPHER *cipher;
+    char cipher_name[MAX_CIPHER_NAME_LEN];
     unsigned char key[MAX_KEY_LEN+1];
     size_t key_len;
     size_t iv_len;

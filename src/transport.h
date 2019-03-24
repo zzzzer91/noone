@@ -6,6 +6,7 @@
 #define _NOONE_TRANSPORT_H_
 
 #include "cryptor.h"
+#include <netinet/in.h>  /* struct sockaddr_in */
 
 #define BUFFER_LEN 32 * 1024
 
@@ -32,11 +33,15 @@ typedef struct NetData {
 
     SsStageType ss_stage;
 
-    struct addrinfo *addr_list_p;
+    struct sockaddr_in sockaddr;
 
-    uint16_t port;
+    socklen_t sockaddr_len;
 
     unsigned char iv[MAX_IV_LEN+1];
+
+    size_t iv_len;
+
+    int is_iv_send;
 
     EVP_CIPHER_CTX *encrypt_ctx;
 
@@ -64,8 +69,8 @@ typedef struct NetData {
 
 NetData *init_net_data();
 
-#define ENCRYPT_ALIAS(nd) \
-    encrypt((nd)->encrypt_ctx, (nd)->plaintext_p, (nd)->plaintext_len, (nd)->ciphertext)
+#define ENCRYPT(nd) \
+    encrypt((nd)->encrypt_ctx, (nd)->remote_buf, (nd)->remote_buf_len, (nd)->remote_buf)
 
 #define DECRYPT(nd) \
     decrypt((nd)->decrypt_ctx, (nd)->ciphertext_p, (nd)->ciphertext_len, (nd)->plaintext)

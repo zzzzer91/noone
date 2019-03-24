@@ -33,7 +33,7 @@ typedef struct AeEvent {
     time_t last_active;
 
     // 监听事件类型掩码，
-    // 值可以是 AE_IN 或 AE_OUT，不能同时
+    // 值可以是 AE_IN 或 AE_OUT，或同时
     int mask;
 
     // 读事件

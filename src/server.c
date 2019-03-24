@@ -23,29 +23,45 @@ main(int argc, char *argv[])
     LOGGER_INFO("Noone started!");
 
     AeEventLoop *ae_ev_loop = ae_create_event_loop(AE_MAX_EVENTS);
-    if (ae_ev_loop == NULL) PANIC("ae_create_event_loop");
+    if (ae_ev_loop == NULL) {
+        PANIC("ae_create_event_loop");
+    }
 
     CryptorInfo *ci = init_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
-    if (ci == NULL) PANIC("init_cryptor_info");
+    if (ci == NULL) {
+        PANIC("init_cryptor_info");
+    }
     ae_ev_loop->extra_data = ci;
 
     // tcp
     int tcp_server_fd = tcp_server_fd_init(SERVER_ADDR, SERVER_PORT);
-    if (tcp_server_fd < 0) PANIC("tcp_server_fd_init");
+    if (tcp_server_fd < 0) {
+        PANIC("tcp_server_fd_init");
+    }
 
-    if (setnonblock(tcp_server_fd) < 0) PANIC("setnonblock");
+    if (setnonblock(tcp_server_fd) < 0) {
+        PANIC("setnonblock");
+    }
 
     int ret = ae_register_event(ae_ev_loop, tcp_server_fd, AE_IN, tcp_accept_conn, NULL, NULL);
-    if (ret  < 0) PANIC("ae_register_event");
+    if (ret  < 0) {
+        PANIC("ae_register_event");
+    }
 
     // udp 可以和 tcp 绑定同一端口
     int udp_server_fd = udp_server_fd_init(SERVER_ADDR, SERVER_PORT);
-    if (udp_server_fd < 0) PANIC("udp_server_fd_init");
+    if (udp_server_fd < 0) {
+        PANIC("udp_server_fd_init");
+    }
 
-    if (setnonblock(udp_server_fd) < 0) PANIC("setnonblock");
+    if (setnonblock(udp_server_fd) < 0) {
+        PANIC("setnonblock");
+    }
 
     ret = ae_register_event(ae_ev_loop, udp_server_fd, AE_IN, udp_accept_conn, NULL, NULL);
-    if (ret < 0) PANIC("ae_register_event");
+    if (ret < 0) {
+        PANIC("ae_register_event");
+    }
 
     ae_run_loop(ae_ev_loop);
 

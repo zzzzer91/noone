@@ -65,7 +65,9 @@ init_cryptor_info(const char *name,
 {
     CryptorInfo *ci = malloc(sizeof(CryptorInfo));
     if (ci == NULL) return NULL;
-    ci->cipher = get_cipher(name);
+    size_t name_len = strlen(name);
+    memcpy(ci->cipher_name, name, name_len);
+    ci->cipher_name[name_len] = 0;
     ci->key_len = key_len;
     ci->iv_len = iv_len;
     bytes_to_key(passwd, ci->key, key_len, NULL, iv_len);
