@@ -4,12 +4,14 @@
 
 #include "helper.h"
 #include "test_log.c"
+#include "test_error.c"
 #include "test_cryptor.c"
 #include "test_ae.c"
 
 int
 main(void)
 {
+    // test_error();
     // test_log();
     test_cryptor();
     test_ae();

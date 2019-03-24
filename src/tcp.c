@@ -11,8 +11,6 @@
 #include "log.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
-#include <errno.h>
 #include <unistd.h>      /* close() */
 #include <sys/socket.h>  /* accept() */
 #include <netinet/in.h>  /* struct sockaddr_in */

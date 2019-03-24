@@ -6,6 +6,7 @@
 #define _NOONE_ERROR_H_
 
 #include "log.h"
+#include <stdio.h>
 #include <errno.h>
 #include <string.h>
 
