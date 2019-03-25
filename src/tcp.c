@@ -115,16 +115,19 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
                 exit(1);
             }
             memcpy(&nd->sockaddr, &listp->ai_addr, 14);
-            nd->sockaddr.sin_family = (sa_family_t)listp->ai_family;
+            nd->sockaddr.sa_family = (sa_family_t)listp->ai_family;
             nd->sockaddr_len = listp->ai_addrlen;
 
             freeaddrinfo(listp);
 
             nd->ss_stage = STAGE_CONNECTING;
         } else if (atty == ATYP_IPV4) {
-            nd->sockaddr.sin_family = AF_INET;
-            memcpy(&nd->sockaddr.sin_addr.s_addr, nd->plaintext_p, 4);
-            LOGGER_DEBUG("%s", inet_ntoa(nd->sockaddr.sin_addr));
+            nd->sockaddr.sa_family = AF_INET;
+            struct in_addr addr;
+            memcpy(&addr, nd->plaintext_p, 4);
+            memcpy(nd->sockaddr.sa_data+2, &addr, 4);
+            nd->ip = inet_ntoa(addr);
+            LOGGER_DEBUG("%s", nd->ip);
             nd->plaintext_p += 4;
             nd->plaintext_len -= 4;
             nd->sockaddr_len = sizeof(nd->sockaddr);
@@ -137,10 +140,13 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
             return;
         }
 
-        memcpy(&nd->sockaddr.sin_port, nd->plaintext_p, 2);
+        uint16_t port;
+        memcpy(&port, nd->plaintext_p, 2);
+        memcpy(nd->sockaddr.sa_data, &port, 2);
         nd->plaintext_p += 2;
         nd->plaintext_len -= 2;
-        LOGGER_DEBUG("%d", ntohs(nd->sockaddr.sin_port));
+        nd->port = ntohs(port);
+        LOGGER_DEBUG("%d", nd->port);
     } else {
         nd->plaintext_len = DECRYPT(nd);
     }
@@ -150,13 +156,13 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->ss_stage == STAGE_CONNECTING) {
         LOGGER_DEBUG("fd: %d, STAGE_CONNECTING", fd);
-        nd->remote_fd = socket(nd->sockaddr.sin_family, SOCK_STREAM, 0);
+        nd->remote_fd = socket(nd->sockaddr.sa_family, SOCK_STREAM, 0);
         if (nd->remote_fd < 0) {
             PANIC("remote_fd");
         }
         setnonblock(nd->remote_fd);
 
-        connect(nd->remote_fd, (struct sockaddr *)&nd->sockaddr, nd->sockaddr_len);
+        connect(nd->remote_fd, &nd->sockaddr, nd->sockaddr_len);
 
         nd->ss_stage = STAGE_STREAM;
     }

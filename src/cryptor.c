@@ -21,7 +21,7 @@ crypto_md5(const unsigned char *data, size_t data_len, unsigned char *buf)
  *   aes-192 的 key 为 24 字节，iv 为 16 字节
  *   aes-256 的 key 为 32 字节，iv 为 16 字节
  */
-int
+void
 bytes_to_key(const unsigned char *passwd,
         unsigned char *key, size_t key_len,
         unsigned char *iv, size_t iv_len)
@@ -46,14 +46,18 @@ bytes_to_key(const unsigned char *passwd,
     if (iv != NULL) {
         memcpy(iv, buf + key_len, iv_len);
     }
-
-    return 0;
 }
 
 const EVP_CIPHER *
 get_cipher(const char *cipher_name) {
     if (!strncmp(cipher_name, "aes-128-ctr", MAX_CIPHER_NAME_LEN)) {
         return EVP_aes_128_ctr();
+    } else if (!strncmp(cipher_name, "aes-256-ctr", MAX_CIPHER_NAME_LEN)) {
+        return EVP_aes_256_ctr();
+    } else if (!strncmp(cipher_name, "aes-128-cfb", MAX_CIPHER_NAME_LEN)) {
+        return EVP_aes_128_cfb();
+    } else if (!strncmp(cipher_name, "aes-256-cfb", MAX_CIPHER_NAME_LEN)) {
+        return EVP_aes_256_cfb();
     }
 
     return NULL;
@@ -85,6 +89,9 @@ init_cipher_ctx(const EVP_CIPHER *cipher,
     return ctx;
 }
 
+/*
+ * 加密失败，返回 0。
+ */
 size_t
 encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
         size_t plaintext_len, unsigned char *ciphertext)
@@ -92,15 +99,22 @@ encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
     size_t ciphertext_len;
     int outlen;
 
-    EVP_EncryptUpdate(ctx, ciphertext, &outlen, plaintext, (int)plaintext_len);
+    if (!EVP_EncryptUpdate(ctx, ciphertext, &outlen, plaintext, (int)plaintext_len)) {
+        return 0;
+    }
     ciphertext_len = (size_t)outlen;
 
-    EVP_EncryptFinal_ex(ctx, ciphertext+outlen, &outlen);
+    if (!EVP_EncryptFinal_ex(ctx, ciphertext+outlen, &outlen)) {
+        return 0;
+    }
     ciphertext_len += outlen;
 
     return ciphertext_len;
 }
 
+/*
+ * 解密失败，返回 0。
+ */
 size_t
 decrypt(EVP_CIPHER_CTX *ctx, unsigned char *ciphertext,
         size_t ciphertext_len, unsigned char *plaintext)
@@ -108,10 +122,14 @@ decrypt(EVP_CIPHER_CTX *ctx, unsigned char *ciphertext,
     size_t plaintext_len;
     int outlen;
 
-    EVP_DecryptUpdate(ctx, plaintext, &outlen, ciphertext, (int)ciphertext_len);
+    if (!EVP_DecryptUpdate(ctx, plaintext, &outlen, ciphertext, (int)ciphertext_len)) {
+        return 0;
+    }
     plaintext_len = (size_t)outlen;
 
-    EVP_DecryptFinal_ex(ctx, plaintext+outlen, &outlen);
+    if (!EVP_DecryptFinal_ex(ctx, plaintext+outlen, &outlen)) {
+        return 0;
+    }
     plaintext_len += outlen;
 
     return plaintext_len;

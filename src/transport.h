@@ -34,9 +34,13 @@ typedef struct NetData {
 
     SsStageType ss_stage;
 
-    struct sockaddr_in sockaddr;
+    struct sockaddr sockaddr;
 
     socklen_t sockaddr_len;
+
+    char *ip;
+
+    uint16_t port;
 
     unsigned char iv[MAX_IV_LEN+1];
 
@@ -108,7 +112,7 @@ NetData *init_net_data();
                     nread = 0; \
                 } else { \
                     LOGGER_ERROR("READN"); \
-                    close(fd); \
+                    close_flag = 1; \
                     return; \
                 } \
             } \
@@ -135,7 +139,7 @@ NetData *init_net_data();
                     break; \
                 } else { \
                     LOGGER_ERROR("WRITEN"); \
-                    close(fd); \
+                    close_flag = 1; \
                     return; \
                 } \
             } \

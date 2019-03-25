@@ -23,7 +23,7 @@ typedef struct CryptorInfo{
 
 void crypto_md5(const unsigned char *data, size_t data_len, unsigned char *buf);
 
-int bytes_to_key(const unsigned char *passwd,
+void bytes_to_key(const unsigned char *passwd,
              unsigned char *key, size_t key_len,
              unsigned char *iv, size_t iv_len);
 

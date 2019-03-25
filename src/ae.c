@@ -261,15 +261,17 @@ ae_process_events(AeEventLoop *event_loop)
     int processed = 0;
 
     if (event_loop->maxfd != -1) {
-        int j;
 
         // 处理文件事件
         int numevents = ae_api_poll(event_loop, -1);
-        for (j = 0; j < numevents; j++) {
-            int fd = event_loop->ready_events[j].data.fd;
+
+        for (int i = 0; i < numevents; i++) {
+            int fd = event_loop->ready_events[i].data.fd;
 
             // 从已就绪数组中获取事件
             AeEvent *fe = &event_loop->events[fd];
+
+            LOGGER_DEBUG("fd: %d, mask: %d", fd, fe->mask);
 
             if (fe->mask & AE_IN) {
                 LOGGER_DEBUG("AE_IN");
