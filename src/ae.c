@@ -274,16 +274,12 @@ ae_process_events(AeEventLoop *event_loop)
             LOGGER_DEBUG("fd: %d, mask: %d", fd, fe->mask);
 
             if (fe->mask & AE_IN) {
-                LOGGER_DEBUG("AE_IN");
                 fe->rcallback(event_loop, fd, fe->client_data);
             } else if (fe->mask & AE_OUT) {
-                LOGGER_DEBUG("AE_OUT");
                 fe->wcallback(event_loop, fd, fe->client_data);
             } else if (fe->mask & EPOLLHUP) {
-                LOGGER_DEBUG("EPOLLHUP");
                 fe->wcallback(event_loop, fd, fe->client_data);
             } else if (fe->mask & EPOLLERR) {
-                LOGGER_DEBUG("EPOLLERR");
                 fe->wcallback(event_loop, fd, fe->client_data);
             }
 
