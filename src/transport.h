@@ -104,7 +104,6 @@ void free_net_data(NetData *nd);
             nleft -= nread; \
             bufp += nread; \
         } \
-        LOGGER_DEBUG("fd: %d, read: %ld", fd, n - nleft); \
         n - nleft; \
     })
 
@@ -129,7 +128,6 @@ void free_net_data(NetData *nd);
             nleft -= nwritten; \
             bufp += nwritten; \
         } \
-        LOGGER_DEBUG("fd: %d, write: %ld", fd, n - nleft); \
         n - nleft; \
     })
 

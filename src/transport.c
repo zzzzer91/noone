@@ -115,8 +115,7 @@ parse_net_data_header(NetData *nd)
             LOGGER_ERROR("%s", gai_strerror(ret2));
             exit(1);
         }
-        memcpy(&nd->sockaddr, &listp->ai_addr, 14);
-        nd->sockaddr.sa_family = (sa_family_t)listp->ai_family;
+        memcpy(&nd->sockaddr, listp->ai_addr, listp->ai_addrlen);
         nd->sockaddr_len = listp->ai_addrlen;
 
         freeaddrinfo(listp);

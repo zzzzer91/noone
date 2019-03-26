@@ -121,7 +121,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     size_t n = READN(fd, nd->ciphertext.p+nd->ciphertext.len, buf_remain, close_flag);
     nd->ciphertext.len += n;
     if (close_flag == 1) {  // ss_client 关闭
-        LOGGER_DEBUG("ss_client close!");
+        LOGGER_DEBUG("read, ssclient close!");
         CLEAR(event_loop, nd);
     }
 
@@ -150,7 +150,6 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
         }
     }
 
-    LOGGER_DEBUG("nd->plaintext.len = %ld", nd->plaintext.len);
     if (nd->plaintext.len > 0) {
         if (ae_register_event(event_loop, nd->remote_fd ,
                 AE_OUT, NULL, tcp_write_remote, nd) < 0) {
@@ -225,7 +224,7 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
     int close_flag = 0;
     size_t ret = WRITEN(fd, nd->remote_cipher.p, nd->remote_cipher.len, close_flag);
     if (close_flag == 1) {
-        LOGGER_DEBUG("ENCRYPT");
+        LOGGER_DEBUG("write, ssclient close!");
         CLEAR(event_loop, nd);
     }
 
