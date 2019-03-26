@@ -31,9 +31,9 @@ test_encrypt_and_decrypt()
 #define PASSWD_TO_IV "1243734da46f16a118114ad51cfd48e2"
 
     CryptorInfo *ci = init_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
-    NetData *sd = init_net_data();
+    NetData *nd = init_net_data();
 
-    bytes_to_key(PASSWD, ci->key, ci->key_len, sd->iv, ci->iv_len);
+    bytes_to_key(PASSWD, ci->key, ci->key_len, nd->cipher_ctx.iv, ci->iv_len);
 
     char *key_hex = malloc(MAX_KEY_LEN*2+1);
     size_t key_hex_len = bytes_to_hex(ci->key, ci->key_len, key_hex);
@@ -41,53 +41,52 @@ test_encrypt_and_decrypt()
     free(key_hex);
 
     char *iv_hex = malloc(MAX_IV_LEN*2+1);
-    size_t iv_hex_len = bytes_to_hex(sd->iv, ci->iv_len, iv_hex);
+    size_t iv_hex_len = bytes_to_hex(nd->cipher_ctx.iv, ci->iv_len, iv_hex);
     EXPECT_EQ_STRING(PASSWD_TO_IV, iv_hex, iv_hex_len);
     free(iv_hex);
 
     // 加密
-    sd->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, sd->iv);
-    strcpy((char *)sd->plaintext, "你好");
-    sd->plaintext_len = strlen((char *)sd->plaintext);
-    sd->ciphertext_len = encrypt(sd->encrypt_ctx,
-            sd->plaintext, sd->plaintext_len, sd->ciphertext);
-    free(sd->encrypt_ctx);
+    nd->cipher_ctx.encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    strcpy((char *)nd->plaintext.data, "你好");
+    nd->plaintext.len = strlen((char *)nd->plaintext.data);
+    nd->ciphertext.len = encrypt(nd->cipher_ctx.encrypt_ctx,
+            nd->plaintext.data, nd->plaintext.len, nd->ciphertext.data);
 
     // 解密
-    sd->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, sd->iv);
-    sd->plaintext_len = decrypt(sd->decrypt_ctx,
-            sd->ciphertext, sd->ciphertext_len, sd->plaintext);
-    free(sd->decrypt_ctx);
+    nd->cipher_ctx.decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    nd->plaintext.len = decrypt(nd->cipher_ctx.decrypt_ctx,
+            nd->ciphertext.data, nd->ciphertext.len, nd->plaintext.data);
 
-    EXPECT_EQ_LONG(6L, sd->plaintext_len);
-    EXPECT_EQ_STRING("你好", sd->plaintext, sd->plaintext_len);
+    EXPECT_EQ_LONG(6L, nd->plaintext.len);
+    EXPECT_EQ_STRING("你好", nd->plaintext.data, nd->plaintext.len);
 
-    free(sd);
     free(ci);
+    free_net_data(nd);
 }
 
 static void
 test_encrypt_and_decrypt_fail()
 {
     CryptorInfo *ci = init_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
-    NetData *sd = init_net_data();
+    NetData *nd = init_net_data();
 
-    bytes_to_key(PASSWD, ci->key, ci->key_len, sd->iv, ci->iv_len);
-    sd->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, sd->iv);
-    strcpy((char *)sd->plaintext, "你好");
-    sd->plaintext_len = strlen((char *)sd->plaintext);
-    encrypt(sd->encrypt_ctx, sd->plaintext, sd->plaintext_len, sd->ciphertext);
-    free(sd->encrypt_ctx);
+    bytes_to_key(PASSWD, ci->key, ci->key_len, nd->cipher_ctx.iv, ci->iv_len);
+    nd->cipher_ctx.encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    strcpy((char *)nd->plaintext.data, "你好");
+    nd->plaintext.len = strlen((char *)nd->plaintext.data);
+    encrypt(nd->cipher_ctx.encrypt_ctx,
+            nd->plaintext.data, nd->plaintext.len, nd->ciphertext.data);
 
-    // 解密
-    bytes_to_key((unsigned char *)"123123123123", ci->key, ci->key_len, sd->iv, ci->iv_len);
-    sd->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, sd->iv);
-    size_t ret = decrypt(sd->decrypt_ctx, sd->ciphertext, sd->ciphertext_len, sd->plaintext);
+    // 解密失败
+    bytes_to_key((unsigned char *)"123123123123",
+            ci->key, ci->key_len, nd->cipher_ctx.iv, ci->iv_len);
+    nd->cipher_ctx.decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    size_t ret = decrypt(nd->cipher_ctx.decrypt_ctx,
+            nd->ciphertext.data, nd->ciphertext.len, nd->plaintext.data);
     EXPECT_EQ_LONG(0L, ret);
-    free(sd->decrypt_ctx);
 
-    free(sd);
     free(ci);
+    free_net_data(nd);
 }
 
 void

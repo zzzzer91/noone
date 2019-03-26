@@ -8,21 +8,38 @@ NetData *
 init_net_data()
 {
     NetData *nd = malloc(sizeof(NetData));
-    if (nd == NULL) return NULL;
+    if (nd == NULL) {
+        return NULL;
+    }
 
     nd->ssclient_fd = -1;
     nd->remote_fd = -1;
 
     nd->ss_stage = STAGE_INIT;
-    nd->ciphertext_len = 0;
-    nd->ciphertext_p = nd->ciphertext;
-    nd->plaintext_len = 0;
-    nd->plaintext_p = nd->plaintext;
-    nd->remote_buf_len = 0;
-    nd->remote_buf_p = nd->remote_buf;
-    nd->remote_buf_cipher_len = 0;
-    nd->remote_buf_cipher_p = nd->remote_buf_cipher;
+    nd->cipher_ctx.encrypt_ctx = NULL;
+    nd->cipher_ctx.decrypt_ctx = NULL;
+
+    init_buffer(&nd->ciphertext, BUF_CAPACITY);
+    init_buffer(&nd->plaintext, BUF_CAPACITY);
+    init_buffer(&nd->remote, BUF_CAPACITY);
+    init_buffer(&nd->remote_cipher, BUF_CAPACITY);
     nd->is_iv_send = 0;
 
     return nd;
+}
+
+void
+free_net_data(NetData *nd)
+{
+    if (nd->cipher_ctx.encrypt_ctx != NULL) {
+        EVP_CIPHER_CTX_free(nd->cipher_ctx.encrypt_ctx);
+    }
+    if (nd->cipher_ctx.decrypt_ctx != NULL) {
+        EVP_CIPHER_CTX_free(nd->cipher_ctx.decrypt_ctx);
+    }
+    free_buffer(&nd->ciphertext);
+    free_buffer(&nd->plaintext);
+    free_buffer(&nd->remote);
+    free_buffer(&nd->remote_cipher);
+    free(nd);
 }

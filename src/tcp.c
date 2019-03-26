@@ -17,6 +17,94 @@
 #include <arpa/inet.h>   /* inet_ntoa() */
 #include <netdb.h>
 
+static void
+handle_stage_init(AeEventLoop *event_loop, int fd, NetData *nd)
+{
+    LOGGER_DEBUG("fd: %d, STAGE_INIT", fd);
+
+    CryptorInfo *ci = event_loop->extra_data;
+    nd->cipher_ctx.iv_len = ci->iv_len;
+    memcpy(nd->cipher_ctx.iv, nd->ciphertext.data, ci->iv_len);
+    nd->ciphertext.idx += ci->iv_len;
+    nd->ciphertext.len -= ci->iv_len;
+    nd->cipher_ctx.encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    nd->cipher_ctx.decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    nd->plaintext.len = DECRYPT(nd);
+    if (nd->plaintext.len < 0) {
+        // TODO
+    }
+    int atty = nd->plaintext.data[nd->plaintext.idx];
+    nd->plaintext.idx += 1;
+    nd->plaintext.len -= 1;
+    if (atty == ATYP_DOMAIN) {
+        size_t domain_len = nd->plaintext.data[nd->plaintext.idx];  // 域名长度
+        nd->plaintext.idx += 1;
+        char domain[65];
+        memcpy(domain, nd->plaintext.data+nd->plaintext.idx, domain_len);
+        domain[domain_len] = 0;  // 加上 '\0'
+        nd->plaintext.idx += domain_len;
+        nd->plaintext.len -= domain_len;
+        LOGGER_DEBUG("%s", domain);
+
+        struct addrinfo hints = {}, *listp;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags = AI_NUMERICSERV; /* 强制只能填端口号, 而不能是端口号对应的服务名 */
+        hints.ai_flags |= AI_ADDRCONFIG; /* 只有当主机配置IPv4时, 才返回IPv4地址, IPv6类似 */
+        int ret2 = getaddrinfo(domain, NULL, &hints, &listp);
+        if (ret2 != 0) {
+            LOGGER_ERROR("%s", gai_strerror(ret2));
+            exit(1);
+        }
+        memcpy(&nd->sockaddr, &listp->ai_addr, 14);
+        nd->sockaddr.sa_family = (sa_family_t)listp->ai_family;
+        nd->sockaddr_len = listp->ai_addrlen;
+
+        freeaddrinfo(listp);
+
+        nd->ss_stage = STAGE_HANDSHAKE;
+    } else if (atty == ATYP_IPV4) {
+        nd->sockaddr.sa_family = AF_INET;
+        struct in_addr addr;
+        memcpy(&addr, nd->plaintext.data+nd->plaintext.idx, 4);
+        memcpy(nd->sockaddr.sa_data+2, &addr, 4);
+        nd->ip = inet_ntoa(addr);
+        LOGGER_DEBUG("%s", nd->ip);
+        nd->plaintext.idx += 4;
+        nd->plaintext.len -= 4;
+        nd->sockaddr_len = sizeof(struct sockaddr_in);
+        nd->ss_stage = STAGE_HANDSHAKE;
+    } else if (atty == ATYP_IPV6) {
+        // TODO
+        nd->ss_stage = STAGE_HANDSHAKE;
+    } else {
+        LOGGER_ERROR("ATYP error！");
+        return;
+    }
+
+    uint16_t port;
+    memcpy(&port, nd->plaintext.data+nd->plaintext.idx, 2);
+    memcpy(nd->sockaddr.sa_data, &port, 2);
+    nd->plaintext.idx += 2;
+    nd->plaintext.len -= 2;
+    nd->port = ntohs(port);
+    LOGGER_DEBUG("%d", nd->port);
+}
+
+static void
+handle_stage_handshake(AeEventLoop *event_loop, int fd, NetData *nd)
+{
+    LOGGER_DEBUG("fd: %d, STAGE_HANDSHAKE", fd);
+    nd->remote_fd = socket(nd->sockaddr.sa_family, SOCK_STREAM, 0);
+    if (nd->remote_fd < 0) {
+        PANIC("remote_fd");
+    }
+    setnonblock(nd->remote_fd);
+
+    connect(nd->remote_fd, &nd->sockaddr, nd->sockaddr_len);
+
+    nd->ss_stage = STAGE_STREAM;
+}
+
 void
 tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 {
@@ -56,14 +144,13 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     int close_flag = 0;
-    size_t n = READN(fd, nd->ciphertext_p, sizeof(nd->ciphertext), close_flag);
-    nd->ciphertext_len += n;
-    if (close_flag == 1) {  // 对端关闭
+    size_t n = READN(fd, nd->ciphertext.data, nd->ciphertext.capacity, close_flag);
+    nd->ciphertext.len += n;
+    if (close_flag == 1) {  // ss_client 关闭
         close(fd);
         free(nd);
         ae_unregister_event(event_loop, fd);
     }
-
 
     /*
      * 开头有两个字段
@@ -80,97 +167,22 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
      *     DST.PORT 字段：目的服务器的端口
      */
     if (nd->ss_stage == STAGE_INIT) {
-        LOGGER_DEBUG("fd: %d, STAGE_INIT", fd);
-        CryptorInfo *ci = event_loop->extra_data;
-        nd->iv_len = ci->iv_len;
-        memcpy(nd->iv, nd->ciphertext_p, ci->iv_len);
-        nd->ciphertext_p += ci->iv_len;
-        nd->ciphertext_len -= ci->iv_len;
-        nd->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->iv);
-        nd->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->iv);
-        nd->plaintext_len = DECRYPT(nd);
-        if (nd->plaintext_len < 0) {
-            // TODO
-        }
-        int atty = nd->plaintext_p[0];
-        nd->plaintext_p += 1;
-        nd->plaintext_len -= 1;
-        if (atty == ATYP_DOMAIN) {
-            size_t domain_len = nd->plaintext_p[0];  // 域名长度
-            nd->plaintext_p += 1;
-            char domain[65];
-            memcpy(domain, nd->plaintext_p, domain_len);
-            domain[domain_len] = 0;  // 加上 '\0'
-            nd->plaintext_p += domain_len;
-            nd->plaintext_len -= domain_len;
-            LOGGER_DEBUG("%s", domain);
-
-            struct addrinfo hints = {}, *listp;
-            hints.ai_socktype = SOCK_STREAM;
-            hints.ai_flags = AI_NUMERICSERV; /* 强制只能填端口号, 而不能是端口号对应的服务名 */
-            hints.ai_flags |= AI_ADDRCONFIG; /* 只有当主机配置IPv4时, 才返回IPv4地址, IPv6类似 */
-            int ret2 = getaddrinfo(domain, NULL, &hints, &listp);
-            if (ret2 != 0) {
-                LOGGER_ERROR("%s", gai_strerror(ret2));
-                exit(1);
-            }
-            memcpy(&nd->sockaddr, &listp->ai_addr, 14);
-            nd->sockaddr.sa_family = (sa_family_t)listp->ai_family;
-            nd->sockaddr_len = listp->ai_addrlen;
-
-            freeaddrinfo(listp);
-
-            nd->ss_stage = STAGE_CONNECTING;
-        } else if (atty == ATYP_IPV4) {
-            nd->sockaddr.sa_family = AF_INET;
-            struct in_addr addr;
-            memcpy(&addr, nd->plaintext_p, 4);
-            memcpy(nd->sockaddr.sa_data+2, &addr, 4);
-            nd->ip = inet_ntoa(addr);
-            LOGGER_DEBUG("%s", nd->ip);
-            nd->plaintext_p += 4;
-            nd->plaintext_len -= 4;
-            nd->sockaddr_len = sizeof(nd->sockaddr);
-            nd->ss_stage = STAGE_CONNECTING;
-        } else if (atty == ATYP_IPV6) {
-            // TODO
-            nd->ss_stage = STAGE_CONNECTING;
-        } else {
-            LOGGER_ERROR("ATYP error！");
-            return;
-        }
-
-        uint16_t port;
-        memcpy(&port, nd->plaintext_p, 2);
-        memcpy(nd->sockaddr.sa_data, &port, 2);
-        nd->plaintext_p += 2;
-        nd->plaintext_len -= 2;
-        nd->port = ntohs(port);
-        LOGGER_DEBUG("%d", nd->port);
+        handle_stage_init(event_loop, fd, nd);
     } else {
-        nd->plaintext_len = DECRYPT(nd);
+        nd->plaintext.len = DECRYPT(nd);
     }
 
-    nd->ciphertext_p = nd->ciphertext;
-    nd->ciphertext_len = 0;
+    nd->ciphertext.idx = 0;
+    nd->ciphertext.len = 0;
 
-    if (nd->ss_stage == STAGE_CONNECTING) {
-        LOGGER_DEBUG("fd: %d, STAGE_CONNECTING", fd);
-        nd->remote_fd = socket(nd->sockaddr.sa_family, SOCK_STREAM, 0);
-        if (nd->remote_fd < 0) {
-            PANIC("remote_fd");
-        }
-        setnonblock(nd->remote_fd);
-
-        connect(nd->remote_fd, &nd->sockaddr, nd->sockaddr_len);
-
-        nd->ss_stage = STAGE_STREAM;
+    if (nd->ss_stage == STAGE_HANDSHAKE) {
+        handle_stage_handshake(event_loop, fd, nd);
     }
 
-    if (nd->plaintext_len > 0) {
+    if (nd->plaintext.len > 0) {
         ae_register_event(event_loop, nd->remote_fd , AE_OUT, NULL, tcp_write_remote, nd);
     } else {
-        nd->plaintext_p = nd->plaintext;
+        nd->plaintext.idx = 0;
     }
 }
 
@@ -179,22 +191,22 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
 
     NetData *nd = data;
-    nd->remote_buf_cipher_len = ENCRYPT(nd);
-    nd->remote_buf_len = 0;
-    nd->remote_buf_p = nd->remote_buf;
+    nd->remote_cipher.len = ENCRYPT(nd);
+    nd->remote.len = 0;
+    nd->remote.idx = 0;
 
     if (nd->is_iv_send == 0) {
-        write(fd, nd->iv, nd->iv_len);
+        write(fd, nd->cipher_ctx.iv, nd->cipher_ctx.iv_len);
         nd->is_iv_send = 1;
     }
 
     int close_flag = 0;
-    size_t n = WRITEN(fd, nd->remote_buf_cipher_p, nd->remote_buf_cipher_len, close_flag);
-    nd->remote_buf_cipher_len -= n;
-    if (nd->remote_buf_cipher_len == 0) {
-        nd->remote_buf_cipher_p = nd->remote_buf_cipher;
+    size_t n = WRITEN(fd, nd->remote_cipher.data+nd->remote_cipher.idx, nd->remote_cipher.len, close_flag);
+    nd->remote_cipher.len -= n;
+    if (nd->remote_cipher.len == 0) {
+        nd->remote_cipher.idx = 0;
     } else {
-        nd->remote_buf_cipher_p += n;
+        nd->remote_cipher.idx += n;
     }
     ae_modify_event(event_loop, fd, AE_IN, tcp_read_ssclient, NULL, nd);
 }
@@ -204,7 +216,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
     int close_flag = 0;
-    nd->remote_buf_len = READN(fd, nd->remote_buf_p, sizeof(nd->remote_buf), close_flag);
+    nd->remote.len = READN(fd, nd->remote.data+nd->remote.idx, nd->remote.capacity, close_flag);
 
     ae_modify_event(event_loop, nd->ssclient_fd, AE_OUT, NULL, tcp_write_ssclient, nd);
 }
@@ -214,12 +226,12 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
     int close_flag = 0;
-    size_t n = WRITEN(fd, nd->plaintext_p, nd->plaintext_len, close_flag);
-    nd->plaintext_len -= n;
-    if (nd->plaintext_len == 0) {
-        nd->plaintext_p = nd->plaintext;
+    size_t n = WRITEN(fd, nd->plaintext.data+nd->plaintext.idx, nd->plaintext.len, close_flag);
+    nd->plaintext.len -= n;
+    if (nd->plaintext.len == 0) {
+        nd->plaintext.idx = 0;
     } else {
-        nd->plaintext_p += n;
+        nd->plaintext.idx += n;
     }
     ae_modify_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd);
 }

@@ -7,9 +7,10 @@
 
 #include "cryptor.h"
 #include "ae.h"
+#include "buffer.h"
 #include <netinet/in.h>  /* struct sockaddr_in */
 
-#define BUFFER_LEN 32 * 1024
+#define BUF_CAPACITY 32 * 1024
 
 // ATYP
 #define ATYP_IPV4 0x01
@@ -21,7 +22,7 @@ typedef enum SsStageType {
     STAGE_ADDR,       /* 解析地址阶段 */
     STAGE_UDP_ASSOC,
     STAGE_DNS,        /* 查询 DNS */
-    STAGE_CONNECTING,
+    STAGE_HANDSHAKE,
     STAGE_STREAM,
     STAGE_DESTROYED = -1
 } SsStageType;
@@ -32,8 +33,6 @@ typedef struct NetData {
 
     int remote_fd;
 
-    SsStageType ss_stage;
-
     struct sockaddr sockaddr;
 
     socklen_t sockaddr_len;
@@ -42,49 +41,33 @@ typedef struct NetData {
 
     uint16_t port;
 
-    unsigned char iv[MAX_IV_LEN+1];
+    SsStageType ss_stage;
 
-    size_t iv_len;
-
-    EVP_CIPHER_CTX *encrypt_ctx;
-
-    EVP_CIPHER_CTX *decrypt_ctx;
-
-    unsigned char ciphertext[BUFFER_LEN];
-
-    unsigned char *ciphertext_p;
-
-    size_t ciphertext_len;
-
-    unsigned char plaintext[BUFFER_LEN];
-
-    unsigned char *plaintext_p;
-
-    size_t plaintext_len;
+    CipherCtx cipher_ctx;
 
     int is_iv_send;
 
-    unsigned char remote_buf[BUFFER_LEN];
+    Buffer ciphertext;
 
-    unsigned char *remote_buf_p;
+    Buffer plaintext;
 
-    size_t remote_buf_len;
+    Buffer remote;
 
-    unsigned char remote_buf_cipher[BUFFER_LEN];
-
-    unsigned char *remote_buf_cipher_p;
-
-    size_t remote_buf_cipher_len;
+    Buffer remote_cipher;
 
 } NetData;
 
 NetData *init_net_data();
 
+void free_net_data(NetData *nd);
+
 #define ENCRYPT(nd) \
-    encrypt((nd)->encrypt_ctx, (nd)->remote_buf_p, (nd)->remote_buf_len, (nd)->remote_buf_cipher)
+    encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.data+(nd)->remote.idx, \
+            (nd)->remote.len, (nd)->remote_cipher.data)
 
 #define DECRYPT(nd) \
-    decrypt((nd)->decrypt_ctx, (nd)->ciphertext_p, (nd)->ciphertext_len, (nd)->plaintext)
+    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.data+(nd)->ciphertext.idx, \
+            (nd)->ciphertext.len, (nd)->plaintext.data)
 /*
  * 1、当对端套接字已关闭，read() 会返回 0。
  * 2、当（read() == -1 && errno == EAGAIN）时，

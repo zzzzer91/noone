@@ -9,7 +9,6 @@ set(CMAKE_C_STANDARD 11)
 # 添加头文件目录
 include_directories(./src)
 
-
 # .c 和 .h 文件
 aux_source_directory(./src SRCS)
 
@@ -27,5 +26,6 @@ add_executable(
         ./src/tcp.c
         ./src/socket.c
         ./src/ae.c
+        ./src/buffer.c
 )
 target_link_libraries(test crypto)

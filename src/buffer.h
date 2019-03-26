@@ -11,10 +11,10 @@ typedef struct Buffer {
     size_t idx;
     size_t len;
     size_t capacity;
-    char  *data;
+    unsigned char *data;
 } Buffer;
 
-Buffer *init_buffer(size_t capacity);
+int init_buffer(Buffer *buf, size_t capacity);
 
 void free_buffer(Buffer *buf);
 

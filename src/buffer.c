@@ -5,24 +5,18 @@
 #include "buffer.h"
 #include <stdlib.h>
 
-Buffer *
-init_buffer(size_t capacity){
-    Buffer *buf = malloc(sizeof(Buffer));
-    if (buf == NULL) {
-        return NULL;
-    }
-
+int
+init_buffer(Buffer *buf, size_t capacity) {
     buf->data = malloc(capacity);
     if (buf->data == NULL) {
-        free(buf);
-        return NULL;
+        return -1;
     }
 
     buf->capacity = capacity;
     buf->idx = 0;
     buf->len = 0;
 
-    return buf;
+    return 0;
 }
 
 void
@@ -35,7 +29,6 @@ free_buffer(Buffer *buf)
     if (buf->data != NULL) {
         free(buf->data);
     }
-    free(buf);
 }
 
 int
@@ -45,7 +38,7 @@ resize_buffer(Buffer *buf, size_t new_size)
         return -1;
     }
 
-    char *new_ptr = realloc(buf, new_size);
+    unsigned char *new_ptr = realloc(buf, new_size);
     if (new_ptr == NULL) {
         return -1;
     }
