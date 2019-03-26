@@ -26,5 +26,6 @@ add_executable(
         ./src/tcp.c
         ./src/socket.c
         ./src/ae.c
+        ./src/buffer.c
 )
 target_link_libraries(test crypto)

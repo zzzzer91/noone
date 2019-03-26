@@ -289,7 +289,8 @@ ae_process_events(AeEventLoop *event_loop)
 
             if (fe->mask & AE_IN) {
                 fe->rcallback(event_loop, fd, fe->client_data);
-            } else if (fe->mask & AE_OUT) {
+            }
+            if (fe->mask & AE_OUT) {
                 fe->wcallback(event_loop, fd, fe->client_data);
             }
 

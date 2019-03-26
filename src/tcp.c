@@ -101,20 +101,23 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     int close_flag = 0;
-    size_t n = READN(fd, nd->ciphertext.data, BUF_CAPACITY, close_flag);
+    size_t n = READN(fd, nd->ciphertext.data, nd->ciphertext.capacity, close_flag);
     nd->ciphertext.len += n;
     if (close_flag == 1) {  // ss_client 关闭
+        LOGGER_DEBUG("ss_client close!");
         goto CLEAR;
     }
 
     if (nd->ss_stage == STAGE_INIT) {
         CryptorInfo *ci = event_loop->extra_data;
         if (handle_stage_init(ci, nd) < 0) {
+            LOGGER_ERROR("handle_stage_init");
             goto CLEAR;
         }
     } else {
         size_t ret = DECRYPT(nd);
         if (ret == 0) {
+            LOGGER_ERROR("DECRYPT");
             goto CLEAR;
         }
         nd->plaintext.len = ret;
@@ -125,6 +128,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->ss_stage == STAGE_HANDSHAKE) {
         if (handle_stage_handshake(nd) < 0) {
+            LOGGER_ERROR("handle_stage_handshake");
             goto CLEAR;
         }
     }
@@ -132,6 +136,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     if (nd->plaintext.len > 0) {
         if (ae_register_event(event_loop, nd->remote_fd ,
                 AE_OUT, NULL, tcp_write_remote, nd) < 0) {
+            LOGGER_ERROR("ae_register_event");
             goto CLEAR;
         }
     } else {
@@ -152,6 +157,7 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
 
     size_t ret = ENCRYPT(nd);
     if (ret == 0) {
+        LOGGER_ERROR("ENCRYPT");
         return;
     }
     nd->remote_cipher.len = ret;
@@ -183,7 +189,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
     int close_flag = 0;
-    size_t ret = READN(fd, nd->remote.p, BUF_CAPACITY, close_flag);
+    size_t ret = READN(fd, nd->remote.p, nd->remote.capacity, close_flag);
     if (close_flag == 1) {
         close(fd);
         ae_unregister_event(event_loop, fd);

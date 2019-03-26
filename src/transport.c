@@ -4,17 +4,11 @@
 
 #include "transport.h"
 #include "log.h"
+#include "buffer.h"
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <arpa/inet.h>   /* inet_ntoa() */
-
-static void
-init_buffer(Buffer *buf)
-{
-    buf->p = buf->data;
-    buf->len = 0;
-}
 
 NetData *
 init_net_data()
@@ -31,13 +25,36 @@ init_net_data()
     nd->cipher_ctx.encrypt_ctx = NULL;
     nd->cipher_ctx.decrypt_ctx = NULL;
 
-    init_buffer(&nd->ciphertext);
-    init_buffer(&nd->plaintext);
-    init_buffer(&nd->remote);
-    init_buffer(&nd->remote_cipher);
+    init_buffer(&nd->ciphertext, BUF_CAPACITY);
+    init_buffer(&nd->plaintext, BUF_CAPACITY);
+    init_buffer(&nd->remote, BUF_CAPACITY);
+    init_buffer(&nd->remote_cipher, BUF_CAPACITY);
     nd->is_iv_send = 0;
 
     return nd;
+}
+
+void
+free_net_data(NetData *nd)
+{
+    if (nd->ssclient_fd != -1) {
+        close(nd->ssclient_fd);
+    }
+    if (nd->remote_fd != -1) {
+        close(nd->remote_fd);
+    }
+    if (nd->cipher_ctx.encrypt_ctx != NULL) {
+        EVP_CIPHER_CTX_free(nd->cipher_ctx.encrypt_ctx);
+    }
+    if (nd->cipher_ctx.decrypt_ctx != NULL) {
+        EVP_CIPHER_CTX_free(nd->cipher_ctx.decrypt_ctx);
+    }
+    free_buffer(&nd->ciphertext);
+    free_buffer(&nd->plaintext);
+    free_buffer(&nd->remote);
+    free_buffer(&nd->remote_cipher);
+
+    free(nd);
 }
 
 int
@@ -135,22 +152,4 @@ parse_net_data_header(NetData *nd)
     LOGGER_DEBUG("%d", nd->port);
 
     return 0;
-}
-
-void
-free_net_data(NetData *nd)
-{
-    if (nd->ssclient_fd != -1) {
-        close(nd->ssclient_fd);
-    }
-    if (nd->remote_fd != -1) {
-        close(nd->remote_fd);
-    }
-    if (nd->cipher_ctx.encrypt_ctx != NULL) {
-        EVP_CIPHER_CTX_free(nd->cipher_ctx.encrypt_ctx);
-    }
-    if (nd->cipher_ctx.decrypt_ctx != NULL) {
-        EVP_CIPHER_CTX_free(nd->cipher_ctx.decrypt_ctx);
-    }
-    free(nd);
 }
