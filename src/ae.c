@@ -124,9 +124,15 @@ ae_create_event_loop(int event_set_size)
 void
 ae_delete_event_loop(AeEventLoop *event_loop)
 {
-    if (event_loop->epfd != -1) close(event_loop->epfd);
-    if (event_loop->ready_events != NULL) free(event_loop->ready_events);
-    if (event_loop->events != NULL) free(event_loop->events);
+    if (event_loop->epfd != -1) {
+        close(event_loop->epfd);
+    }
+    if (event_loop->ready_events != NULL) {
+        free(event_loop->ready_events);
+    }
+    if (event_loop->events != NULL) {
+        free(event_loop->events);
+    }
 
     free(event_loop);
 }
@@ -173,7 +179,9 @@ int
 ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         AeCallback *rcallback, AeCallback *wcallback, void *client_data)
 {
-    if (fd >= event_loop->event_set_size) return -1;
+    if (fd >= event_loop->event_set_size) {
+        return -1;
+    }
 
     // 监听指定 fd 的指定事件
     if (ae_api_add_event(event_loop, fd, mask) == -1) {
@@ -211,7 +219,9 @@ ae_modify_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         AeCallback *rcallback, AeCallback *wcallback, void *client_data)
 {
     AeEvent *fe = &event_loop->events[fd];
-    if (fe->mask == AE_NONE) return 0;
+    if (fe->mask == AE_NONE) {
+        return 0;
+    }
 
     return ae_register_event(event_loop, fd, mask, rcallback, wcallback, client_data);
 }
@@ -222,20 +232,26 @@ ae_modify_event(AeEventLoop *event_loop, int fd, uint32_t mask,
 void
 ae_unregister_event(AeEventLoop *event_loop, int fd)
 {
-    if (fd >= event_loop->event_set_size) return;
+    if (fd >= event_loop->event_set_size) {
+        return;
+    }
 
     // 取出文件事件结构
     AeEvent *fe = &event_loop->events[fd];
 
     // 未设置监听的事件类型，直接返回
-    if (fe->mask == AE_NONE) return;
+    if (fe->mask == AE_NONE) {
+        return;
+    }
 
     // 计算新 maxfd
     if (fd == event_loop->maxfd) {
         /* Update the max fd */
         int j;
         for (j = event_loop->maxfd-1; j >= 0; j--) {
-            if (event_loop->events[j].mask != AE_NONE) break;
+            if (event_loop->events[j].mask != AE_NONE) {
+                break;
+            }
         }
 
         event_loop->maxfd = j;
@@ -271,15 +287,9 @@ ae_process_events(AeEventLoop *event_loop)
             // 从已就绪数组中获取事件
             AeEvent *fe = &event_loop->events[fd];
 
-            LOGGER_DEBUG("fd: %d, mask: %d", fd, fe->mask);
-
             if (fe->mask & AE_IN) {
                 fe->rcallback(event_loop, fd, fe->client_data);
             } else if (fe->mask & AE_OUT) {
-                fe->wcallback(event_loop, fd, fe->client_data);
-            } else if (fe->mask & EPOLLHUP) {
-                fe->wcallback(event_loop, fd, fe->client_data);
-            } else if (fe->mask & EPOLLERR) {
                 fe->wcallback(event_loop, fd, fe->client_data);
             }
 
