@@ -37,7 +37,7 @@ typedef struct NetData {
 
     socklen_t sockaddr_len;
 
-    char *ip;
+    char ip[17];
 
     uint16_t port;
 
@@ -89,7 +89,6 @@ void free_net_data(NetData *nd);
         while (nleft > 0) { \
             nread = read(fd, bufp, nleft); \
             if (nread == 0) {  \
-                LOGGER_DEBUG("fd: %d, READN, connect close!", fd); \
                 close_flag = 1; \
                 break; \
             } else if (nread < 0) { \
@@ -98,7 +97,6 @@ void free_net_data(NetData *nd);
                 } else if (errno == EINTR) { \
                     nread = 0; \
                 } else { \
-                    LOGGER_ERROR("READN"); \
                     close_flag = 1; \
                     return; \
                 } \
@@ -118,14 +116,12 @@ void free_net_data(NetData *nd);
         while (nleft > 0) { \
             nwritten = write(fd, bufp, nleft); \
             if (nwritten == 0) { \
-                LOGGER_DEBUG("fd: %d, WRITEN, connect close!", fd); \
                 close_flag = 1; \
                 break; \
             } else if (nwritten < 0) { \
                 if (errno == EINTR) { \
                     break; \
                 } else { \
-                    LOGGER_ERROR("WRITEN"); \
                     close_flag = 1; \
                     return; \
                 } \

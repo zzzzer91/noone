@@ -90,6 +90,7 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 
     if (ae_register_event(event_loop, conn_fd, AE_IN, tcp_read_ssclient, NULL, nd) < 0) {
         LOGGER_ERROR("init_net_data");
+        close(conn_fd);
         free_net_data(nd);
         return;
     }
@@ -101,7 +102,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     int close_flag = 0;
-    size_t n = READN(fd, nd->ciphertext.data, nd->ciphertext.capacity, close_flag);
+    size_t n = READN(fd, nd->ciphertext.p+nd->ciphertext.len, nd->ciphertext.capacity, close_flag);
     nd->ciphertext.len += n;
     if (close_flag == 1) {  // ss_client 关闭
         LOGGER_DEBUG("ss_client close!");
@@ -146,8 +147,15 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     return;
 
 CLEAR:
+    if (nd->ssclient_fd != -1) {
+        close(nd->ssclient_fd);
+        ae_unregister_event(event_loop, nd->ssclient_fd);
+    }
+    if (nd->remote_fd != -1) {
+        close(nd->remote_fd);
+        ae_unregister_event(event_loop, nd->remote_fd);
+    }
     free_net_data(nd);
-    ae_unregister_event(event_loop, fd);
 }
 
 void
@@ -189,12 +197,13 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
     int close_flag = 0;
-    size_t ret = READN(fd, nd->remote.p, nd->remote.capacity, close_flag);
+    size_t ret = READN(fd, nd->remote.p+nd->remote.len, nd->remote.capacity, close_flag);
     if (close_flag == 1) {
+        LOGGER_DEBUG("read, remote close!");
         close(fd);
         ae_unregister_event(event_loop, fd);
     }
-    nd->remote.len = ret;
+    nd->remote.len += ret;
 
     ae_modify_event(event_loop, nd->ssclient_fd, AE_OUT, NULL, tcp_write_ssclient, nd);
 }
@@ -207,16 +216,16 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     int close_flag = 0;
     size_t n = WRITEN(fd, nd->plaintext.p, nd->plaintext.len, close_flag);
     if (close_flag == 1) {
+        LOGGER_DEBUG("write, remote close!");
         close(fd);
         ae_unregister_event(event_loop, fd);
     }
 
     nd->plaintext.len -= n;
-    if (nd->plaintext.len == 0) {
+    if (nd->plaintext.len == 0) {  // 写完
         nd->plaintext.p = nd->plaintext.data;
+        ae_modify_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd);
     } else {
         nd->plaintext.p += n;
     }
-
-    ae_modify_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd);
 }

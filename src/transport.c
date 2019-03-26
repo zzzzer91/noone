@@ -37,12 +37,6 @@ init_net_data()
 void
 free_net_data(NetData *nd)
 {
-    if (nd->ssclient_fd != -1) {
-        close(nd->ssclient_fd);
-    }
-    if (nd->remote_fd != -1) {
-        close(nd->remote_fd);
-    }
     if (nd->cipher_ctx.encrypt_ctx != NULL) {
         EVP_CIPHER_CTX_free(nd->cipher_ctx.encrypt_ctx);
     }
@@ -133,11 +127,15 @@ parse_net_data_header(NetData *nd)
         nd->plaintext.p += 4;
         nd->plaintext.len -= 4;
         memcpy(nd->sockaddr.sa_data+2, &addr, 4);
-        nd->ip = inet_ntoa(addr);
-        LOGGER_DEBUG("%s", nd->ip);
         nd->sockaddr_len = sizeof(struct sockaddr_in);
     } else if (atty == ATYP_IPV6) {
-        // TODO
+        nd->sockaddr.sa_family = AF_INET6;
+        struct in6_addr addr6;
+        memcpy(&addr6, nd->plaintext.p, 16);
+        nd->plaintext.p += 16;
+        nd->plaintext.len -= 16;
+        memcpy(nd->sockaddr.sa_data+2, &addr6, 16);
+        nd->sockaddr_len = sizeof(struct sockaddr_in6);
     } else {
         LOGGER_ERROR("ATYP error！");
         return -1;
