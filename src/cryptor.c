@@ -43,8 +43,10 @@ bytes_to_key(const unsigned char *passwd,
     }
 
     memcpy(key, buf, key_len);
+    key[key_len] = 0;
     if (iv != NULL) {
         memcpy(iv, buf + key_len, iv_len);
+        iv[iv_len] = 0;
     }
 }
 

@@ -56,19 +56,24 @@ free_net_data(NetData *nd)
 int
 init_net_data_cipher(CryptorInfo *ci, NetData *nd)
 {
-    nd->cipher_ctx.iv_len = ci->iv_len;
     memcpy(nd->cipher_ctx.iv, nd->ciphertext.data, ci->iv_len);
     nd->ciphertext.p += ci->iv_len;
     nd->ciphertext.len -= ci->iv_len;
+    nd->cipher_ctx.iv[ci->iv_len] = 0;
+    nd->cipher_ctx.iv_len = ci->iv_len;
+
+    memcpy(nd->cipher_ctx.key, ci->key, ci->key_len);
+    nd->cipher_ctx.key[ci->key_len] = 0;
+    nd->cipher_ctx.key_len = ci->key_len;
 
     EVP_CIPHER_CTX *ctx;
-    ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    ctx = INIT_ENCRYPT_CTX(ci->cipher_name, nd->cipher_ctx.key, nd->cipher_ctx.iv);
     if (ctx == NULL) {
         return -1;
     }
     nd->cipher_ctx.encrypt_ctx = ctx;
 
-    ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    ctx = INIT_DECRYPT_CTX(ci->cipher_name, nd->cipher_ctx.key, nd->cipher_ctx.iv);
     if (ctx == NULL) {
         return -1;
     }
