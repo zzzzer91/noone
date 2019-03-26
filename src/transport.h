@@ -107,13 +107,14 @@ void free_net_data(NetData *nd);
         close_flag; \
     })
 
-#define WRITEN(fd, buf, n, close_flag) \
+#define WRITEN(fd, buf) \
     ({ \
-        size_t nleft = n; \
+        int close_flag = 0; \
+        size_t nleft = buf.len; \
         ssize_t nwritten; \
-        unsigned char *bufp = buf; \
+        unsigned char *p = buf.p; \
         while (nleft > 0) { \
-            nwritten = write(fd, bufp, nleft); \
+            nwritten = write(fd, p, nleft); \
             if (nwritten == 0) { \
                 close_flag = 1; \
                 break; \
@@ -122,14 +123,16 @@ void free_net_data(NetData *nd);
                     break; \
                 } else { \
                     close_flag = 1; \
-                    return; \
+                    break; \
                 } \
             } \
             nleft -= nwritten; \
-            bufp += nwritten; \
+            p += nwritten; \
+            buf.len -= nwritten; \
         } \
-        LOGGER_DEBUG("fd: %d, write: %ld", fd, n - nleft); \
-        n - nleft; \
+        buf.len = nleft; \
+        buf.p = p; \
+        close_flag; \
     })
 
 #endif /* _NOONE_TRANSPORT_H_ */

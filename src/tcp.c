@@ -164,20 +164,16 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
 
-    int close_flag = 0;
-    size_t n = WRITEN(fd, nd->plaintext.p, nd->plaintext.len, close_flag);
+    int close_flag = WRITEN(fd, nd->plaintext);
     if (close_flag == 1) {
         LOGGER_DEBUG("write, remote close!");
         close(fd);
         ae_unregister_event(event_loop, fd);
     }
 
-    nd->plaintext.len -= n;
     if (nd->plaintext.len == 0) {  // 写完
         nd->plaintext.p = nd->plaintext.data;
         ae_modify_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd);
-    } else {
-        nd->plaintext.p += n;
     }
 }
 
@@ -216,18 +212,14 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
         nd->is_iv_send = 1;
     }
 
-    int close_flag = 0;
-    size_t ret = WRITEN(fd, nd->remote_cipher.p, nd->remote_cipher.len, close_flag);
+    int close_flag = WRITEN(fd, nd->remote_cipher);
     if (close_flag == 1) {
         LOGGER_DEBUG("write, ssclient close!");
         CLEAR(event_loop, nd);
     }
 
-    nd->remote_cipher.len -= ret;
     if (nd->remote_cipher.len == 0) {
         nd->remote_cipher.p = nd->remote_cipher.data;
         ae_modify_event(event_loop, fd, AE_IN, tcp_read_ssclient, NULL, nd);
-    } else {
-        nd->remote_cipher.p += ret;
     }
 }
