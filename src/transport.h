@@ -8,6 +8,7 @@
 #include "cryptor.h"
 #include "ae.h"
 #include "buffer.h"
+#include "log.h"
 #include <netdb.h>
 
 #define BUF_CAPACITY 32 * 1024
@@ -119,8 +120,10 @@ void free_net_data(NetData *nd);
                 close_flag = 1; \
                 break; \
             } else if (nwritten < 0) { \
-                if (errno == EINTR) { \
+                if (errno == EAGAIN) { \
                     break; \
+                } else if (errno == EINTR) { \
+                    nwritten = 0; \
                 } else { \
                     close_flag = 1; \
                     break; \
@@ -128,7 +131,6 @@ void free_net_data(NetData *nd);
             } \
             nleft -= nwritten; \
             p += nwritten; \
-            buf.len -= nwritten; \
         } \
         buf.len = nleft; \
         buf.p = p; \

@@ -190,7 +190,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 
     size_t ret = ENCRYPT(nd);
     if (ret == 0) {
-        LOGGER_ERROR("ENCRYPT");
+        LOGGER_ERROR("ENCRYPT %s:%s", nd->domain, nd->remote_port_str);
         CLEAR(event_loop, nd);
     }
     nd->remote_cipher.len += ret;

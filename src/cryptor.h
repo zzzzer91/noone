@@ -17,6 +17,7 @@
 typedef struct CryptorInfo {
     char cipher_name[MAX_CIPHER_NAME_LEN];
     unsigned char key[MAX_KEY_LEN+1];
+    size_t cipher_name_len;
     size_t key_len;
     size_t iv_len;
 } CryptorInfo;
@@ -24,9 +25,11 @@ typedef struct CryptorInfo {
 typedef struct CipherCtx {
     EVP_CIPHER_CTX *encrypt_ctx;
     EVP_CIPHER_CTX *decrypt_ctx;
+    char cipher_name[MAX_CIPHER_NAME_LEN];
     unsigned char key[MAX_KEY_LEN+1];
-    size_t key_len;
     unsigned char iv[MAX_IV_LEN+1];
+    size_t cipher_name_len;
+    size_t key_len;
     size_t iv_len;
 } CipherCtx;
 

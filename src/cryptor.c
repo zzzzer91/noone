@@ -77,9 +77,11 @@ init_cryptor_info(const char *name,
     size_t name_len = strlen(name);
     memcpy(ci->cipher_name, name, name_len);
     ci->cipher_name[name_len] = 0;
+    ci->cipher_name_len = name_len;
+
+    bytes_to_key(passwd, ci->key, key_len, NULL, iv_len);
     ci->key_len = key_len;
     ci->iv_len = iv_len;
-    bytes_to_key(passwd, ci->key, key_len, NULL, iv_len);
 
     return ci;
 }
