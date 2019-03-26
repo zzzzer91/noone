@@ -120,7 +120,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
         nd->plaintext.len = ret;
     }
 
-    nd->ciphertext.idx = 0;
+    nd->ciphertext.p = nd->ciphertext.data;
     nd->ciphertext.len = 0;
 
     if (nd->ss_stage == STAGE_HANDSHAKE) {
@@ -135,7 +135,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
             goto CLEAR;
         }
     } else {
-        nd->plaintext.idx = 0;
+        nd->plaintext.p = nd->plaintext.data;
     }
 
     return;
@@ -151,12 +151,12 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     size_t ret = ENCRYPT(nd);
-    if (ret < 0) {
+    if (ret == 0) {
         return;
     }
     nd->remote_cipher.len = ret;
+    nd->remote.p = nd->remote.data;
     nd->remote.len = 0;
-    nd->remote.idx = 0;
 
     if (nd->is_iv_send == 0) {
         write(fd, nd->cipher_ctx.iv, nd->cipher_ctx.iv_len);
@@ -164,17 +164,16 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
     }
 
     int close_flag = 0;
-    ret = WRITEN(fd, nd->remote_cipher.data+nd->remote_cipher.idx,
-            nd->remote_cipher.len, close_flag);
+    ret = WRITEN(fd, nd->remote_cipher.p, nd->remote_cipher.len, close_flag);
     if (close_flag == 1) {
         // TODO
     }
 
     nd->remote_cipher.len -= ret;
     if (nd->remote_cipher.len == 0) {
-        nd->remote_cipher.idx = 0;
+        nd->remote_cipher.p = nd->remote_cipher.data;
     } else {
-        nd->remote_cipher.idx += ret;
+        nd->remote_cipher.p += ret;
     }
     ae_modify_event(event_loop, fd, AE_IN, tcp_read_ssclient, NULL, nd);
 }
@@ -184,8 +183,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
     int close_flag = 0;
-    size_t ret = READN(fd, nd->remote.data+nd->remote.idx,
-            BUF_CAPACITY, close_flag);
+    size_t ret = READN(fd, nd->remote.p, BUF_CAPACITY, close_flag);
     if (close_flag == 1) {
         close(fd);
         ae_unregister_event(event_loop, fd);
@@ -201,8 +199,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     int close_flag = 0;
-    size_t n = WRITEN(fd, nd->plaintext.data+nd->plaintext.idx,
-            nd->plaintext.len, close_flag);
+    size_t n = WRITEN(fd, nd->plaintext.p, nd->plaintext.len, close_flag);
     if (close_flag == 1) {
         close(fd);
         ae_unregister_event(event_loop, fd);
@@ -210,9 +207,9 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 
     nd->plaintext.len -= n;
     if (nd->plaintext.len == 0) {
-        nd->plaintext.idx = 0;
+        nd->plaintext.p = nd->plaintext.data;
     } else {
-        nd->plaintext.idx += n;
+        nd->plaintext.p += n;
     }
 
     ae_modify_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd);

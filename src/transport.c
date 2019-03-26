@@ -12,7 +12,7 @@
 static void
 init_buffer(Buffer *buf)
 {
-    buf->idx = 0;
+    buf->p = buf->data;
     buf->len = 0;
 }
 
@@ -45,14 +45,16 @@ init_net_data_cipher(CryptorInfo *ci, NetData *nd)
 {
     nd->cipher_ctx.iv_len = ci->iv_len;
     memcpy(nd->cipher_ctx.iv, nd->ciphertext.data, ci->iv_len);
-    nd->ciphertext.idx += ci->iv_len;
+    nd->ciphertext.p += ci->iv_len;
     nd->ciphertext.len -= ci->iv_len;
+
     EVP_CIPHER_CTX *ctx;
     ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
     if (ctx == NULL) {
         return -1;
     }
     nd->cipher_ctx.encrypt_ctx = ctx;
+
     ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
     if (ctx == NULL) {
         return -1;
@@ -79,16 +81,17 @@ init_net_data_cipher(CryptorInfo *ci, NetData *nd)
 int
 parse_net_data_header(NetData *nd)
 {
-    int atty = nd->plaintext.data[nd->plaintext.idx];
-    nd->plaintext.idx += 1;
+    int atty = nd->plaintext.p[0];
+    nd->plaintext.p += 1;
     nd->plaintext.len -= 1;
     if (atty == ATYP_DOMAIN) {
-        size_t domain_len = nd->plaintext.data[nd->plaintext.idx];  // 域名长度
-        nd->plaintext.idx += 1;
+        size_t domain_len = nd->plaintext.p[0];  // 域名长度
+        nd->plaintext.p += 1;
+        nd->plaintext.len -= 1;
         char domain[65];
-        memcpy(domain, nd->plaintext.data+nd->plaintext.idx, domain_len);
+        memcpy(domain, nd->plaintext.p, domain_len);
         domain[domain_len] = 0;  // 加上 '\0'
-        nd->plaintext.idx += domain_len;
+        nd->plaintext.p += domain_len;
         nd->plaintext.len -= domain_len;
         LOGGER_DEBUG("%s", domain);
 
@@ -109,12 +112,12 @@ parse_net_data_header(NetData *nd)
     } else if (atty == ATYP_IPV4) {
         nd->sockaddr.sa_family = AF_INET;
         struct in_addr addr;
-        memcpy(&addr, nd->plaintext.data+nd->plaintext.idx, 4);
+        memcpy(&addr, nd->plaintext.p, 4);
+        nd->plaintext.p += 4;
+        nd->plaintext.len -= 4;
         memcpy(nd->sockaddr.sa_data+2, &addr, 4);
         nd->ip = inet_ntoa(addr);
         LOGGER_DEBUG("%s", nd->ip);
-        nd->plaintext.idx += 4;
-        nd->plaintext.len -= 4;
         nd->sockaddr_len = sizeof(struct sockaddr_in);
     } else if (atty == ATYP_IPV6) {
         // TODO
@@ -124,10 +127,10 @@ parse_net_data_header(NetData *nd)
     }
 
     uint16_t port;
-    memcpy(&port, nd->plaintext.data+nd->plaintext.idx, 2);
-    memcpy(nd->sockaddr.sa_data, &port, 2);
-    nd->plaintext.idx += 2;
+    memcpy(&port, nd->plaintext.p, 2);
+    nd->plaintext.p += 2;
     nd->plaintext.len -= 2;
+    memcpy(nd->sockaddr.sa_data, &port, 2);
     nd->port = ntohs(port);
     LOGGER_DEBUG("%d", nd->port);
 

@@ -27,7 +27,7 @@ typedef enum SsStageType {
 } SsStageType;
 
 typedef struct Buffer {
-    size_t idx;
+    unsigned char *p;  // 指针
     size_t len;
     unsigned char data[BUF_CAPACITY];
 } Buffer;
@@ -71,11 +71,11 @@ int parse_net_data_header(NetData *nd);
 void free_net_data(NetData *nd);
 
 #define ENCRYPT(nd) \
-    encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.data+(nd)->remote.idx, \
+    encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.p, \
             (nd)->remote.len, (nd)->remote_cipher.data)
 
 #define DECRYPT(nd) \
-    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.data+(nd)->ciphertext.idx, \
+    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.p, \
             (nd)->ciphertext.len, (nd)->plaintext.data)
 /*
  * 1、当对端套接字已关闭，read() 会返回 0。
