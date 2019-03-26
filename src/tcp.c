@@ -116,16 +116,12 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
 
-    size_t buf_remain = nd->ciphertext.capacity -
-            (nd->ciphertext.p - nd->ciphertext.data + nd->ciphertext.len);
-
-    int close_flag = 0;
-    size_t n = READN(fd, nd->ciphertext.p+nd->ciphertext.len, buf_remain, close_flag);
-    nd->ciphertext.len += n;
+    int close_flag = READN(fd, nd->ciphertext);
     if (close_flag == 1) {  // ss_client 关闭
         LOGGER_DEBUG("read, ssclient close!");
         CLEAR(event_loop, nd);
     }
+    // LOGGER_DEBUG("fd: %d, read: %ld", fd, n);
 
     if (nd->ss_stage == STAGE_INIT) {
         CryptorInfo *ci = event_loop->extra_data;
@@ -190,17 +186,14 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
 
-    size_t buf_remain = nd->remote.capacity - (nd->remote.p - nd->remote.data + nd->remote.len);
-    int close_flag = 0;
-    size_t ret = READN(fd, nd->remote.p+nd->remote.len, buf_remain, close_flag);
+    int close_flag = READN(fd, nd->remote);
     if (close_flag == 1) {
         LOGGER_DEBUG("read, remote close!");
         close(fd);
         ae_unregister_event(event_loop, fd);
     }
-    nd->remote.len += ret;
 
-    ret = ENCRYPT(nd);
+    size_t ret = ENCRYPT(nd);
     if (ret == 0) {
         LOGGER_ERROR("ENCRYPT");
         // TODO

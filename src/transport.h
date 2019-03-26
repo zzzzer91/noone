@@ -79,13 +79,14 @@ void free_net_data(NetData *nd);
  *    因为前面可能读了数据。
  *    WRITEN() 同理。
  */
-#define READN(fd, buf, n, close_flag) \
+#define READN(fd, buf) \
     ({ \
-        size_t nleft = n; \
+        int close_flag = 0; \
+        size_t nleft = buf.capacity - (buf.p - buf.data + buf.len); \
         ssize_t nread; \
-        unsigned char *bufp = buf; \
+        unsigned char *p = buf.p + buf.len; \
         while (nleft > 0) { \
-            nread = read(fd, bufp, nleft); \
+            nread = read(fd, p, nleft); \
             if (nread == 0) {  \
                 close_flag = 1; \
                 break; \
@@ -96,14 +97,14 @@ void free_net_data(NetData *nd);
                     nread = 0; \
                 } else { \
                     close_flag = 1; \
-                    return; \
+                    break; \
                 } \
             } \
             nleft -= nread; \
-            bufp += nread; \
+            p += nread; \
+            buf.len += nread; \
         } \
-        LOGGER_DEBUG("fd: %d, read: %ld", fd, n - nleft); \
-        n - nleft; \
+        close_flag; \
     })
 
 #define WRITEN(fd, buf, n, close_flag) \
