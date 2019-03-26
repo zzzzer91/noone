@@ -96,6 +96,7 @@ handle_stage_handshake(NetData *nd)
         return -1;
     }
 
+    LOGGER_DEBUG("connecting %s:%d", nd->domain, nd->remote_port);
     if (connect(fd, &nd->sockaddr, nd->sockaddr_len) < 0) {
         if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
             close(fd);

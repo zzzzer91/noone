@@ -8,7 +8,7 @@
 #include <sys/epoll.h>
 #include <time.h>
 
-#define AE_MAX_EVENTS 8192
+#define AE_MAX_EVENTS 4096
 
 /*
  * 文件事件状态
@@ -29,9 +29,6 @@ typedef void AeCallback(AeEventLoop *event_loop, int fd, void *data);
  */
 typedef struct AeEvent {
 
-    // 最后激活时间，用于踢掉超时连接
-    time_t last_active;
-
     // 监听事件类型掩码，
     // 值可以是 AE_IN 或 AE_OUT，或同时
     int mask;
@@ -44,6 +41,9 @@ typedef struct AeEvent {
 
     // 多路复用库的私有数据
     void *client_data;
+
+    // 最后激活时间，用于踢掉超时连接
+    time_t last_active;
 
 } AeEvent;
 

@@ -13,7 +13,7 @@
 /* test */
 #define SERVER_ADDR "127.0.0.1"
 #define SERVER_PORT 9527
-#define PASSWD (unsigned char *)"yousonofabitch"
+#define PASSWD (unsigned char *)"123123"
 
 int
 main(int argc, char *argv[])

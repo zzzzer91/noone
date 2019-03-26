@@ -37,9 +37,9 @@ typedef struct NetData {
 
     socklen_t sockaddr_len;
 
-    char ip[17];
+    char domain[64];
 
-    uint16_t port;
+    uint16_t remote_port;
 
     SsStageType ss_stage;
 
@@ -104,6 +104,7 @@ void free_net_data(NetData *nd);
             nleft -= nread; \
             bufp += nread; \
         } \
+        LOGGER_DEBUG("fd: %d, read: %ld", fd, n - nleft); \
         n - nleft; \
     })
 
@@ -128,6 +129,7 @@ void free_net_data(NetData *nd);
             nleft -= nwritten; \
             bufp += nwritten; \
         } \
+        LOGGER_DEBUG("fd: %d, write: %ld", fd, n - nleft); \
         n - nleft; \
     })
 

@@ -97,23 +97,23 @@ parse_net_data_header(NetData *nd)
     nd->plaintext.len -= 1;
     if (atty == ATYP_DOMAIN) {
         size_t domain_len = nd->plaintext.p[0];  // 域名长度
+        if (domain_len > 63) {
+            LOGGER_ERROR("domain_len too long!");
+            return -1;
+        }
         nd->plaintext.p += 1;
         nd->plaintext.len -= 1;
-        char domain[65];
-        memcpy(domain, nd->plaintext.p, domain_len);
-        domain[domain_len] = 0;  // 加上 '\0'
+        memcpy(nd->domain, nd->plaintext.p, domain_len);
+        nd->domain[domain_len] = 0;  // 加上 '\0'
         nd->plaintext.p += domain_len;
         nd->plaintext.len -= domain_len;
-        LOGGER_DEBUG("%s", domain);
 
         struct addrinfo hints = {}, *listp;
         hints.ai_socktype = SOCK_STREAM;
-        hints.ai_flags = AI_NUMERICSERV; /* 强制只能填端口号, 而不能是端口号对应的服务名 */
-        hints.ai_flags |= AI_ADDRCONFIG; /* 只有当主机配置IPv4时, 才返回IPv4地址, IPv6类似 */
-        int ret2 = getaddrinfo(domain, NULL, &hints, &listp);
+        int ret2 = getaddrinfo(nd->domain, NULL, &hints, &listp);
         if (ret2 != 0) {
             LOGGER_ERROR("%s", gai_strerror(ret2));
-            exit(1);
+            return -1;
         }
         memcpy(&nd->sockaddr, listp->ai_addr, listp->ai_addrlen);
         nd->sockaddr_len = listp->ai_addrlen;
@@ -145,8 +145,7 @@ parse_net_data_header(NetData *nd)
     nd->plaintext.p += 2;
     nd->plaintext.len -= 2;
     memcpy(nd->sockaddr.sa_data, &port, 2);
-    nd->port = ntohs(port);
-    LOGGER_DEBUG("%d", nd->port);
+    nd->remote_port = ntohs(port);
 
     return 0;
 }
