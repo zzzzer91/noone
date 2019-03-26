@@ -87,8 +87,7 @@ handle_stage_init(CryptorInfo *ci, NetData *nd)
 static int
 handle_stage_handshake(NetData *nd)
 {
-    int fd = socket(nd->addr_listp->ai_family,
-            nd->addr_listp->ai_socktype, nd->addr_listp->ai_protocol);
+    int fd = socket(nd->addr_listp->ai_family, nd->addr_listp->ai_socktype, 0);
     if (fd < 0) {
         return -1;
     }
@@ -119,6 +118,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 
     size_t buf_remain = nd->ciphertext.capacity -
             (nd->ciphertext.p - nd->ciphertext.data + nd->ciphertext.len);
+
     int close_flag = 0;
     size_t n = READN(fd, nd->ciphertext.p+nd->ciphertext.len, buf_remain, close_flag);
     nd->ciphertext.len += n;
