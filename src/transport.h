@@ -67,11 +67,11 @@ void free_net_data(NetData *nd);
 
 #define ENCRYPT(nd) \
     encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.p, \
-            (nd)->remote.len, (nd)->remote_cipher.data)
+            (nd)->remote.len, (nd)->remote_cipher.p+(nd)->remote_cipher.len)
 
 #define DECRYPT(nd) \
     decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.p, \
-            (nd)->ciphertext.len, (nd)->plaintext.data)
+            (nd)->ciphertext.len, (nd)->plaintext.p+(nd)->plaintext.len)
 /*
  * 1、当对端套接字已关闭，read() 会返回 0。
  * 2、当（read() == -1 && errno == EAGAIN）时，
