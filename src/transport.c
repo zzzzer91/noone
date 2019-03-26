@@ -52,11 +52,11 @@ init_net_data_cipher(CryptorInfo *ci, NetData *nd)
     if (ctx == NULL) {
         return -1;
     }
+    nd->cipher_ctx.encrypt_ctx = ctx;
     ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
     if (ctx == NULL) {
         return -1;
     }
-    nd->cipher_ctx.encrypt_ctx = ctx;
     nd->cipher_ctx.decrypt_ctx = ctx;
 
     return 0;
