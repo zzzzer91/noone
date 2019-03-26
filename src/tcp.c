@@ -14,83 +14,28 @@
 #include <unistd.h>      /* close() */
 #include <sys/socket.h>  /* accept() */
 #include <netinet/in.h>  /* struct sockaddr_in */
-#include <arpa/inet.h>   /* inet_ntoa() */
-#include <netdb.h>
 
-static void
+static int
 handle_stage_init(AeEventLoop *event_loop, int fd, NetData *nd)
 {
     LOGGER_DEBUG("fd: %d, STAGE_INIT", fd);
 
-    CryptorInfo *ci = event_loop->extra_data;
-    nd->cipher_ctx.iv_len = ci->iv_len;
-    memcpy(nd->cipher_ctx.iv, nd->ciphertext.data, ci->iv_len);
-    nd->ciphertext.idx += ci->iv_len;
-    nd->ciphertext.len -= ci->iv_len;
-    nd->cipher_ctx.encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
-    nd->cipher_ctx.decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    init_net_data_cipher(event_loop->extra_data, nd);
+
     nd->plaintext.len = DECRYPT(nd);
     if (nd->plaintext.len < 0) {
         // TODO
     }
-    int atty = nd->plaintext.data[nd->plaintext.idx];
-    nd->plaintext.idx += 1;
-    nd->plaintext.len -= 1;
-    if (atty == ATYP_DOMAIN) {
-        size_t domain_len = nd->plaintext.data[nd->plaintext.idx];  // 域名长度
-        nd->plaintext.idx += 1;
-        char domain[65];
-        memcpy(domain, nd->plaintext.data+nd->plaintext.idx, domain_len);
-        domain[domain_len] = 0;  // 加上 '\0'
-        nd->plaintext.idx += domain_len;
-        nd->plaintext.len -= domain_len;
-        LOGGER_DEBUG("%s", domain);
 
-        struct addrinfo hints = {}, *listp;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_flags = AI_NUMERICSERV; /* 强制只能填端口号, 而不能是端口号对应的服务名 */
-        hints.ai_flags |= AI_ADDRCONFIG; /* 只有当主机配置IPv4时, 才返回IPv4地址, IPv6类似 */
-        int ret2 = getaddrinfo(domain, NULL, &hints, &listp);
-        if (ret2 != 0) {
-            LOGGER_ERROR("%s", gai_strerror(ret2));
-            exit(1);
-        }
-        memcpy(&nd->sockaddr, &listp->ai_addr, 14);
-        nd->sockaddr.sa_family = (sa_family_t)listp->ai_family;
-        nd->sockaddr_len = listp->ai_addrlen;
-
-        freeaddrinfo(listp);
-
-        nd->ss_stage = STAGE_HANDSHAKE;
-    } else if (atty == ATYP_IPV4) {
-        nd->sockaddr.sa_family = AF_INET;
-        struct in_addr addr;
-        memcpy(&addr, nd->plaintext.data+nd->plaintext.idx, 4);
-        memcpy(nd->sockaddr.sa_data+2, &addr, 4);
-        nd->ip = inet_ntoa(addr);
-        LOGGER_DEBUG("%s", nd->ip);
-        nd->plaintext.idx += 4;
-        nd->plaintext.len -= 4;
-        nd->sockaddr_len = sizeof(struct sockaddr_in);
-        nd->ss_stage = STAGE_HANDSHAKE;
-    } else if (atty == ATYP_IPV6) {
+    int ret = parse_net_data_header(nd);
+    if (ret < 0) {
         // TODO
-        nd->ss_stage = STAGE_HANDSHAKE;
-    } else {
-        LOGGER_ERROR("ATYP error！");
-        return;
     }
 
-    uint16_t port;
-    memcpy(&port, nd->plaintext.data+nd->plaintext.idx, 2);
-    memcpy(nd->sockaddr.sa_data, &port, 2);
-    nd->plaintext.idx += 2;
-    nd->plaintext.len -= 2;
-    nd->port = ntohs(port);
-    LOGGER_DEBUG("%d", nd->port);
+    return 0;
 }
 
-static void
+static int
 handle_stage_handshake(AeEventLoop *event_loop, int fd, NetData *nd)
 {
     LOGGER_DEBUG("fd: %d, STAGE_HANDSHAKE", fd);
@@ -103,6 +48,8 @@ handle_stage_handshake(AeEventLoop *event_loop, int fd, NetData *nd)
     connect(nd->remote_fd, &nd->sockaddr, nd->sockaddr_len);
 
     nd->ss_stage = STAGE_STREAM;
+
+    return 0;
 }
 
 void
@@ -201,7 +148,8 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
     }
 
     int close_flag = 0;
-    size_t n = WRITEN(fd, nd->remote_cipher.data+nd->remote_cipher.idx, nd->remote_cipher.len, close_flag);
+    size_t n = WRITEN(fd, nd->remote_cipher.data+nd->remote_cipher.idx,
+            nd->remote_cipher.len, close_flag);
     nd->remote_cipher.len -= n;
     if (nd->remote_cipher.len == 0) {
         nd->remote_cipher.idx = 0;
@@ -216,7 +164,8 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
     int close_flag = 0;
-    nd->remote.len = READN(fd, nd->remote.data+nd->remote.idx, nd->remote.capacity, close_flag);
+    nd->remote.len = READN(fd, nd->remote.data+nd->remote.idx,
+            nd->remote.capacity, close_flag);
 
     ae_modify_event(event_loop, nd->ssclient_fd, AE_OUT, NULL, tcp_write_ssclient, nd);
 }
@@ -226,7 +175,8 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
     int close_flag = 0;
-    size_t n = WRITEN(fd, nd->plaintext.data+nd->plaintext.idx, nd->plaintext.len, close_flag);
+    size_t n = WRITEN(fd, nd->plaintext.data+nd->plaintext.idx,
+            nd->plaintext.len, close_flag);
     nd->plaintext.len -= n;
     if (nd->plaintext.len == 0) {
         nd->plaintext.idx = 0;

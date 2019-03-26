@@ -33,7 +33,7 @@ tcp_server_fd_init(const char *addr, unsigned short port)
         return -1;
     }
 
-    if (listen(server_fd, SOMAXCONN) < 0) {
+    if (listen(server_fd, MAX_LISTEN) < 0) {
         return -1;
     }
 

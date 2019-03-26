@@ -59,6 +59,10 @@ typedef struct NetData {
 
 NetData *init_net_data();
 
+int init_net_data_cipher(CryptorInfo *ci, NetData *nd);
+
+int parse_net_data_header(NetData *nd);
+
 void free_net_data(NetData *nd);
 
 #define ENCRYPT(nd) \

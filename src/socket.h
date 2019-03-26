@@ -5,8 +5,7 @@
 #ifndef _NOONE_SOCKET_H_
 #define _NOONE_SOCKET_H_
 
-/* Maximum queue length specifiable by listen.  */
-#define SOMAXCONN	1024
+#define MAX_LISTEN	1024
 
 int tcp_server_fd_init(const char *addr, unsigned short port);
 

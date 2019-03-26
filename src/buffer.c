@@ -6,7 +6,8 @@
 #include <stdlib.h>
 
 int
-init_buffer(Buffer *buf, size_t capacity) {
+init_buffer(Buffer *buf, size_t capacity)
+{
     buf->data = malloc(capacity);
     if (buf->data == NULL) {
         return -1;
