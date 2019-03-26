@@ -54,17 +54,17 @@ struct AeEventLoop {
     // epoll_event 实例描述符
     int epfd;
 
-    // 事件槽，只用来放置 epoll_wait() 已就绪事件
-    struct epoll_event *ready_events;
+    // 事件数组容量
+    int event_set_size; /* max number of file descriptors tracked */
 
     // 目前已注册的最大描述符
     int maxfd;   /* highest file descriptor currently registered */
 
-    // 事件数组容量
-    int event_set_size; /* max number of file descriptors tracked */
-
     // 已注册的文件事件
     AeEvent *events; /* Registered events */
+
+    // 事件槽，只用来放置 epoll_wait() 已就绪事件
+    struct epoll_event *ready_events;
 
     // 事件处理器的开关
     int stop;

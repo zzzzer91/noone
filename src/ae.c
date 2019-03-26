@@ -76,29 +76,23 @@ check_last_active(AeEventLoop *event_loop)
 AeEventLoop *
 ae_create_event_loop(int event_set_size)
 {
-    AeEventLoop *event_loop = malloc(sizeof(*event_loop));
+    AeEventLoop *event_loop = malloc(sizeof(AeEventLoop));
     if (event_loop == NULL) {
-        return NULL;
-    }
-
-    // 初始化事件槽空间，放置 epoll_wait() 已就绪事件
-    event_loop->ready_events = malloc(sizeof(struct epoll_event)*event_loop->event_set_size);
-    if (event_loop->ready_events == NULL) {
-        ae_delete_event_loop(event_loop);
         return NULL;
     }
 
     // 创建 epoll 实例
     event_loop->epfd = epoll_create(AE_MAX_EVENTS);
     if (event_loop->epfd == -1) {
-        ae_delete_event_loop(event_loop);
+        free(event_loop);
         return NULL;
     }
 
     // 初始化文件事件结构
-    event_loop->events = malloc(sizeof(AeEventLoop)*event_set_size);
+    event_loop->events = malloc(sizeof(AeEvent)*event_set_size);
     if (event_loop->events == NULL) {
-        ae_delete_event_loop(event_loop);
+        close(event_loop->epfd);
+        free(event_loop);
         return NULL;
     }
     /* Events with mask == AE_NONE are not set. So let's initialize the
@@ -106,6 +100,15 @@ ae_create_event_loop(int event_set_size)
     // 初始化监听事件
     for (int i = 0; i < event_set_size; i++) {
         event_loop->events[i].mask = AE_NONE;
+    }
+
+    // 初始化事件槽空间，放置 epoll_wait() 已就绪事件
+    event_loop->ready_events = malloc(sizeof(struct epoll_event)*event_set_size);
+    if (event_loop->ready_events == NULL) {
+        close(event_loop->epfd);
+        free(event_loop->events);
+        free(event_loop);
+        return NULL;
     }
 
     // 设置数组大小
@@ -124,16 +127,9 @@ ae_create_event_loop(int event_set_size)
 void
 ae_delete_event_loop(AeEventLoop *event_loop)
 {
-    if (event_loop->epfd != -1) {
-        close(event_loop->epfd);
-    }
-    if (event_loop->ready_events != NULL) {
-        free(event_loop->ready_events);
-    }
-    if (event_loop->events != NULL) {
-        free(event_loop->events);
-    }
-
+    close(event_loop->epfd);
+    free(event_loop->events);
+    free(event_loop->ready_events);
     free(event_loop);
 }
 
@@ -288,7 +284,7 @@ ae_process_events(AeEventLoop *event_loop)
             AeEvent *fe = &event_loop->events[fd];
 
             if (fe->mask & AE_IN) {
-                fe->rcallback(event_loop, fd, fe->client_data);
+                     fe->rcallback(event_loop, fd, fe->client_data);
             }
             if (fe->mask & AE_OUT) {
                 fe->wcallback(event_loop, fd, fe->client_data);
