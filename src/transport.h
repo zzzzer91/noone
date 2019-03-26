@@ -8,7 +8,7 @@
 #include "cryptor.h"
 #include "ae.h"
 #include "buffer.h"
-#include <netinet/in.h>  /* struct sockaddr_in */
+#include <netdb.h>
 
 #define BUF_CAPACITY 32 * 1024
 
@@ -33,13 +33,11 @@ typedef struct NetData {
 
     int remote_fd;
 
-    struct sockaddr sockaddr;
-
-    socklen_t sockaddr_len;
+    struct addrinfo *addr_listp;
 
     char domain[64];
 
-    uint16_t remote_port;
+    char remote_port_str[6];
 
     SsStageType ss_stage;
 

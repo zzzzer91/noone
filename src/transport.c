@@ -20,11 +20,10 @@ init_net_data()
 
     nd->ssclient_fd = -1;
     nd->remote_fd = -1;
-
     nd->ss_stage = STAGE_INIT;
+    nd->addr_listp = NULL;
     nd->cipher_ctx.encrypt_ctx = NULL;
     nd->cipher_ctx.decrypt_ctx = NULL;
-
     init_buffer(&nd->ciphertext, BUF_CAPACITY);
     init_buffer(&nd->plaintext, BUF_CAPACITY);
     init_buffer(&nd->remote, BUF_CAPACITY);
@@ -37,6 +36,9 @@ init_net_data()
 void
 free_net_data(NetData *nd)
 {
+    if (nd->addr_listp != NULL) {
+        freeaddrinfo(nd->addr_listp);
+    }
     if (nd->cipher_ctx.encrypt_ctx != NULL) {
         EVP_CIPHER_CTX_free(nd->cipher_ctx.encrypt_ctx);
     }
@@ -92,6 +94,10 @@ init_net_data_cipher(CryptorInfo *ci, NetData *nd)
 int
 parse_net_data_header(NetData *nd)
 {
+    int ret;
+    struct addrinfo hints = {};
+    hints.ai_socktype = SOCK_STREAM;
+
     int atty = nd->plaintext.p[0];
     nd->plaintext.p += 1;
     nd->plaintext.len -= 1;
@@ -103,38 +109,25 @@ parse_net_data_header(NetData *nd)
         }
         nd->plaintext.p += 1;
         nd->plaintext.len -= 1;
+
         memcpy(nd->domain, nd->plaintext.p, domain_len);
         nd->domain[domain_len] = 0;  // 加上 '\0'
         nd->plaintext.p += domain_len;
         nd->plaintext.len -= domain_len;
 
-        struct addrinfo hints = {}, *listp;
-        hints.ai_socktype = SOCK_STREAM;
-        int ret2 = getaddrinfo(nd->domain, NULL, &hints, &listp);
-        if (ret2 != 0) {
-            LOGGER_ERROR("%s", gai_strerror(ret2));
-            return -1;
-        }
-        memcpy(&nd->sockaddr, listp->ai_addr, listp->ai_addrlen);
-        nd->sockaddr_len = listp->ai_addrlen;
-
-        freeaddrinfo(listp);
+        hints.ai_family = AF_UNSPEC;
     } else if (atty == ATYP_IPV4) {
-        nd->sockaddr.sa_family = AF_INET;
-        struct in_addr addr;
-        memcpy(&addr, nd->plaintext.p, 4);
+        inet_ntop(AF_INET, nd->plaintext.p, nd->domain, sizeof(nd->domain));
         nd->plaintext.p += 4;
         nd->plaintext.len -= 4;
-        memcpy(nd->sockaddr.sa_data+2, &addr, 4);
-        nd->sockaddr_len = sizeof(struct sockaddr_in);
+
+        hints.ai_family = AF_INET;
     } else if (atty == ATYP_IPV6) {
-        nd->sockaddr.sa_family = AF_INET6;
-        struct in6_addr addr6;
-        memcpy(&addr6, nd->plaintext.p, 16);
+        inet_ntop(AF_INET6, nd->plaintext.p, nd->domain, sizeof(nd->domain));
         nd->plaintext.p += 16;
         nd->plaintext.len -= 16;
-        memcpy(nd->sockaddr.sa_data+2, &addr6, 16);
-        nd->sockaddr_len = sizeof(struct sockaddr_in6);
+
+        hints.ai_family = AF_INET6;
     } else {
         LOGGER_ERROR("ATYP error！");
         return -1;
@@ -144,8 +137,14 @@ parse_net_data_header(NetData *nd)
     memcpy(&port, nd->plaintext.p, 2);
     nd->plaintext.p += 2;
     nd->plaintext.len -= 2;
-    memcpy(nd->sockaddr.sa_data, &port, 2);
-    nd->remote_port = ntohs(port);
+    snprintf(nd->remote_port_str, 6, "%d", ntohs(port));
+    nd->remote_port_str[5] = 0;
+
+    ret = getaddrinfo(nd->domain, nd->remote_port_str, &hints, &nd->addr_listp);
+    if (ret != 0) {
+        LOGGER_ERROR("%s", gai_strerror(ret));
+        return -1;
+    }
 
     return 0;
 }

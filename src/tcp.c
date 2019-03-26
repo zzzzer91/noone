@@ -87,7 +87,8 @@ handle_stage_init(CryptorInfo *ci, NetData *nd)
 static int
 handle_stage_handshake(NetData *nd)
 {
-    int fd = socket(nd->sockaddr.sa_family, SOCK_STREAM, 0);
+    int fd = socket(nd->addr_listp->ai_family,
+            nd->addr_listp->ai_socktype, nd->addr_listp->ai_protocol);
     if (fd < 0) {
         return -1;
     }
@@ -96,8 +97,8 @@ handle_stage_handshake(NetData *nd)
         return -1;
     }
 
-    LOGGER_DEBUG("connecting %s:%d", nd->domain, nd->remote_port);
-    if (connect(fd, &nd->sockaddr, nd->sockaddr_len) < 0) {
+    LOGGER_DEBUG("connecting %s:%s", nd->domain, nd->remote_port_str);
+    if (connect(fd, nd->addr_listp->ai_addr, nd->addr_listp->ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
             close(fd);
             return -1;
