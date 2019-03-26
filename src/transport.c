@@ -9,6 +9,13 @@
 #include <netdb.h>
 #include <arpa/inet.h>   /* inet_ntoa() */
 
+static void
+init_buffer(Buffer *buf)
+{
+    buf->idx = 0;
+    buf->len = 0;
+}
+
 NetData *
 init_net_data()
 {
@@ -24,10 +31,10 @@ init_net_data()
     nd->cipher_ctx.encrypt_ctx = NULL;
     nd->cipher_ctx.decrypt_ctx = NULL;
 
-    init_buffer(&nd->ciphertext, BUF_CAPACITY);
-    init_buffer(&nd->plaintext, BUF_CAPACITY);
-    init_buffer(&nd->remote, BUF_CAPACITY);
-    init_buffer(&nd->remote_cipher, BUF_CAPACITY);
+    init_buffer(&nd->ciphertext);
+    init_buffer(&nd->plaintext);
+    init_buffer(&nd->remote);
+    init_buffer(&nd->remote_cipher);
     nd->is_iv_send = 0;
 
     return nd;
@@ -40,8 +47,17 @@ init_net_data_cipher(CryptorInfo *ci, NetData *nd)
     memcpy(nd->cipher_ctx.iv, nd->ciphertext.data, ci->iv_len);
     nd->ciphertext.idx += ci->iv_len;
     nd->ciphertext.len -= ci->iv_len;
-    nd->cipher_ctx.encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
-    nd->cipher_ctx.decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    EVP_CIPHER_CTX *ctx;
+    ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    if (ctx == NULL) {
+        return -1;
+    }
+    ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    if (ctx == NULL) {
+        return -1;
+    }
+    nd->cipher_ctx.encrypt_ctx = ctx;
+    nd->cipher_ctx.decrypt_ctx = ctx;
 
     return 0;
 }
@@ -133,9 +149,5 @@ free_net_data(NetData *nd)
     if (nd->cipher_ctx.decrypt_ctx != NULL) {
         EVP_CIPHER_CTX_free(nd->cipher_ctx.decrypt_ctx);
     }
-    free_buffer(&nd->ciphertext);
-    free_buffer(&nd->plaintext);
-    free_buffer(&nd->remote);
-    free_buffer(&nd->remote_cipher);
     free(nd);
 }

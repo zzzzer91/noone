@@ -68,7 +68,10 @@ init_cryptor_info(const char *name,
                   const unsigned char *passwd, size_t key_len, size_t iv_len)
 {
     CryptorInfo *ci = malloc(sizeof(CryptorInfo));
-    if (ci == NULL) return NULL;
+    if (ci == NULL) {
+        return NULL;
+    }
+
     size_t name_len = strlen(name);
     memcpy(ci->cipher_name, name, name_len);
     ci->cipher_name[name_len] = 0;
@@ -83,9 +86,14 @@ EVP_CIPHER_CTX *
 init_cipher_ctx(const EVP_CIPHER *cipher,
         const unsigned char *key, const unsigned char *iv, int op)
 {
-
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    EVP_CipherInit_ex(ctx, cipher, NULL, key, iv, op);
+    if (ctx == NULL) {
+        return NULL;
+    }
+    if (!EVP_CipherInit_ex(ctx, cipher, NULL, key, iv, op)) {
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
     return ctx;
 }
 

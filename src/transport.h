@@ -7,7 +7,6 @@
 
 #include "cryptor.h"
 #include "ae.h"
-#include "buffer.h"
 #include <netinet/in.h>  /* struct sockaddr_in */
 
 #define BUF_CAPACITY 32 * 1024
@@ -20,12 +19,18 @@
 typedef enum SsStageType {
     STAGE_INIT = 0,   /* 获取 iv 阶段 */
     STAGE_ADDR,       /* 解析地址阶段 */
-    STAGE_UDP_ASSOC,
     STAGE_DNS,        /* 查询 DNS */
-    STAGE_HANDSHAKE,
-    STAGE_STREAM,
+    STAGE_HANDSHAKE,  /* TCP 握手阶段 */
+    STAGE_STREAM,     /* TCP 传输阶段 */
+    STAGE_UDP,
     STAGE_DESTROYED = -1
 } SsStageType;
+
+typedef struct Buffer {
+    size_t idx;
+    size_t len;
+    unsigned char data[BUF_CAPACITY];
+} Buffer;
 
 typedef struct NetData {
 

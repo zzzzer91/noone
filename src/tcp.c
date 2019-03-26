@@ -16,20 +16,20 @@
 #include <netinet/in.h>  /* struct sockaddr_in */
 
 static int
-handle_stage_init(AeEventLoop *event_loop, int fd, NetData *nd)
+handle_stage_init(CryptorInfo *ci, NetData *nd)
 {
-    LOGGER_DEBUG("fd: %d, STAGE_INIT", fd);
-
-    init_net_data_cipher(event_loop->extra_data, nd);
-
-    nd->plaintext.len = DECRYPT(nd);
-    if (nd->plaintext.len < 0) {
-        // TODO
+    if (init_net_data_cipher(ci, nd) < 0) {
+        return -1;
     }
 
-    int ret = parse_net_data_header(nd);
-    if (ret < 0) {
-        // TODO
+    size_t ret = DECRYPT(nd);
+    if (ret == 0) {
+        return -1;
+    }
+    nd->plaintext.len = ret;
+
+    if (parse_net_data_header(nd) < 0) {
+        return -1;
     }
 
     nd->ss_stage = STAGE_HANDSHAKE;
@@ -38,16 +38,25 @@ handle_stage_init(AeEventLoop *event_loop, int fd, NetData *nd)
 }
 
 static int
-handle_stage_handshake(AeEventLoop *event_loop, int fd, NetData *nd)
+handle_stage_handshake(NetData *nd)
 {
-    LOGGER_DEBUG("fd: %d, STAGE_HANDSHAKE", fd);
-    nd->remote_fd = socket(nd->sockaddr.sa_family, SOCK_STREAM, 0);
-    if (nd->remote_fd < 0) {
-        PANIC("remote_fd");
+    int fd = socket(nd->sockaddr.sa_family, SOCK_STREAM, 0);
+    if (fd < 0) {
+        return -1;
     }
-    setnonblock(nd->remote_fd);
+    if (setnonblock(fd) < 0) {
+        close(fd);
+        return -1;
+    }
 
-    connect(nd->remote_fd, &nd->sockaddr, nd->sockaddr_len);
+    if (connect(fd, &nd->sockaddr, nd->sockaddr_len) < 0) {
+        if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
+            close(fd);
+            return -1;
+        }
+    }
+
+    nd->remote_fd = fd;
 
     nd->ss_stage = STAGE_STREAM;
 
@@ -92,40 +101,60 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     int close_flag = 0;
-    size_t n = READN(fd, nd->ciphertext.data, nd->ciphertext.capacity, close_flag);
+    size_t n = READN(fd, nd->ciphertext.data, BUF_CAPACITY, close_flag);
     nd->ciphertext.len += n;
     if (close_flag == 1) {  // ss_client 关闭
-        close(fd);
-        free(nd);
-        ae_unregister_event(event_loop, fd);
+        goto CLEAR;
     }
 
     if (nd->ss_stage == STAGE_INIT) {
-        handle_stage_init(event_loop, fd, nd);
+        CryptorInfo *ci = event_loop->extra_data;
+        if (handle_stage_init(ci, nd) < 0) {
+            goto CLEAR;
+        }
     } else {
-        nd->plaintext.len = DECRYPT(nd);
+        size_t ret = DECRYPT(nd);
+        if (ret == 0) {
+            goto CLEAR;
+        }
+        nd->plaintext.len = ret;
     }
 
     nd->ciphertext.idx = 0;
     nd->ciphertext.len = 0;
 
     if (nd->ss_stage == STAGE_HANDSHAKE) {
-        handle_stage_handshake(event_loop, fd, nd);
+        if (handle_stage_handshake(nd) < 0) {
+            goto CLEAR;
+        }
     }
 
     if (nd->plaintext.len > 0) {
-        ae_register_event(event_loop, nd->remote_fd , AE_OUT, NULL, tcp_write_remote, nd);
+        if (ae_register_event(event_loop, nd->remote_fd ,
+                AE_OUT, NULL, tcp_write_remote, nd) < 0) {
+            goto CLEAR;
+        }
     } else {
         nd->plaintext.idx = 0;
     }
+
+    return;
+
+CLEAR:
+    free_net_data(nd);
+    ae_unregister_event(event_loop, fd);
 }
 
 void
 tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
-
     NetData *nd = data;
-    nd->remote_cipher.len = ENCRYPT(nd);
+
+    size_t ret = ENCRYPT(nd);
+    if (ret < 0) {
+        return;
+    }
+    nd->remote_cipher.len = ret;
     nd->remote.len = 0;
     nd->remote.idx = 0;
 
@@ -135,13 +164,17 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
     }
 
     int close_flag = 0;
-    size_t n = WRITEN(fd, nd->remote_cipher.data+nd->remote_cipher.idx,
+    ret = WRITEN(fd, nd->remote_cipher.data+nd->remote_cipher.idx,
             nd->remote_cipher.len, close_flag);
-    nd->remote_cipher.len -= n;
+    if (close_flag == 1) {
+        // TODO
+    }
+
+    nd->remote_cipher.len -= ret;
     if (nd->remote_cipher.len == 0) {
         nd->remote_cipher.idx = 0;
     } else {
-        nd->remote_cipher.idx += n;
+        nd->remote_cipher.idx += ret;
     }
     ae_modify_event(event_loop, fd, AE_IN, tcp_read_ssclient, NULL, nd);
 }
@@ -151,8 +184,13 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
     int close_flag = 0;
-    nd->remote.len = READN(fd, nd->remote.data+nd->remote.idx,
-            nd->remote.capacity, close_flag);
+    size_t ret = READN(fd, nd->remote.data+nd->remote.idx,
+            BUF_CAPACITY, close_flag);
+    if (close_flag == 1) {
+        close(fd);
+        ae_unregister_event(event_loop, fd);
+    }
+    nd->remote.len = ret;
 
     ae_modify_event(event_loop, nd->ssclient_fd, AE_OUT, NULL, tcp_write_ssclient, nd);
 }
@@ -161,14 +199,21 @@ void
 tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
+
     int close_flag = 0;
     size_t n = WRITEN(fd, nd->plaintext.data+nd->plaintext.idx,
             nd->plaintext.len, close_flag);
+    if (close_flag == 1) {
+        close(fd);
+        ae_unregister_event(event_loop, fd);
+    }
+
     nd->plaintext.len -= n;
     if (nd->plaintext.len == 0) {
         nd->plaintext.idx = 0;
     } else {
         nd->plaintext.idx += n;
     }
+
     ae_modify_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd);
 }
