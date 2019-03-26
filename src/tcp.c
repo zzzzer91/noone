@@ -32,6 +32,8 @@ handle_stage_init(AeEventLoop *event_loop, int fd, NetData *nd)
         // TODO
     }
 
+    nd->ss_stage = STAGE_HANDSHAKE;
+
     return 0;
 }
 
@@ -79,8 +81,7 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 
     if (ae_register_event(event_loop, conn_fd, AE_IN, tcp_read_ssclient, NULL, nd) < 0) {
         LOGGER_ERROR("init_net_data");
-        free(nd);
-        close(conn_fd);
+        free_net_data(nd);
         return;
     }
 }
@@ -99,20 +100,6 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
         ae_unregister_event(event_loop, fd);
     }
 
-    /*
-     * 开头有两个字段
-     * - ATYP 字段：address type 的缩写，取值为：
-     *     0x01：IPv4
-     *     0x03：域名
-     *     0x04：IPv6
-     *
-     * - DST.ADDR 字段：destination address 的缩写，取值随 ATYP 变化：
-     *
-     *     ATYP == 0x01：4 个字节的 IPv4 地址
-     *     ATYP == 0x03：1 个字节表示域名长度，紧随其后的是对应的域名
-     *     ATYP == 0x04：16 个字节的 IPv6 地址
-     *     DST.PORT 字段：目的服务器的端口
-     */
     if (nd->ss_stage == STAGE_INIT) {
         handle_stage_init(event_loop, fd, nd);
     } else {

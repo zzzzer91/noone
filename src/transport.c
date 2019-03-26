@@ -5,6 +5,7 @@
 #include "transport.h"
 #include "log.h"
 #include <string.h>
+#include <unistd.h>
 #include <netdb.h>
 #include <arpa/inet.h>   /* inet_ntoa() */
 
@@ -45,6 +46,20 @@ init_net_data_cipher(CryptorInfo *ci, NetData *nd)
     return 0;
 }
 
+/*
+ * 开头有两个字段
+ * - ATYP 字段：address type 的缩写，取值为：
+ *     0x01：IPv4
+ *     0x03：域名
+ *     0x04：IPv6
+ *
+ * - DST.ADDR 字段：destination address 的缩写，取值随 ATYP 变化：
+ *
+ *     ATYP == 0x01：4 个字节的 IPv4 地址
+ *     ATYP == 0x03：1 个字节表示域名长度，紧随其后的是对应的域名
+ *     ATYP == 0x04：16 个字节的 IPv6 地址
+ *     DST.PORT 字段：目的服务器的端口
+ */
 int
 parse_net_data_header(NetData *nd)
 {
@@ -75,8 +90,6 @@ parse_net_data_header(NetData *nd)
         nd->sockaddr_len = listp->ai_addrlen;
 
         freeaddrinfo(listp);
-
-        nd->ss_stage = STAGE_HANDSHAKE;
     } else if (atty == ATYP_IPV4) {
         nd->sockaddr.sa_family = AF_INET;
         struct in_addr addr;
@@ -87,10 +100,8 @@ parse_net_data_header(NetData *nd)
         nd->plaintext.idx += 4;
         nd->plaintext.len -= 4;
         nd->sockaddr_len = sizeof(struct sockaddr_in);
-        nd->ss_stage = STAGE_HANDSHAKE;
     } else if (atty == ATYP_IPV6) {
         // TODO
-        nd->ss_stage = STAGE_HANDSHAKE;
     } else {
         LOGGER_ERROR("ATYP error！");
         return -1;
@@ -110,6 +121,12 @@ parse_net_data_header(NetData *nd)
 void
 free_net_data(NetData *nd)
 {
+    if (nd->ssclient_fd != -1) {
+        close(nd->ssclient_fd);
+    }
+    if (nd->remote_fd != -1) {
+        close(nd->remote_fd);
+    }
     if (nd->cipher_ctx.encrypt_ctx != NULL) {
         EVP_CIPHER_CTX_free(nd->cipher_ctx.encrypt_ctx);
     }
