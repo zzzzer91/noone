@@ -43,11 +43,9 @@ ae_api_add_event(AeEventLoop *event_loop, int fd, uint32_t mask)
 static void
 ae_api_del_event(AeEventLoop *event_loop, int fd)
 {
-    struct epoll_event ee = {0, {0}};
-
     /* Note, Kernel < 2.6.9 requires a non null event pointer even for
      * EPOLL_CTL_DEL. */
-    epoll_ctl(event_loop->epfd, EPOLL_CTL_DEL, fd, &ee);
+    epoll_ctl(event_loop->epfd, EPOLL_CTL_DEL, fd, NULL);
 }
 
 /*

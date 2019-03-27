@@ -134,7 +134,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
             LOGGER_ERROR("DECRYPT");
             CLEAR(event_loop, nd);
         }
-        nd->plaintext.len = ret;
+        nd->plaintext.len += ret;
     }
 
     nd->ciphertext.p = nd->ciphertext.data;

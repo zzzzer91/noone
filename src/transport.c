@@ -120,16 +120,16 @@ write_net_data(int fd, Buffer *buf)
         p += nwritten;
         sum += nwritten;
     }
+    LOGGER_DEBUG("fd: %d, write: %ld", fd, sum);
     buf->len = nleft;
     buf->p = p;
-    LOGGER_DEBUG("fd: %d, write: %ld", fd, sum);
     return close_flag;
 }
 
 int
 init_net_data_cipher(CryptorInfo *ci, NetData *nd)
 {
-    memcpy(nd->cipher_ctx.iv, nd->ciphertext.data, ci->iv_len);
+    memcpy(nd->cipher_ctx.iv, nd->ciphertext.p, ci->iv_len);
     nd->ciphertext.p += ci->iv_len;
     nd->ciphertext.len -= ci->iv_len;
     nd->cipher_ctx.iv[ci->iv_len] = 0;
