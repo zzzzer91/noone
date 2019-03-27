@@ -8,7 +8,7 @@
 int
 init_buffer(Buffer *buf, size_t capacity)
 {
-    buf->data = malloc(capacity);
+    buf->data = malloc(capacity*sizeof(unsigned char));
     if (buf->data == NULL) {
         return -1;
     }
@@ -39,7 +39,7 @@ resize_buffer(Buffer *buf, size_t new_size)
         return -1;
     }
 
-    unsigned char *new_ptr = realloc(buf, new_size);
+    unsigned char *new_ptr = realloc(buf, new_size*sizeof(unsigned char));
     if (new_ptr == NULL) {
         return -1;
     }

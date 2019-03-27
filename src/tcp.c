@@ -96,7 +96,7 @@ handle_stage_handshake(NetData *nd)
         return -1;
     }
 
-    LOGGER_DEBUG("connecting %s:%s", nd->domain, nd->remote_port_str);
+    LOGGER_INFO("connecting %s:%s", nd->domain, nd->remote_port_str);
     if (connect(fd, nd->addr_listp->ai_addr, nd->addr_listp->ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
             close(fd);
@@ -116,7 +116,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
 
-    int close_flag = READN(fd, nd->ciphertext);
+    int close_flag = read_net_data(fd, &nd->ciphertext);
     if (close_flag == 1) {  // ss_client 关闭
         LOGGER_DEBUG("read, ssclient close!");
         CLEAR(event_loop, nd);
@@ -163,7 +163,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
 
-    int close_flag = WRITEN(fd, nd->plaintext);
+    int close_flag = write_net_data(fd, &nd->plaintext);
     if (close_flag == 1) {
         LOGGER_DEBUG("write, remote close!");
         close(fd);
@@ -181,7 +181,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
 
-    int close_flag = READN(fd, nd->remote);
+    int close_flag = read_net_data(fd, &nd->remote);
     if (close_flag == 1) {
         LOGGER_DEBUG("read, remote close!");
         close(fd);
@@ -211,7 +211,7 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
         nd->is_iv_send = 1;
     }
 
-    int close_flag = WRITEN(fd, nd->remote_cipher);
+    int close_flag = write_net_data(fd, &nd->remote_cipher);
     if (close_flag == 1) {
         LOGGER_DEBUG("write, ssclient close!");
         CLEAR(event_loop, nd);

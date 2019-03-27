@@ -58,11 +58,15 @@ typedef struct NetData {
 
 NetData *init_net_data();
 
+void free_net_data(NetData *nd);
+
+int read_net_data(int fd, Buffer *buf);
+
+int write_net_data(int fd, Buffer *buf);
+
 int init_net_data_cipher(CryptorInfo *ci, NetData *nd);
 
 int parse_net_data_header(NetData *nd);
-
-void free_net_data(NetData *nd);
 
 #define ENCRYPT(nd) \
     encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.p, \
@@ -71,70 +75,5 @@ void free_net_data(NetData *nd);
 #define DECRYPT(nd) \
     decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.p, \
             (nd)->ciphertext.len, (nd)->plaintext.p+(nd)->plaintext.len)
-/*
- * 1、当对端套接字已关闭，read() 会返回 0。
- * 2、当（read() == -1 && errno == EAGAIN）时，
- *    代表 EPOLLET 模式的 socket 数据读完。
- * 3、ET 模式下，触发 epoll_wait()，然后执行 READN()，当执行到
- *    read() 时，可能就会碰到 read() 返回 0，此时不能直接 return，
- *    因为前面可能读了数据。
- *    WRITEN() 同理。
- */
-#define READN(fd, buf) \
-    ({ \
-        int close_flag = 0; \
-        size_t nleft = buf.capacity - (buf.p - buf.data + buf.len); \
-        ssize_t nread; \
-        unsigned char *p = buf.p + buf.len; \
-        while (nleft > 0) { \
-            nread = read(fd, p, nleft); \
-            if (nread == 0) {  \
-                close_flag = 1; \
-                break; \
-            } else if (nread < 0) { \
-                if (errno == EAGAIN) { \
-                    break; \
-                } else if (errno == EINTR) { \
-                    nread = 0; \
-                } else { \
-                    close_flag = 1; \
-                    break; \
-                } \
-            } \
-            nleft -= nread; \
-            p += nread; \
-            buf.len += nread; \
-        } \
-        close_flag; \
-    })
-
-#define WRITEN(fd, buf) \
-    ({ \
-        int close_flag = 0; \
-        size_t nleft = buf.len; \
-        ssize_t nwritten; \
-        unsigned char *p = buf.p; \
-        while (nleft > 0) { \
-            nwritten = write(fd, p, nleft); \
-            if (nwritten == 0) { \
-                close_flag = 1; \
-                break; \
-            } else if (nwritten < 0) { \
-                if (errno == EAGAIN) { \
-                    break; \
-                } else if (errno == EINTR) { \
-                    nwritten = 0; \
-                } else { \
-                    close_flag = 1; \
-                    break; \
-                } \
-            } \
-            nleft -= nwritten; \
-            p += nwritten; \
-        } \
-        buf.len = nleft; \
-        buf.p = p; \
-        close_flag; \
-    })
 
 #endif /* _NOONE_TRANSPORT_H_ */

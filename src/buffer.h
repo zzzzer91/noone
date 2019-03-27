@@ -8,10 +8,10 @@
 #include <stddef.h>
 
 typedef struct Buffer {
+    unsigned char *data;
+    unsigned char *p;  // 指针
     size_t len;
     size_t capacity;
-    unsigned char *p;  // 指针
-    unsigned char *data;
 } Buffer;
 
 int init_buffer(Buffer *buf, size_t capacity);

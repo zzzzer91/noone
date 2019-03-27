@@ -6,6 +6,7 @@
 #include "log.h"
 #include "buffer.h"
 #include <string.h>
+#include <errno.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <arpa/inet.h>   /* inet_ntoa() */
@@ -53,6 +54,74 @@ free_net_data(NetData *nd)
     free(nd);
 }
 
+/*
+ * 1、当对端套接字已关闭，read() 会返回 0。
+ * 2、当（read() == -1 && errno == EAGAIN）时，
+ *    代表 EPOLLET 模式的 socket 数据读完。
+ * 3、ET 模式下，触发 epoll_wait()，然后执行 read_net_data()，当执行到
+ *    read() 时，可能就会碰到 read() 返回 0，此时不能直接 return，
+ *    因为前面可能读了数据。
+ *    write_net_data() 同理。
+ */
+int
+read_net_data(int fd, Buffer *buf)
+{
+    int close_flag = 0;
+    size_t nleft = buf->capacity - (buf->p - buf->data + buf->len);
+    ssize_t nread;
+    unsigned char *p = buf->p + buf->len;
+    while (nleft > 0) {
+        nread = read(fd, p, nleft);
+        if (nread == 0) {
+            close_flag = 1;
+            break;
+        } else if (nread < 0) {
+            if (errno == EAGAIN) {
+                break;
+            } else if (errno == EINTR) {
+                nread = 0;
+            } else {
+                close_flag = 1;
+                break;
+            }
+        }
+        nleft -= nread;
+        p += nread;
+        buf->len += nread;
+    }
+    return close_flag;
+}
+
+int
+write_net_data(int fd, Buffer *buf)
+{
+    int close_flag = 0;
+    size_t nleft = buf->len;
+    ssize_t nwritten;
+    unsigned char *p = buf->p;
+    while (nleft > 0) {
+        nwritten = write(fd, p, nleft);
+        if (nwritten == 0) {
+            close_flag = 1;
+            break;
+        } else if (nwritten < 0) {
+            if (errno == EAGAIN) {
+                break;
+            } else if (errno == EINTR) {
+                nwritten = 0;
+            } else {
+                close_flag = 1;
+                break;
+            }
+        }
+        nleft -= nwritten;
+        p += nwritten;
+    }
+    buf->len = nleft;
+    buf->p = p;
+    return close_flag;
+}
+
 int
 init_net_data_cipher(CryptorInfo *ci, NetData *nd)
 {
@@ -71,13 +140,13 @@ init_net_data_cipher(CryptorInfo *ci, NetData *nd)
     nd->cipher_ctx.key_len = ci->key_len;
 
     EVP_CIPHER_CTX *ctx;
-    ctx = INIT_ENCRYPT_CTX(nd->cipher_ctx.cipher_name, nd->cipher_ctx.key, nd->cipher_ctx.iv);
+    ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
     if (ctx == NULL) {
         return -1;
     }
     nd->cipher_ctx.encrypt_ctx = ctx;
 
-    ctx = INIT_DECRYPT_CTX(ci->cipher_name, nd->cipher_ctx.key, nd->cipher_ctx.iv);
+    ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
     if (ctx == NULL) {
         return -1;
     }
