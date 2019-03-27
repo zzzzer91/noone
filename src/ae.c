@@ -25,7 +25,7 @@ ae_api_add_event(AeEventLoop *event_loop, int fd, uint32_t mask)
                  EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
         struct epoll_event ee;
-        ee.events = mask | EPOLLET;
+        ee.events = mask;
         ee.data.u64 = 0; /* avoid valgrind warning */
         ee.data.fd = fd;
 
@@ -284,7 +284,7 @@ ae_process_events(AeEventLoop *event_loop)
             AeEvent *fe = &event_loop->events[fd];
 
             if (fe->mask & AE_IN) {
-                     fe->rcallback(event_loop, fd, fe->client_data);
+                fe->rcallback(event_loop, fd, fe->client_data);
             }
             if (fe->mask & AE_OUT) {
                 fe->wcallback(event_loop, fd, fe->client_data);

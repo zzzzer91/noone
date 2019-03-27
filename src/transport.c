@@ -68,7 +68,7 @@ read_net_data(int fd, Buffer *buf)
 {
     int close_flag = 0;
     size_t nleft = buf->capacity - (buf->p - buf->data + buf->len);
-    ssize_t nread;
+    ssize_t nread, sum = 0;
     unsigned char *p = buf->p + buf->len;
     while (nleft > 0) {
         nread = read(fd, p, nleft);
@@ -87,8 +87,10 @@ read_net_data(int fd, Buffer *buf)
         }
         nleft -= nread;
         p += nread;
-        buf->len += nread;
+        sum += nread;
     }
+    LOGGER_DEBUG("fd: %d, read: %ld", fd, sum);
+    buf->len += sum;
     return close_flag;
 }
 
@@ -97,7 +99,7 @@ write_net_data(int fd, Buffer *buf)
 {
     int close_flag = 0;
     size_t nleft = buf->len;
-    ssize_t nwritten;
+    ssize_t nwritten, sum = 0;
     unsigned char *p = buf->p;
     while (nleft > 0) {
         nwritten = write(fd, p, nleft);
@@ -116,9 +118,11 @@ write_net_data(int fd, Buffer *buf)
         }
         nleft -= nwritten;
         p += nwritten;
+        sum += nwritten;
     }
     buf->len = nleft;
     buf->p = p;
+    LOGGER_DEBUG("fd: %d, write: %ld", fd, sum);
     return close_flag;
 }
 

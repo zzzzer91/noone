@@ -51,14 +51,17 @@ test_encrypt_and_decrypt()
     nd->plaintext.len = strlen((char *)nd->plaintext.data);
     nd->ciphertext.len = encrypt(nd->cipher_ctx.encrypt_ctx,
             nd->plaintext.data, nd->plaintext.len, nd->ciphertext.data);
+    // 测试多次加密，一次解密
+    nd->ciphertext.len += encrypt(nd->cipher_ctx.encrypt_ctx,
+            nd->plaintext.data, nd->plaintext.len, nd->ciphertext.data+nd->plaintext.len);
 
     // 解密
     nd->cipher_ctx.decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
     nd->plaintext.len = decrypt(nd->cipher_ctx.decrypt_ctx,
             nd->ciphertext.data, nd->ciphertext.len, nd->plaintext.data);
 
-    EXPECT_EQ_LONG(6L, nd->plaintext.len);
-    EXPECT_EQ_STRING("你好", nd->plaintext.data, nd->plaintext.len);
+    EXPECT_EQ_LONG(12L, nd->plaintext.len);
+    EXPECT_EQ_STRING("你好你好", nd->plaintext.data, nd->plaintext.len);
 
     free(ci);
     free_net_data(nd);

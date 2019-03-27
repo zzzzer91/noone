@@ -11,7 +11,7 @@
 #include "log.h"
 #include <netdb.h>
 
-#define BUF_CAPACITY 32 * 1024
+#define BUF_CAPACITY 8 * 1024
 
 // ATYP
 #define ATYP_IPV4 0x01
