@@ -25,7 +25,7 @@ ae_api_add_event(AeEventLoop *event_loop, int fd, uint32_t mask)
                  EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
         struct epoll_event ee;
-        ee.events = mask;
+        ee.events = mask | EPOLLET;
         ee.data.u64 = 0; /* avoid valgrind warning */
         ee.data.fd = fd;
 
