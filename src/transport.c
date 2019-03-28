@@ -89,8 +89,8 @@ read_net_data(int fd, Buffer *buf)
         p += nread;
         sum += nread;
     }
-    LOGGER_DEBUG("fd: %d, read: %ld", fd, sum);
     buf->len += sum;
+    LOGGER_DEBUG("fd: %d, read: %ld, remain capacity: %ld", fd, sum, nleft);
     return close_flag;
 }
 
@@ -120,18 +120,18 @@ write_net_data(int fd, Buffer *buf)
         p += nwritten;
         sum += nwritten;
     }
-    LOGGER_DEBUG("fd: %d, write: %ld", fd, sum);
-    buf->len = nleft;
     buf->p = p;
+    buf->len = nleft;
+    LOGGER_DEBUG("fd: %d, write: %ld, remain len: %ld", fd, sum, nleft);
     return close_flag;
 }
 
 int
-init_net_data_cipher(CryptorInfo *ci, NetData *nd)
+init_net_data_cipher(int fd, CryptorInfo *ci, NetData *nd)
 {
-    memcpy(nd->cipher_ctx.iv, nd->ciphertext.p, ci->iv_len);
-    nd->ciphertext.p += ci->iv_len;
-    nd->ciphertext.len -= ci->iv_len;
+    if (read(fd, nd->cipher_ctx.iv, ci->iv_len) < ci->iv_len) {
+        return -1;
+    }
     nd->cipher_ctx.iv[ci->iv_len] = 0;
     nd->cipher_ctx.iv_len = ci->iv_len;
 

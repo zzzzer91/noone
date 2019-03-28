@@ -64,16 +64,16 @@ int read_net_data(int fd, Buffer *buf);
 
 int write_net_data(int fd, Buffer *buf);
 
-int init_net_data_cipher(CryptorInfo *ci, NetData *nd);
+int init_net_data_cipher(int fd, CryptorInfo *ci, NetData *nd);
 
 int parse_net_data_header(NetData *nd);
 
 #define ENCRYPT(nd) \
-    encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.p, \
+    encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.data, \
             (nd)->remote.len, (nd)->remote_cipher.p+(nd)->remote_cipher.len)
 
 #define DECRYPT(nd) \
-    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.p, \
+    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.data, \
             (nd)->ciphertext.len, (nd)->plaintext.p+(nd)->plaintext.len)
 
 #endif /* _NOONE_TRANSPORT_H_ */

@@ -9,6 +9,7 @@
 #include "cryptor.h"
 #include "error.h"
 #include "log.h"
+#include <unistd.h>
 
 /* test */
 #define SERVER_ADDR "127.0.0.1"
@@ -66,6 +67,8 @@ main(int argc, char *argv[])
     ae_run_loop(ae_ev_loop);
 
     free(ci);
+    close(tcp_server_fd);
+    close(udp_server_fd);
     ae_delete_event_loop(ae_ev_loop);
 
     return 0;
