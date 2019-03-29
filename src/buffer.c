@@ -14,7 +14,7 @@ init_buffer(Buffer *buf, size_t capacity)
     }
 
     buf->capacity = capacity;
-    buf->p = buf->data;
+    buf->idx = 0;
     buf->len = 0;
 
     return 0;
@@ -28,7 +28,7 @@ free_buffer(Buffer *buf)
     }
 
     buf->capacity = 0;
-    buf->p = NULL;
+    buf->idx = 0;
     buf->len = 0;
 }
 

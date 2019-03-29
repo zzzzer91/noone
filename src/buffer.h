@@ -9,8 +9,8 @@
 
 typedef struct Buffer {
     unsigned char *data;
-    unsigned char *p;  // 指针
     size_t len;
+    size_t idx;
     size_t capacity;
 } Buffer;
 

@@ -27,8 +27,8 @@ init_net_data()
     nd->cipher_ctx.decrypt_ctx = NULL;
     init_buffer(&nd->ciphertext, BUF_CAPACITY);
     init_buffer(&nd->plaintext, BUF_CAPACITY);
-    init_buffer(&nd->remote, BUF_CAPACITY);
-    init_buffer(&nd->remote_cipher, BUF_CAPACITY);
+    init_buffer(&nd->remote, BUF_CAPACITY*2);
+    init_buffer(&nd->remote_cipher, BUF_CAPACITY*2);
     nd->is_iv_send = 0;
 
     return nd;
@@ -67,9 +67,9 @@ int
 read_net_data(int fd, Buffer *buf)
 {
     int close_flag = 0;
-    size_t nleft = buf->capacity - (buf->p - buf->data + buf->len);
+    size_t nleft = buf->capacity - (buf->idx + buf->len);
     ssize_t nread, sum = 0;
-    unsigned char *p = buf->p + buf->len;
+    unsigned char *p = buf->data + buf->idx + buf->len;
     while (nleft > 0) {
         nread = read(fd, p, nleft);
         if (nread == 0) {
@@ -100,7 +100,7 @@ write_net_data(int fd, Buffer *buf)
     int close_flag = 0;
     size_t nleft = buf->len;
     ssize_t nwritten, sum = 0;
-    unsigned char *p = buf->p;
+    unsigned char *p = buf->data + buf->idx;
     while (nleft > 0) {
         nwritten = write(fd, p, nleft);
         if (nwritten == 0) {
@@ -112,6 +112,7 @@ write_net_data(int fd, Buffer *buf)
             } else if (errno == EINTR) {
                 nwritten = 0;
             } else {
+                LOGGER_ERROR("write");
                 close_flag = 1;
                 break;
             }
@@ -120,8 +121,8 @@ write_net_data(int fd, Buffer *buf)
         p += nwritten;
         sum += nwritten;
     }
-    buf->p = p;
-    buf->len = nleft;
+    buf->idx += sum;
+    buf->len -= sum;
     LOGGER_DEBUG("fd: %d, write: %ld, remain len: %ld", fd, sum, nleft);
     return close_flag;
 }
@@ -180,33 +181,33 @@ parse_net_data_header(NetData *nd)
     struct addrinfo hints = {};
     hints.ai_socktype = SOCK_STREAM;
 
-    int atty = nd->plaintext.p[0];
-    nd->plaintext.p += 1;
+    int atty = nd->plaintext.data[nd->plaintext.idx];
+    nd->plaintext.idx += 1;
     nd->plaintext.len -= 1;
     if (atty == ATYP_DOMAIN) {
-        size_t domain_len = nd->plaintext.p[0];  // 域名长度
+        size_t domain_len = nd->plaintext.data[nd->plaintext.idx];  // 域名长度
         if (domain_len > 63) {
             LOGGER_ERROR("domain_len too long!");
             return -1;
         }
-        nd->plaintext.p += 1;
+        nd->plaintext.idx += 1;
         nd->plaintext.len -= 1;
 
-        memcpy(nd->domain, nd->plaintext.p, domain_len);
+        memcpy(nd->domain, nd->plaintext.data+nd->plaintext.idx, domain_len);
         nd->domain[domain_len] = 0;  // 加上 '\0'
-        nd->plaintext.p += domain_len;
+        nd->plaintext.idx += domain_len;
         nd->plaintext.len -= domain_len;
 
         hints.ai_family = AF_UNSPEC;
     } else if (atty == ATYP_IPV4) {
-        inet_ntop(AF_INET, nd->plaintext.p, nd->domain, sizeof(nd->domain));
-        nd->plaintext.p += 4;
+        inet_ntop(AF_INET, nd->plaintext.data+nd->plaintext.idx, nd->domain, sizeof(nd->domain));
+        nd->plaintext.idx += 4;
         nd->plaintext.len -= 4;
 
         hints.ai_family = AF_INET;
     } else if (atty == ATYP_IPV6) {
-        inet_ntop(AF_INET6, nd->plaintext.p, nd->domain, sizeof(nd->domain));
-        nd->plaintext.p += 16;
+        inet_ntop(AF_INET6, nd->plaintext.data+nd->plaintext.idx, nd->domain, sizeof(nd->domain));
+        nd->plaintext.idx += 16;
         nd->plaintext.len -= 16;
 
         hints.ai_family = AF_INET6;
@@ -216,8 +217,8 @@ parse_net_data_header(NetData *nd)
     }
 
     uint16_t port;
-    memcpy(&port, nd->plaintext.p, 2);
-    nd->plaintext.p += 2;
+    memcpy(&port, nd->plaintext.data+nd->plaintext.idx, 2);
+    nd->plaintext.idx += 2;
     nd->plaintext.len -= 2;
     snprintf(nd->remote_port_str, 6, "%d", ntohs(port));
     nd->remote_port_str[5] = 0;

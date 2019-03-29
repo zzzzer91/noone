@@ -11,7 +11,7 @@
 #include "log.h"
 #include <netdb.h>
 
-#define BUF_CAPACITY 32 * 1024
+#define BUF_CAPACITY 16 * 1024
 
 // ATYP
 #define ATYP_IPV4 0x01
@@ -69,11 +69,11 @@ int init_net_data_cipher(int fd, CryptorInfo *ci, NetData *nd);
 int parse_net_data_header(NetData *nd);
 
 #define ENCRYPT(nd) \
-    encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.data, \
-            (nd)->remote.len, (nd)->remote_cipher.p+(nd)->remote_cipher.len)
+    encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.data, (nd)->remote.len, \
+            (nd)->remote_cipher.data+(nd)->remote_cipher.idx+(nd)->remote_cipher.len)
 
 #define DECRYPT(nd) \
-    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.data, \
-            (nd)->ciphertext.len, (nd)->plaintext.p+(nd)->plaintext.len)
+    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.data, (nd)->ciphertext.len, \
+            (nd)->plaintext.data+(nd)->plaintext.idx+(nd)->plaintext.len)
 
 #endif /* _NOONE_TRANSPORT_H_ */
