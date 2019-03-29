@@ -76,4 +76,4 @@ int parse_net_data_header(NetData *nd);
     decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.data, (nd)->ciphertext.len, \
             (nd)->plaintext.data+(nd)->plaintext.idx+(nd)->plaintext.len)
 
-#endif /* _NOONE_TRANSPORT_H_ */
+#endif  /* _NOONE_TRANSPORT_H_ */

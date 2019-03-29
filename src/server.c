@@ -19,7 +19,7 @@
 int
 main(int argc, char *argv[])
 {
-    SET_LOG_LEVEL(DEBUG);
+    // SET_LOG_LEVEL(DEBUG);
 
     LOGGER_INFO("Noone started!");
 

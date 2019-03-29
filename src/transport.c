@@ -37,9 +37,6 @@ init_net_data()
 void
 free_net_data(NetData *nd)
 {
-    if (nd->addr_listp != NULL) {
-        freeaddrinfo(nd->addr_listp);
-    }
     if (nd->cipher_ctx.encrypt_ctx != NULL) {
         EVP_CIPHER_CTX_free(nd->cipher_ctx.encrypt_ctx);
     }

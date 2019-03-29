@@ -20,4 +20,4 @@ void free_buffer(Buffer *buf);
 
 int resize_buffer(Buffer *buf, size_t new_size);
 
-#endif /* _NOONE_BUFFER_H_ */
+#endif  /* _NOONE_BUFFER_H_ */
