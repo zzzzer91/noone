@@ -3,7 +3,7 @@
  */
 
 #ifndef _NOONE_LRU_H_
-#define _NOONE_LRU_H__
+#define _NOONE_LRU_H_
 
 #include <stddef.h>
 
