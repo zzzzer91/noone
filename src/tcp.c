@@ -105,7 +105,7 @@ handle_stage_handshake(NetData *nd)
         return -1;
     }
 
-    LOGGER_INFO("connecting %s:%s", nd->domain, nd->remote_port_str);
+    LOGGER_INFO("fd: %d, connecting %s:%s", nd->ssclient_fd, nd->domain, nd->remote_port_str);
     if (connect(fd, nd->addr_listp->ai_addr, nd->addr_listp->ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
             close(fd);
@@ -162,8 +162,10 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     }
 
     if (nd->plaintext.len > 0) {
-        if (ae_register_event(event_loop, nd->remote_fd, AE_OUT, NULL, tcp_write_remote, nd) < 0) {
-            LOGGER_ERROR("fd: %d, ae_register_event", fd);
+        if (ae_register_event(event_loop, nd->remote_fd,
+                AE_OUT, NULL, tcp_write_remote, nd) < 0) {
+
+            LOGGER_ERROR("fd: %d, tcp_read_ssclient, ae_register_event", fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }
     } else {
@@ -184,8 +186,8 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->plaintext.len == 0) {  // 写完
         nd->plaintext.idx = 0;
-        if (ae_modify_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd) < 0) {
-            LOGGER_ERROR("fd: %d, ae_modify_event", fd);
+        if (ae_register_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd) < 0) {
+            LOGGER_ERROR("fd: %d, tcp_write_remote, ae_register_event", fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }
     }
@@ -199,7 +201,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     int close_flag = read_net_data(fd, &nd->remote);
     if (close_flag == 1) {
         LOGGER_DEBUG("fd: %d, read, remote close!", fd);
-        CLEAR_REMOTE(event_loop, nd);
+        CLEAR_REMOTE(event_loop, nd);  // 读到对端关闭, 但还可能有数据发给 ss_client
         if (nd->remote.len == 0) {
             return;
         }
@@ -214,10 +216,13 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     nd->remote.len = 0;
     nd->remote_cipher.len += ret;
 
-    if (ae_modify_event(event_loop, nd->ssclient_fd, AE_OUT, NULL, tcp_write_ssclient, nd) < 0) {
-        LOGGER_ERROR("fd: %d, ae_modify_event", fd);
+    if (ae_register_event(event_loop, nd->ssclient_fd,
+            AE_OUT, NULL, tcp_write_ssclient, nd) < 0) {
+
+        LOGGER_ERROR("fd: %d, tcp_read_remote, ae_register_event", fd);
         CLEAR_SSCLIENT(event_loop, nd);
     }
+    ae_unregister_event(event_loop, fd);
 }
 
 void
@@ -241,8 +246,16 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->remote_cipher.len == 0) {
         nd->remote_cipher.idx = 0;
-        if (ae_modify_event(event_loop, fd, AE_IN, tcp_read_ssclient, NULL, nd) < 0) {
-            LOGGER_ERROR("fd: %d, ae_modify_event", fd);
+        if (ae_register_event(event_loop, fd, AE_IN, tcp_read_ssclient, NULL, nd) < 0) {
+            LOGGER_ERROR("fd: %d, tcp_write_ssclient, ae_register_event", fd);
+            CLEAR_SSCLIENT(event_loop, nd);
+        }
+    }
+    if (nd->remote_fd != -1) {  // 对端已关闭
+        if (ae_register_event(event_loop, nd->remote_fd,
+                              AE_IN, tcp_read_remote, NULL, nd) < 0) {
+
+            LOGGER_ERROR("fd: %d, tcp_write_ssclient, ae_register_event", fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }
     }
