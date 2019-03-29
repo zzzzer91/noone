@@ -27,5 +27,6 @@ add_executable(  # 要排除 server.c
         ./src/socket.c
         ./src/ae.c
         ./src/buffer.c
+        ./src/lru.c
 )
 target_link_libraries(test crypto)
