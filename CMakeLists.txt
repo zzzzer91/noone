@@ -17,7 +17,7 @@ add_executable(noone ${SRCS})
 target_link_libraries(noone crypto)
 
 # 测试
-add_executable(
+add_executable(  # 要排除 server.c
         test
         ./tests/test.c
         ./src/log.c
