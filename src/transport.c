@@ -112,7 +112,6 @@ write_net_data(int fd, Buffer *buf)
             } else if (errno == EINTR) {
                 nwritten = 0;
             } else {
-                LOGGER_ERROR("write");
                 close_flag = 1;
                 break;
             }
