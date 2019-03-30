@@ -105,6 +105,9 @@ handle_stage_handshake(NetData *nd)
         return -1;
     }
 
+    // 注意：当设置非阻塞 socket 后，tcp 三次握手会异步进行，
+    // 所以可能会出现三次握手还未完成，就进行 write，
+    // 此时 write 会把 errno 置为 EAGAIN
     LOGGER_INFO("fd: %d, connecting %s:%s", nd->ssclient_fd, nd->domain, nd->remote_port_str);
     if (connect(fd, nd->addr_listp->ai_addr, nd->addr_listp->ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS

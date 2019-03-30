@@ -52,6 +52,8 @@ free_net_data(NetData *nd)
 }
 
 /*
+ * 这个函数必须和非阻塞 socket 配合。
+ *
  * 1、当对端套接字已关闭，read() 会返回 0。
  * 2、当（read() == -1 && errno == EAGAIN）时，
  *    代表 EPOLLET 模式的 socket 数据读完。
@@ -68,12 +70,14 @@ read_net_data(int fd, Buffer *buf)
     ssize_t nread, sum = 0;
     unsigned char *p = buf->data + buf->idx + buf->len;
     while (nleft > 0) {
+        // 若没设置非阻塞 socket，这里会一直阻塞直到读到 nleft 字节内容。
+        // 这是没法接受的。
         nread = read(fd, p, nleft);
         if (nread == 0) {
             close_flag = 1;
             break;
         } else if (nread < 0) {
-            if (errno == EAGAIN) {
+            if (errno == EAGAIN) {  // 需先设置非阻塞 socket
                 break;
             } else if (errno == EINTR) {
                 nread = 0;
@@ -99,12 +103,14 @@ write_net_data(int fd, Buffer *buf)
     ssize_t nwritten, sum = 0;
     unsigned char *p = buf->data + buf->idx;
     while (nleft > 0) {
+        // 阻塞 socket 会一直等，
+        // 非阻塞 socket 会在未成功发送时将 errno 设为 EAGAIN
         nwritten = write(fd, p, nleft);
         if (nwritten == 0) {
             close_flag = 1;
             break;
         } else if (nwritten < 0) {
-            if (errno == EAGAIN) {
+            if (errno == EAGAIN) {  // 需先设置非阻塞 socket，在三次握手未完成或发送缓冲区满出现
                 break;
             } else if (errno == EINTR) {
                 nwritten = 0;
