@@ -10,6 +10,7 @@
 #include "error.h"
 #include "log.h"
 #include <unistd.h>
+#include <signal.h>
 
 /* test */
 #define SERVER_ADDR "127.0.0.1"
@@ -22,6 +23,10 @@ main(int argc, char *argv[])
     // SET_LOG_LEVEL(DEBUG);
 
     LOGGER_INFO("Noone started!");
+
+    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
+        PANIC("signal");
+    }
 
     AeEventLoop *ae_ev_loop = ae_create_event_loop(AE_MAX_EVENTS);
     if (ae_ev_loop == NULL) {

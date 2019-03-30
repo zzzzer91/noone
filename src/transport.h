@@ -36,7 +36,7 @@ typedef struct NetData {
 
     struct addrinfo *addr_listp;
 
-    char domain[64];
+    char domain[65];
 
     char remote_port_str[6];
 
@@ -46,13 +46,9 @@ typedef struct NetData {
 
     int is_iv_send;
 
-    Buffer ciphertext;
-
-    Buffer plaintext;
+    Buffer ssclient;
 
     Buffer remote;
-
-    Buffer remote_cipher;
 
 } NetData;
 
@@ -70,10 +66,10 @@ int parse_net_data_header(NetData *nd);
 
 #define ENCRYPT(nd) \
     encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.data, (nd)->remote.len, \
-            (nd)->remote_cipher.data+(nd)->remote_cipher.idx+(nd)->remote_cipher.len)
+            (nd)->remote.data)
 
 #define DECRYPT(nd) \
-    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.data, (nd)->ciphertext.len, \
-            (nd)->plaintext.data+(nd)->plaintext.idx+(nd)->plaintext.len)
+    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ssclient.data, (nd)->ssclient.len, \
+            (nd)->ssclient.data)
 
 #endif  /* _NOONE_TRANSPORT_H_ */
