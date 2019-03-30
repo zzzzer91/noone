@@ -76,13 +76,13 @@ handle_stage_init(int fd, CryptorInfo *ci, NetData *nd)
         return -1;
     }
 
-    nd->ss_stage = STAGE_ADDR;
+    nd->ss_stage = STAGE_HEADER;
 
     return 0;
 }
 
 static int
-handle_stage_addr(NetData *nd)
+handle_stage_header(NetData *nd)
 {
     if (parse_net_data_header(nd) < 0) {
         return -1;
@@ -126,8 +126,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     if (nd->ss_stage == STAGE_INIT) {
-        CryptorInfo *ci = event_loop->extra_data;
-        if (handle_stage_init(fd, ci, nd) < 0) {
+        if (handle_stage_init(fd, event_loop->extra_data, nd) < 0) {
             LOGGER_ERROR("fd: %d, handle_stage_init", fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }
@@ -147,9 +146,9 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     nd->ciphertext.len = 0;
     nd->plaintext.len += ret;
 
-    if (nd->ss_stage == STAGE_ADDR) {
-        if (handle_stage_addr(nd) < 0) {
-            LOGGER_ERROR("fd: %d, handle_stage_addr", fd);
+    if (nd->ss_stage == STAGE_HEADER) {
+        if (handle_stage_header(nd) < 0) {
+            LOGGER_ERROR("fd: %d, handle_stage_header", fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }
     }
@@ -186,7 +185,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->plaintext.len == 0) {  // 写完
         nd->plaintext.idx = 0;
-        if (ae_register_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd) < 0) {
+        if (ae_modify_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd) < 0) {
             LOGGER_ERROR("fd: %d, tcp_write_remote, ae_register_event", fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }

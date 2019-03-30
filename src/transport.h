@@ -20,9 +20,9 @@
 
 typedef enum SsStageType {
     STAGE_INIT = 0,   /* 获取 iv 阶段 */
-    STAGE_ADDR,       /* 解析地址阶段 */
-    STAGE_DNS,        /* 查询 DNS */
-    STAGE_HANDSHAKE,  /* TCP 握手阶段 */
+    STAGE_HEADER,     /* 解析 header 阶段，获取 remote 的 ip 和 port */
+    STAGE_DNS,        /* 查询 DNS，可能不进行这一步 */
+    STAGE_HANDSHAKE,  /* TCP 和 remote 握手阶段 */
     STAGE_STREAM,     /* TCP 传输阶段 */
     STAGE_UDP,
     STAGE_DESTROYED = -1

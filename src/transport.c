@@ -177,7 +177,7 @@ parse_net_data_header(NetData *nd)
     struct addrinfo hints = {};
     hints.ai_socktype = SOCK_STREAM;
 
-    int atty = nd->plaintext.data[nd->plaintext.idx];
+    int atty = nd->plaintext.data[0];
     nd->plaintext.idx += 1;
     nd->plaintext.len -= 1;
     if (atty == ATYP_DOMAIN) {
