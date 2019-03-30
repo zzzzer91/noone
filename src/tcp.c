@@ -188,7 +188,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->plaintext.len == 0) {  // 写完
         nd->plaintext.idx = 0;
-        if (ae_modify_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd) < 0) {
+        if (ae_register_event(event_loop, fd, AE_IN, tcp_read_remote, NULL, nd) < 0) {
             LOGGER_ERROR("fd: %d, tcp_write_remote, ae_register_event", fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }
@@ -203,9 +203,10 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     int close_flag = read_net_data(fd, &nd->remote);
     if (close_flag == 1) {
         LOGGER_DEBUG("fd: %d, read, remote close!", fd);
-        CLEAR_REMOTE(event_loop, nd);  // 读到对端关闭, 但还可能有数据发给 ss_client
-        if (nd->remote.len == 0) {
-            return;
+        if (nd->remote.len != 0) {  // 读到对端关闭, 但还有数据发给 ss_client
+            CLEAR_REMOTE(event_loop, nd);
+        } else {
+            CLEAR_SSCLIENT(event_loop, nd);
         }
     }
 

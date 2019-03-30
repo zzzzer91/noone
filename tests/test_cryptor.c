@@ -78,14 +78,14 @@ test_encrypt_and_decrypt_fail()
     strcpy((char *)nd->plaintext.data, "你好");
     nd->plaintext.len = strlen((char *)nd->plaintext.data);
     encrypt(nd->cipher_ctx.encrypt_ctx,
-            nd->plaintext.data, nd->plaintext.len, nd->ciphertext.data);
+            nd->plaintext.data, nd->plaintext.len, nd->plaintext.data);
 
     // 解密失败
     bytes_to_key((unsigned char *)"123123123123",
             ci->key, ci->key_len, nd->cipher_ctx.iv, ci->iv_len);
     nd->cipher_ctx.decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
     size_t ret = decrypt(nd->cipher_ctx.decrypt_ctx,
-            nd->ciphertext.data, nd->ciphertext.len, nd->plaintext.data);
+            nd->plaintext.data, nd->ciphertext.len, nd->plaintext.data);
     EXPECT_EQ_LONG(0L, ret);
 
     free(ci);

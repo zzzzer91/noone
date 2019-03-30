@@ -82,9 +82,7 @@ int ae_get_event_set_size(AeEventLoop *event_loop);
 
 int ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         AeCallback *rcallback, AeCallback *wcallback, void *client_data);
-int ae_modify_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-        AeCallback *rcallback, AeCallback *wcallback, void *client_data);
-void ae_unregister_event(AeEventLoop *event_loop, int fd);
+int ae_unregister_event(AeEventLoop *event_loop, int fd);
 int ae_process_events(AeEventLoop *event_loop);
 
 #endif  /* _NOONE_AE_H_ */

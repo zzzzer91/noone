@@ -40,12 +40,12 @@ ae_api_add_event(AeEventLoop *event_loop, int fd, uint32_t mask)
 /*
  * 从 fd 中删除给定事件
  */
-static void
+static int
 ae_api_del_event(AeEventLoop *event_loop, int fd)
 {
     /* Note, Kernel < 2.6.9 requires a non null event pointer even for
      * EPOLL_CTL_DEL. */
-    epoll_ctl(event_loop->epfd, EPOLL_CTL_DEL, fd, NULL);
+    return epoll_ctl(event_loop->epfd, EPOLL_CTL_DEL, fd, NULL);
 }
 
 /*
@@ -161,7 +161,7 @@ ae_run_loop(AeEventLoop *event_loop)
         // 开始处理事件
         ae_process_events(event_loop);
 
-        // 检查所有时间的最后激活时间，踢掉超时的时间
+        // 检查所有时间的最后激活时间，踢掉超时的事件
         check_last_active(event_loop);
     }
 }
@@ -206,28 +206,13 @@ ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
 }
 
 /*
- * 修改 fd 监听事件
- */
-int
-ae_modify_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-        AeCallback *rcallback, AeCallback *wcallback, void *client_data)
-{
-    AeEvent *fe = &event_loop->events[fd];
-    if (fe->mask == AE_NONE) {
-        return 0;
-    }
-
-    return ae_register_event(event_loop, fd, mask, rcallback, wcallback, client_data);
-}
-
-/*
  * 将 fd 从监听队列中删除
  */
-void
+int
 ae_unregister_event(AeEventLoop *event_loop, int fd)
 {
     if (fd >= event_loop->event_set_size) {
-        return;
+        return -1;
     }
 
     // 取出文件事件结构
@@ -235,7 +220,7 @@ ae_unregister_event(AeEventLoop *event_loop, int fd)
 
     // 未设置监听的事件类型，直接返回
     if (fe->mask == AE_NONE) {
-        return;
+        return 0;
     }
 
     // 计算新 maxfd
@@ -254,7 +239,7 @@ ae_unregister_event(AeEventLoop *event_loop, int fd)
     fe->mask = AE_NONE;
 
     // 取消对给定 fd 的给定事件的监视
-    ae_api_del_event(event_loop, fd);
+    return ae_api_del_event(event_loop, fd);
 }
 
 /* Process every pending time event, then every pending file event
