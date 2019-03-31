@@ -13,8 +13,7 @@
     do { \
         time_t t = time(NULL); \
         struct tm *lt = localtime(&t); \
-        char nowtime[32]; \
-        memset(nowtime, 0, sizeof(nowtime)); \
+        char nowtime[32] = {0}; \
         strftime(nowtime, 32, "%Y-%m-%d %H:%M:%S", lt); \
         fprintf(stderr, "[%s] " "["log_level"] " fmt "\n", nowtime, ##args); \
     } while(0)
