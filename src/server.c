@@ -9,9 +9,13 @@
 #include "cryptor.h"
 #include "error.h"
 #include "log.h"
-#include "config.h"
 #include <unistd.h>
 #include <signal.h>
+
+/* test */
+#define SERVER_ADDR "127.0.0.1"
+#define SERVER_PORT 9527
+#define PASSWD (unsigned char *)"123123"
 
 int
 main(int argc, char *argv[])

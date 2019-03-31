@@ -5,9 +5,10 @@
 #ifndef _NOONE_LOG_H_
 #define _NOONE_LOG_H_
 
-#include "config.h"
 #include <stdio.h>
 #include <time.h>
+
+#define NOONE_DEBUG 0
 
 #define LOGGER_PRINT(log_level, fmt, args...) \
     do { \
