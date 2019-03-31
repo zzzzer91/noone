@@ -2,6 +2,7 @@
  * Created by zzzzer on 3/29/19.
  */
 
+#include "helper.h"
 #include "lru.h"
 #include "log.h"
 #include <stdlib.h>
@@ -42,7 +43,21 @@ test_hash_key()
 }
 
 void
+test_hashtable()
+{
+    HashTable *ht = init_hash_table(CAPACITY);
+    char s1[] = "rm.api.weibo.com";
+    char s2[] = "clients4.google.com";
+    hash_set(ht, s1, 123);
+    hash_set(ht, s1, 456);
+    hash_set(ht, s2, 789);
+    EXPECT_EQ_INT(456, (int)hash_get(ht, s1));
+    EXPECT_EQ_INT(789, (int)hash_get(ht, s2));
+}
+
+void
 test_lru()
 {
     test_hash_key();
+    test_hashtable();
 }
