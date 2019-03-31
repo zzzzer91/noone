@@ -3,7 +3,6 @@
  */
 
 #include "helper.h"
-#include "test_log.c"
 #include "test_error.c"
 #include "test_cryptor.c"
 #include "test_ae.c"

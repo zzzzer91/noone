@@ -17,7 +17,6 @@ target_link_libraries(noone crypto)
 add_executable(  # 要排除 server.c
         test
         ./tests/test.c
-        ./src/log.c
         ./src/cryptor.c
         ./src/transport.c
         ./src/tcp.c

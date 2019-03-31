@@ -46,9 +46,13 @@ typedef struct NetData {
 
     int is_iv_send;
 
-    Buffer ssclient;
+    Buffer plaintext;
+
+    Buffer ciphertext;     // 如果加密前和加密后长度不一，可能会溢出？
 
     Buffer remote;
+
+    Buffer remote_cipher;  // 如果加密前和加密后长度不一，可能会溢出？
 
 } NetData;
 
@@ -66,10 +70,10 @@ int parse_net_data_header(NetData *nd);
 
 #define ENCRYPT(nd) \
     encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.data, (nd)->remote.len, \
-            (nd)->remote.data)
+            (nd)->remote_cipher.data)
 
 #define DECRYPT(nd) \
-    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ssclient.data, (nd)->ssclient.len, \
-            (nd)->ssclient.data)
+    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.data, (nd)->ciphertext.len, \
+            (nd)->plaintext.data)
 
 #endif  /* _NOONE_TRANSPORT_H_ */
