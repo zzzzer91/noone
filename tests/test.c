@@ -12,10 +12,11 @@
 int
 main(void)
 {
-    // test_error();
+    // test_log();
     test_cryptor();
     test_ae();
     test_hashtable();
+    // test_error();
 
     SUMMARY();
 

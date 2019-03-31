@@ -103,7 +103,7 @@ hash_get(HashTable *ht, char *key)
 }
 
 void *
-hash_del(HashTable *ht, void *key)
+hash_del(HashTable *ht, char *key)
 {
     assert(ht != NULL);
 

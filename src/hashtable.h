@@ -35,6 +35,6 @@ int hash_set(HashTable *ht, char *key, void *value);
 
 void *hash_get(HashTable *ht, char *key);
 
-void *hash_del(HashTable *ht, void *key);
+void *hash_del(HashTable *ht, char *key);
 
 #endif  /* _NOONE_HASHTABLE_H_ */
