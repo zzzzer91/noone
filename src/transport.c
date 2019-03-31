@@ -91,7 +91,6 @@ read_net_data(int fd, Buffer *buf)
         sum += nread;
     }
     buf->len = sum;
-    LOGGER_DEBUG("fd: %d, read: %ld, remain capacity: %ld", fd, sum, nleft);
     return close_flag;
 }
 
@@ -100,7 +99,7 @@ write_net_data(int fd, Buffer *buf)
 {
     int close_flag = 0;
     size_t nleft = buf->len;
-    ssize_t nwritten, sum = 0;
+    ssize_t nwritten;
     unsigned char *p = buf->data;
     while (nleft > 0) {
         // 阻塞 socket 会一直等，
@@ -121,10 +120,8 @@ write_net_data(int fd, Buffer *buf)
         }
         nleft -= nwritten;
         p += nwritten;
-        sum += nwritten;
     }
     buf->len = nleft;
-    LOGGER_DEBUG("fd: %d, write: %ld, remain len: %ld", fd, sum, nleft);
     return close_flag;
 }
 
@@ -243,6 +240,7 @@ parse_net_data_header(NetData *nd)
 
 /*
  * 检查所有时间的最后激活时间，踢掉超时的时间
+ * TODO 性能很差
  */
 void
 check_last_active(AeEventLoop *event_loop, int fd, void *data)
