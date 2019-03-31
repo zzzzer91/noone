@@ -3,11 +3,11 @@
  */
 
 #include "helper.h"
-#include "lru.h"
+#include "hashtable.h"
 #include "log.h"
 #include <stdlib.h>
 
-#define CAPACITY 1024*128
+#define CAPACITY 1024*64
 
 void
 test_hash_key()
@@ -43,21 +43,25 @@ test_hash_key()
 }
 
 void
-test_hashtable()
+test_table()
 {
     HashTable *ht = init_hash_table(CAPACITY);
     char s1[] = "rm.api.weibo.com";
     char s2[] = "clients4.google.com";
-    hash_set(ht, s1, 123);
-    hash_set(ht, s1, 456);
-    hash_set(ht, s2, 789);
-    EXPECT_EQ_INT(456, (int)hash_get(ht, s1));
-    EXPECT_EQ_INT(789, (int)hash_get(ht, s2));
+    hash_set(ht, s1, (void *)123L);
+    hash_set(ht, s1, (void *)456L);
+    hash_set(ht, s2, (void *)789L);
+    EXPECT_EQ_LONG(2L, ht->size);
+    EXPECT_EQ_LONG(456L, (long)hash_get(ht, s1));
+    EXPECT_EQ_LONG(789L, (long)hash_get(ht, s2));
+    EXPECT_EQ_LONG(789L, (long)hash_del(ht, s2));
+    EXPECT_EQ_LONG((long)NULL, (long)hash_del(ht, s2));
+    EXPECT_EQ_LONG(1L, ht->size);
 }
 
 void
-test_lru()
+test_hashtable()
 {
-    test_hash_key();
-    test_hashtable();
+    // test_hash_key();
+    test_table();
 }
