@@ -29,6 +29,8 @@ typedef void AeCallback(AeEventLoop *event_loop, int fd, void *data);
  */
 typedef struct AeEvent {
 
+    int fd;
+
     // 监听事件类型掩码，
     // 值可以是 AE_IN 或 AE_OUT，或同时
     int mask;
@@ -76,7 +78,7 @@ struct AeEventLoop {
 /* Prototypes */
 AeEventLoop *ae_create_event_loop(int event_set_size);
 void ae_delete_event_loop(AeEventLoop *event_loop);
-void ae_run_loop(AeEventLoop *event_loop);
+void ae_run_loop(AeEventLoop *event_loop, AeCallback timeout_callback);
 void ae_stop_event_loop(AeEventLoop *event_loop);
 int ae_get_event_set_size(AeEventLoop *event_loop);
 

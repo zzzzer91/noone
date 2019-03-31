@@ -12,6 +12,7 @@
 #include <netdb.h>
 
 #define BUF_CAPACITY 16 * 1024
+#define EVENT_TIMIEOUT 90  // 超时限制
 
 // ATYP
 #define ATYP_IPV4 0x01
@@ -68,6 +69,8 @@ int init_net_data_cipher(int fd, CryptorInfo *ci, NetData *nd);
 
 int parse_net_data_header(NetData *nd);
 
+void check_last_active(AeEventLoop *event_loop, int fd, void *data);
+
 #define ENCRYPT(nd) \
     encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.data, (nd)->remote.len, \
             (nd)->remote_cipher.data)
@@ -75,5 +78,26 @@ int parse_net_data_header(NetData *nd);
 #define DECRYPT(nd) \
     decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.data, (nd)->ciphertext.len, \
             (nd)->plaintext.data)
+
+#define CLEAR_SSCLIENT(event_loop, nd) \
+    do { \
+        if (nd->ssclient_fd != -1) { \
+            ae_unregister_event(event_loop, nd->ssclient_fd); \
+            close(nd->ssclient_fd); \
+        } \
+        if (nd->remote_fd != -1) { \
+            ae_unregister_event(event_loop, nd->remote_fd); \
+            close(nd->remote_fd); \
+        } \
+        free_net_data(nd); \
+        return; \
+    } while (0)
+
+#define CLEAR_REMOTE(event_loop, nd) \
+    do { \
+        ae_unregister_event(event_loop, nd->remote_fd); \
+        close(nd->remote_fd); \
+        nd->remote_fd = -1; \
+    } while (0)
 
 #endif  /* _NOONE_TRANSPORT_H_ */

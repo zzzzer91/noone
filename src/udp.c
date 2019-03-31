@@ -3,11 +3,12 @@
  */
 
 #include "udp.h"
+#include "log.h"
 
 void
 udp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 {
-
+    LOGGER_ERROR("udp 尚不支持！");
 }
 
 void

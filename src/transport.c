@@ -201,13 +201,15 @@ parse_net_data_header(NetData *nd)
 
         hints.ai_family = AF_UNSPEC;
     } else if (atty == ATYP_IPV4) {
-        inet_ntop(AF_INET, nd->plaintext.data+nd->plaintext.idx, nd->domain, sizeof(nd->domain));
+        inet_ntop(AF_INET, nd->plaintext.data+nd->plaintext.idx,
+                nd->domain, sizeof(nd->domain));
         nd->plaintext.idx += 4;
         nd->plaintext.len -= 4;
 
         hints.ai_family = AF_INET;
     } else if (atty == ATYP_IPV6) {
-        inet_ntop(AF_INET6, nd->plaintext.data+nd->plaintext.idx, nd->domain, sizeof(nd->domain));
+        inet_ntop(AF_INET6, nd->plaintext.data+nd->plaintext.idx,
+                nd->domain, sizeof(nd->domain));
         nd->plaintext.idx += 16;
         nd->plaintext.len -= 16;
 
@@ -237,4 +239,26 @@ parse_net_data_header(NetData *nd)
     nd->plaintext.idx = 0;
 
     return 0;
+}
+
+/*
+ * 检查所有时间的最后激活时间，踢掉超时的时间
+ */
+void
+check_last_active(AeEventLoop *event_loop, int fd, void *data)
+{
+    // 前面占了 6 个描述符，分别是：
+    // stdin，stdout，stderr，tcp_server，udp_sever，epfd
+    int epfd = event_loop->epfd;
+    time_t current_time = time(NULL);
+    for (int j = event_loop->maxfd-1; j != epfd; j--) {
+        AeEvent *fe = &event_loop->events[j];
+        if (fe->mask != AE_NONE) {
+            if ((current_time - fe->last_active) > EVENT_TIMIEOUT) {  // 踢出超时
+                LOGGER_DEBUG("kill fd: %d", fe->fd);
+                NetData *nd = fe->client_data;
+                CLEAR_SSCLIENT(event_loop, nd);
+            }
+        }
+    }
 }

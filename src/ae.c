@@ -60,15 +60,6 @@ ae_api_poll(AeEventLoop *event_loop, int timeout)
 }
 
 /*
- * 检查所有时间的最后激活时间，踢掉超时的时间
- */
-static void
-check_last_active(AeEventLoop *event_loop)
-{
-
-}
-
-/*
  * 创建事件处理器
  */
 AeEventLoop *
@@ -153,7 +144,7 @@ ae_get_event_set_size(AeEventLoop *event_loop)
  * 事件处理器的主循环
  */
 void
-ae_run_loop(AeEventLoop *event_loop)
+ae_run_loop(AeEventLoop *event_loop, AeCallback timeout_callback)
 {
     event_loop->stop = 0;
 
@@ -162,7 +153,9 @@ ae_run_loop(AeEventLoop *event_loop)
         ae_process_events(event_loop);
 
         // 检查所有时间的最后激活时间，踢掉超时的事件
-        check_last_active(event_loop);
+        if (timeout_callback) {
+            timeout_callback(event_loop, -1, NULL);
+        }
     }
 }
 
@@ -186,6 +179,8 @@ ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
     AeEvent *fe = &event_loop->events[fd];
 
     fe->last_active = time(NULL);
+
+    fe->fd = fd;
 
     // 设置文件事件类型，以及事件的处理器
     fe->mask = mask;

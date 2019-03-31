@@ -15,27 +15,6 @@
 #include <sys/socket.h>  /* accept() */
 #include <netinet/in.h>  /* struct sockaddr_in */
 
-#define CLEAR_SSCLIENT(event_loop, nd) \
-    do { \
-        if (nd->ssclient_fd != -1) { \
-            ae_unregister_event(event_loop, nd->ssclient_fd); \
-            close(nd->ssclient_fd); \
-        } \
-        if (nd->remote_fd != -1) { \
-            ae_unregister_event(event_loop, nd->remote_fd); \
-            close(nd->remote_fd); \
-        } \
-        free_net_data(nd); \
-        return; \
-    } while (0)
-
-#define CLEAR_REMOTE(event_loop, nd) \
-    do { \
-        ae_unregister_event(event_loop, nd->remote_fd); \
-        close(nd->remote_fd); \
-        nd->remote_fd = -1; \
-    } while (0)
-
 void
 tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 {
