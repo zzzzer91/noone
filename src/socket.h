@@ -5,7 +5,7 @@
 #ifndef _NOONE_SOCKET_H_
 #define _NOONE_SOCKET_H_
 
-#define MAX_LISTEN	1024
+#define MAX_LISTEN	2048
 
 int tcp_server_fd_init(const char *addr, unsigned short port);
 

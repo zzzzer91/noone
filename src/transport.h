@@ -12,7 +12,9 @@
 #include <netdb.h>
 
 #define BUF_CAPACITY 16 * 1024
-#define EVENT_TIMIEOUT 90  // 超时限制
+#define EVENT_TIMIEOUT 90  // 超时限制，超过踢掉
+#define MAX_DOMAIN_LEN 64
+#define MAX_PORT_LEN 5
 
 // ATYP
 #define ATYP_IPV4 0x01
@@ -37,15 +39,15 @@ typedef struct NetData {
 
     struct addrinfo *addr_listp;
 
-    char domain[65];
+    char remote_domain[MAX_DOMAIN_LEN+1];
 
-    char remote_port_str[6];
+    char remote_port[MAX_PORT_LEN+1];
 
     SsStageType ss_stage;
 
-    CipherCtx cipher_ctx;
-
     int is_iv_send;
+
+    NooneCipherCtx *cipher_ctx;
 
     Buffer plaintext;
 
@@ -65,18 +67,18 @@ int read_net_data(int fd, Buffer *buf);
 
 int write_net_data(int fd, Buffer *buf);
 
-int init_net_data_cipher(int fd, CryptorInfo *ci, NetData *nd);
+int init_net_data_cipher(int fd, NooneCryptorInfo *ci, NetData *nd);
 
 int parse_net_data_header(NetData *nd);
 
 void check_last_active(AeEventLoop *event_loop, int fd, void *data);
 
 #define ENCRYPT(nd) \
-    encrypt((nd)->cipher_ctx.encrypt_ctx, (nd)->remote.data, (nd)->remote.len, \
+    encrypt((nd)->cipher_ctx->encrypt_ctx, (nd)->remote.data, (nd)->remote.len, \
             (nd)->remote_cipher.data)
 
 #define DECRYPT(nd) \
-    decrypt((nd)->cipher_ctx.decrypt_ctx, (nd)->ciphertext.data, (nd)->ciphertext.len, \
+    decrypt((nd)->cipher_ctx->decrypt_ctx, (nd)->ciphertext.data, (nd)->ciphertext.len, \
             (nd)->plaintext.data)
 
 #define CLEAR_SSCLIENT(event_loop, nd) \

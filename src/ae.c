@@ -21,8 +21,7 @@ ae_api_add_event(AeEventLoop *event_loop, int fd, uint32_t mask)
     int fe_mask = event_loop->events[fd].mask;
 
     if (fe_mask != mask) {
-        int op = fe_mask == AE_NONE ?
-                 EPOLL_CTL_ADD : EPOLL_CTL_MOD;
+        int op = fe_mask == AE_NONE ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
         struct epoll_event ee;
         ee.events = mask;
@@ -156,7 +155,7 @@ ae_run_loop(AeEventLoop *event_loop, AeCallback timeout_callback)
         if (timeout_callback) {
             i++;
         }
-        if (i == 1024) {  // 能达到这个次数代表触发的很频繁，那么可以开始踢掉一些旧事件
+        if (i == 256) {  // 能达到这个次数代表触发的很频繁，那么可以开始踢掉一些旧事件
             // 检查所有事件的最后激活时间，踢掉超时的事件
             timeout_callback(event_loop, -1, NULL);
             i = 0;

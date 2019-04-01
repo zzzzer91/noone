@@ -50,9 +50,9 @@ main(int argc, char *argv[])
         PANIC("ae_create_event_loop");
     }
 
-    CryptorInfo *ci = init_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
+    NooneCryptorInfo *ci = init_noone_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
     if (ci == NULL) {
-        PANIC("init_cryptor_info");
+        PANIC("init_noone_cryptor_info");
     }
     ae_ev_loop->extra_data = ci;
 

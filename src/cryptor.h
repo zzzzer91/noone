@@ -14,24 +14,24 @@
 
 #define MD5_LEN 16
 
-typedef struct CryptorInfo {
+typedef struct NooneCryptorInfo {
     char cipher_name[MAX_CIPHER_NAME_LEN];
     unsigned char key[MAX_KEY_LEN+1];
-    size_t cipher_name_len;
-    size_t key_len;
-    size_t iv_len;
-} CryptorInfo;
+    int cipher_name_len;
+    int key_len;
+    int iv_len;
+} NooneCryptorInfo;
 
-typedef struct CipherCtx {
+typedef struct NooneCipherCtx {
     char cipher_name[MAX_CIPHER_NAME_LEN];
     unsigned char key[MAX_KEY_LEN+1];
     unsigned char iv[MAX_IV_LEN+1];
-    size_t cipher_name_len;
-    size_t key_len;
-    size_t iv_len;
+    int cipher_name_len;
+    int key_len;
+    int iv_len;
     EVP_CIPHER_CTX *encrypt_ctx;
     EVP_CIPHER_CTX *decrypt_ctx;
-} CipherCtx;
+} NooneCipherCtx;
 
 void crypto_md5(const unsigned char *data, size_t data_len, unsigned char *buf);
 
@@ -41,17 +41,20 @@ void bytes_to_key(const unsigned char *passwd,
 
 const EVP_CIPHER *get_cipher(const char *cipher_name);
 
-CryptorInfo *init_cryptor_info(const char *name,
+NooneCryptorInfo *init_noone_cryptor_info(const char *name,
         const unsigned char *passwd, size_t key_len, size_t iv_len);
 
-EVP_CIPHER_CTX *init_cipher_ctx(const EVP_CIPHER *cipher,
+NooneCipherCtx *init_noone_cipher_ctx();
+void free_noone_cipher_ctx(NooneCipherCtx *cipher_ctx);
+
+EVP_CIPHER_CTX *init_evp_cipher_ctx(const EVP_CIPHER *cipher,
         const unsigned char *key, const unsigned char *iv, int op);
 
 #define INIT_ENCRYPT_CTX(cipher_name, key, iv) \
-    init_cipher_ctx(get_cipher(cipher_name), key, iv, 1)
+    init_evp_cipher_ctx(get_cipher(cipher_name), key, iv, 1)
 
 #define INIT_DECRYPT_CTX(cipher_name, key, iv) \
-    init_cipher_ctx(get_cipher(cipher_name), key, iv, 0)
+    init_evp_cipher_ctx(get_cipher(cipher_name), key, iv, 0)
 
 size_t encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
         size_t plaintext_len, unsigned char *ciphertext);

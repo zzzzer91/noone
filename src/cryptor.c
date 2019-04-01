@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <openssl/evp.h>
+#include <assert.h>
 
 void
 crypto_md5(const unsigned char *data, size_t data_len, unsigned char *buf)
@@ -65,11 +66,11 @@ get_cipher(const char *cipher_name) {
     return NULL;
 }
 
-CryptorInfo *
-init_cryptor_info(const char *name,
-                  const unsigned char *passwd, size_t key_len, size_t iv_len)
+NooneCryptorInfo *
+init_noone_cryptor_info(const char *name,
+                        const unsigned char *passwd, size_t key_len, size_t iv_len)
 {
-    CryptorInfo *ci = malloc(sizeof(CryptorInfo));
+    NooneCryptorInfo *ci = malloc(sizeof(NooneCryptorInfo));
     if (ci == NULL) {
         return NULL;
     }
@@ -86,8 +87,33 @@ init_cryptor_info(const char *name,
     return ci;
 }
 
+NooneCipherCtx *
+init_noone_cipher_ctx()
+{
+    NooneCipherCtx *cipher_ctx = calloc(1, sizeof(NooneCipherCtx));
+    if (cipher_ctx == NULL) {
+        return NULL;
+    }
+
+    return cipher_ctx;
+}
+
+void
+free_noone_cipher_ctx(NooneCipherCtx *cipher_ctx)
+{
+    assert(cipher_ctx!=NULL);
+
+    if (cipher_ctx->encrypt_ctx != NULL) {
+        EVP_CIPHER_CTX_free(cipher_ctx->encrypt_ctx);
+    }
+    if (cipher_ctx->decrypt_ctx != NULL) {
+        EVP_CIPHER_CTX_free(cipher_ctx->decrypt_ctx);
+    }
+    free(cipher_ctx);
+}
+
 EVP_CIPHER_CTX *
-init_cipher_ctx(const EVP_CIPHER *cipher,
+init_evp_cipher_ctx(const EVP_CIPHER *cipher,
         const unsigned char *key, const unsigned char *iv, int op)
 {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();

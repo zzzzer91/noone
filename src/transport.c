@@ -23,8 +23,9 @@ init_net_data()
     nd->remote_fd = -1;
     nd->ss_stage = STAGE_INIT;
     nd->addr_listp = NULL;
-    nd->cipher_ctx.encrypt_ctx = NULL;
-    nd->cipher_ctx.decrypt_ctx = NULL;
+    memset(nd->remote_domain, 0, sizeof(nd->remote_domain));
+    memset(nd->remote_port, 0, sizeof(nd->remote_port));
+    nd->cipher_ctx = init_noone_cipher_ctx();
     init_buffer(&nd->ciphertext, BUF_CAPACITY);
     init_buffer(&nd->plaintext, BUF_CAPACITY);
     init_buffer(&nd->remote, BUF_CAPACITY*2);
@@ -37,12 +38,7 @@ init_net_data()
 void
 free_net_data(NetData *nd)
 {
-    if (nd->cipher_ctx.encrypt_ctx != NULL) {
-        EVP_CIPHER_CTX_free(nd->cipher_ctx.encrypt_ctx);
-    }
-    if (nd->cipher_ctx.decrypt_ctx != NULL) {
-        EVP_CIPHER_CTX_free(nd->cipher_ctx.decrypt_ctx);
-    }
+    free_noone_cipher_ctx(nd->cipher_ctx);
     free_buffer(&nd->ciphertext);
     free_buffer(&nd->plaintext);
     free_buffer(&nd->remote);
@@ -126,34 +122,34 @@ write_net_data(int fd, Buffer *buf)
 }
 
 int
-init_net_data_cipher(int fd, CryptorInfo *ci, NetData *nd)
+init_net_data_cipher(int fd, NooneCryptorInfo *ci, NetData *nd)
 {
-    if (read(fd, nd->cipher_ctx.iv, ci->iv_len) < ci->iv_len) {
+    if (read(fd, nd->cipher_ctx->iv, ci->iv_len) < ci->iv_len) {
         return -1;
     }
-    nd->cipher_ctx.iv[ci->iv_len] = 0;
-    nd->cipher_ctx.iv_len = ci->iv_len;
+    nd->cipher_ctx->iv[ci->iv_len] = 0;
+    nd->cipher_ctx->iv_len = ci->iv_len;
 
-    memcpy(nd->cipher_ctx.cipher_name, ci->cipher_name, ci->cipher_name_len);
-    nd->cipher_ctx.cipher_name[ci->cipher_name_len] = 0;
-    nd->cipher_ctx.cipher_name_len = ci->cipher_name_len;
+    memcpy(nd->cipher_ctx->cipher_name, ci->cipher_name, ci->cipher_name_len);
+    nd->cipher_ctx->cipher_name[ci->cipher_name_len] = 0;
+    nd->cipher_ctx->cipher_name_len = ci->cipher_name_len;
 
-    memcpy(nd->cipher_ctx.key, ci->key, ci->key_len);
-    nd->cipher_ctx.key[ci->key_len] = 0;
-    nd->cipher_ctx.key_len = ci->key_len;
+    memcpy(nd->cipher_ctx->key, ci->key, ci->key_len);
+    nd->cipher_ctx->key[ci->key_len] = 0;
+    nd->cipher_ctx->key_len = ci->key_len;
 
     EVP_CIPHER_CTX *ctx;
-    ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx->iv);
     if (ctx == NULL) {
         return -1;
     }
-    nd->cipher_ctx.encrypt_ctx = ctx;
+    nd->cipher_ctx->encrypt_ctx = ctx;
 
-    ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx.iv);
+    ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx->iv);
     if (ctx == NULL) {
         return -1;
     }
-    nd->cipher_ctx.decrypt_ctx = ctx;
+    nd->cipher_ctx->decrypt_ctx = ctx;
 
     return 0;
 }
@@ -176,7 +172,7 @@ int
 parse_net_data_header(NetData *nd)
 {
     int ret;
-    struct addrinfo hints = {};
+    struct addrinfo hints = {0};
     hints.ai_socktype = SOCK_STREAM;
 
     int atty = nd->plaintext.data[0];
@@ -184,29 +180,29 @@ parse_net_data_header(NetData *nd)
     nd->plaintext.len -= 1;
     if (atty == ATYP_DOMAIN) {
         size_t domain_len = nd->plaintext.data[nd->plaintext.idx];  // 域名长度
-        if (domain_len > 63) {
+        if (domain_len > MAX_DOMAIN_LEN) {
             LOGGER_ERROR("domain_len too long!");
             return -1;
         }
         nd->plaintext.idx += 1;
         nd->plaintext.len -= 1;
 
-        memcpy(nd->domain, nd->plaintext.data+nd->plaintext.idx, domain_len);
-        nd->domain[domain_len] = 0;  // 加上 '\0'
+        memcpy(nd->remote_domain, nd->plaintext.data+nd->plaintext.idx, domain_len);
+        nd->remote_domain[domain_len] = 0;  // 加上 '\0'
         nd->plaintext.idx += domain_len;
         nd->plaintext.len -= domain_len;
 
         hints.ai_family = AF_UNSPEC;
     } else if (atty == ATYP_IPV4) {
         inet_ntop(AF_INET, nd->plaintext.data+nd->plaintext.idx,
-                nd->domain, sizeof(nd->domain));
+                nd->remote_domain, sizeof(nd->remote_domain));
         nd->plaintext.idx += 4;
         nd->plaintext.len -= 4;
 
         hints.ai_family = AF_INET;
     } else if (atty == ATYP_IPV6) {
         inet_ntop(AF_INET6, nd->plaintext.data+nd->plaintext.idx,
-                nd->domain, sizeof(nd->domain));
+                nd->remote_domain, sizeof(nd->remote_domain));
         nd->plaintext.idx += 16;
         nd->plaintext.len -= 16;
 
@@ -220,10 +216,10 @@ parse_net_data_header(NetData *nd)
     memcpy(&port, nd->plaintext.data+nd->plaintext.idx, 2);
     nd->plaintext.idx += 2;
     nd->plaintext.len -= 2;
-    snprintf(nd->remote_port_str, 6, "%d", ntohs(port));
-    nd->remote_port_str[5] = 0;
+    snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
+    nd->remote_port[5] = 0;
 
-    ret = getaddrinfo(nd->domain, nd->remote_port_str, &hints, &nd->addr_listp);
+    ret = getaddrinfo(nd->remote_domain, nd->remote_port, &hints, &nd->addr_listp);
     if (ret != 0) {
         LOGGER_ERROR("%s", gai_strerror(ret));
         return -1;
