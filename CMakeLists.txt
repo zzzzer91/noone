@@ -24,6 +24,7 @@ add_executable(  # 要排除 server.c
         ./src/ae.c
         ./src/buffer.c
         ./src/hashtable.c
+        ./src/queue.c
         ./src/lru.c
 )
 target_link_libraries(test crypto)

@@ -8,6 +8,7 @@
 #include "test_cryptor.c"
 #include "test_ae.c"
 #include "test_hashtable.c"
+#include "test_queue.c"
 
 int
 main(void)
@@ -16,6 +17,7 @@ main(void)
     test_cryptor();
     test_ae();
     test_hashtable();
+    test_queue();
     // test_error();
 
     SUMMARY();
