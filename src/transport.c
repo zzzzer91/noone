@@ -251,7 +251,7 @@ check_last_active(AeEventLoop *event_loop, int fd, void *data)
         if (fe->mask != AE_NONE) {
             if ((current_time - fe->last_active) > AE_WAIT_SECONDS) {  // 踢出超时
                 LOGGER_DEBUG("kill fd: %d", fe->fd);
-                NetData *nd = fe->client_data;
+                NetData *nd = fe->client_data;  // ss_client 和 remote_client 共用 nd
                 CLEAR_SSCLIENT(event_loop, nd);
             }
         }
