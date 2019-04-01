@@ -145,6 +145,8 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
         return;
     }
 
+    // 不需要考虑重复注册问题
+    // ae_register_event() 中有相应处理逻辑
     if (ae_register_event(event_loop, nd->remote_fd,
             AE_OUT, NULL, tcp_write_remote, nd) < 0) {
 

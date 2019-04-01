@@ -12,7 +12,6 @@
 #include <netdb.h>
 
 #define BUF_CAPACITY 16 * 1024
-#define EVENT_TIMIEOUT 90  // 超时限制，超过踢掉
 #define MAX_DOMAIN_LEN 64
 #define MAX_PORT_LEN 5
 

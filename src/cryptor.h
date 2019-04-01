@@ -44,6 +44,8 @@ const EVP_CIPHER *get_cipher(const char *cipher_name);
 NooneCryptorInfo *init_noone_cryptor_info(const char *name,
         const unsigned char *passwd, size_t key_len, size_t iv_len);
 
+void free_noone_cryptor_info(NooneCryptorInfo *cryptor_info);
+
 NooneCipherCtx *init_noone_cipher_ctx();
 void free_noone_cipher_ctx(NooneCipherCtx *cipher_ctx);
 

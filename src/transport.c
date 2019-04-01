@@ -236,7 +236,8 @@ parse_net_data_header(NetData *nd)
 
 /*
  * 检查所有时间的最后激活时间，踢掉超时的时间
- * TODO 性能很差
+ * 更新时间的操作，在 ae_register_event() 中进行。
+ * TODO 性能不行
  */
 void
 check_last_active(AeEventLoop *event_loop, int fd, void *data)
@@ -248,7 +249,7 @@ check_last_active(AeEventLoop *event_loop, int fd, void *data)
     for (int j = event_loop->maxfd-1; j != epfd; j--) {
         AeEvent *fe = &event_loop->events[j];
         if (fe->mask != AE_NONE) {
-            if ((current_time - fe->last_active) > EVENT_TIMIEOUT) {  // 踢出超时
+            if ((current_time - fe->last_active) > AE_WAIT_SECONDS) {  // 踢出超时
                 LOGGER_DEBUG("kill fd: %d", fe->fd);
                 NetData *nd = fe->client_data;
                 CLEAR_SSCLIENT(event_loop, nd);

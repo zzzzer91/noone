@@ -68,7 +68,7 @@ get_cipher(const char *cipher_name) {
 
 NooneCryptorInfo *
 init_noone_cryptor_info(const char *name,
-                        const unsigned char *passwd, size_t key_len, size_t iv_len)
+        const unsigned char *passwd, size_t key_len, size_t iv_len)
 {
     NooneCryptorInfo *ci = malloc(sizeof(NooneCryptorInfo));
     if (ci == NULL) {
@@ -85,6 +85,14 @@ init_noone_cryptor_info(const char *name,
     ci->iv_len = iv_len;
 
     return ci;
+}
+
+void
+free_noone_cryptor_info(NooneCryptorInfo *cryptor_info)
+{
+    assert(cryptor_info!=NULL);
+
+    free(cryptor_info);
 }
 
 NooneCipherCtx *

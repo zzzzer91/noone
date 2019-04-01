@@ -68,10 +68,5 @@ main(int argc, char *argv[])
 
     ae_run_loop(ae_ev_loop, check_last_active);
 
-    free(ci);
-    close(tcp_server_fd);
-    close(udp_server_fd);
-    ae_delete_event_loop(ae_ev_loop);
-
     return 0;
 }

@@ -9,7 +9,7 @@
 #include <sys/epoll.h>
 
 /*
- * 关联给定事件到 fd，默认 ET 模式
+ * 关联给定事件到 fd
  *
  * 如果 fd 没有关联任何事件，那么这是一个 ADD 操作。
  *
@@ -48,7 +48,7 @@ ae_api_del_event(AeEventLoop *event_loop, int fd)
 }
 
 /*
- * 获取可执行事件
+ * 获取可执行事件，timeout 单位毫秒
  */
 static int
 ae_api_poll(AeEventLoop *event_loop, int timeout)
@@ -150,15 +150,20 @@ ae_run_loop(AeEventLoop *event_loop, AeCallback timeout_callback)
     int i = 0;
     while (!event_loop->stop) {
         // 开始处理事件
-        ae_process_events(event_loop);
+        int processed = ae_process_events(event_loop);
 
+        // 检查超时事件
         if (timeout_callback) {
-            i++;
-        }
-        if (i == 256) {  // 能达到这个次数代表触发的很频繁，那么可以开始踢掉一些旧事件
-            // 检查所有事件的最后激活时间，踢掉超时的事件
-            timeout_callback(event_loop, -1, NULL);
-            i = 0;
+            if (processed == 0) {  // epoll_wait() 未执行任何事件就返回
+                timeout_callback(event_loop, -1, NULL);
+            } else {  // 传入了超时回调函数
+                i += processed;
+                if (i == 1024) {  // 能达到这个次数代表触发的很频繁，那么可以开始踢掉一些旧事件
+                    // 检查所有事件的最后激活时间，踢掉超时的事件
+                    timeout_callback(event_loop, -1, NULL);
+                    i = 0;
+                }
+            }
         }
     }
 }
@@ -256,8 +261,8 @@ ae_process_events(AeEventLoop *event_loop)
 
     if (event_loop->maxfd != -1) {
 
-        // 处理文件事件
-        int numevents = ae_api_poll(event_loop, -1);
+        // 处理文件事件，这里设置时间的原因是，每隔一段时间返回，然后踢掉超时事件
+        int numevents = ae_api_poll(event_loop, AE_WAIT_SECONDS*1000);
 
         for (int i = 0; i < numevents; i++) {
             int fd = event_loop->ready_events[i].data.fd;

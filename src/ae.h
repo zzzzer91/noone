@@ -9,6 +9,7 @@
 #include <time.h>
 
 #define AE_MAX_EVENTS 4096
+#define AE_WAIT_SECONDS 90
 
 /*
  * 文件事件状态
