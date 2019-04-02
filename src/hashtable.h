@@ -27,16 +27,18 @@ typedef struct HashTable {
     EntryZipper *entry_zipper;
 } HashTable;
 
-HashTable *init_hash_table(size_t capacity);
+HashTable *init_hashtable(size_t capacity);
 
-void free_hash_table(HashTable *ht);
+void free_hashtable(HashTable *ht);
 
 size_t djb_hash(char *key);
 
-int hash_set(HashTable *ht, char *key, void *value);
+int hashtable_set(HashTable *ht, char *key, void *value);
 
-void *hash_get(HashTable *ht, char *key);
+void *hashtable_get(HashTable *ht, char *key);
 
-void *hash_del(HashTable *ht, char *key);
+void *hashtable_del(HashTable *ht, char *key);
+
+void hashtable_clear(HashTable *ht);
 
 #endif  /* _NOONE_HASHTABLE_H_ */

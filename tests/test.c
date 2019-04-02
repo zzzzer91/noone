@@ -9,6 +9,7 @@
 #include "test_ae.c"
 #include "test_hashtable.c"
 #include "test_queue.c"
+#include "test_lru.c"
 
 int
 main(void)
@@ -18,6 +19,7 @@ main(void)
     test_ae();
     test_hashtable();
     test_queue();
+    test_lru();
     // test_error();
 
     SUMMARY();

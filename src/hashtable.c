@@ -9,7 +9,7 @@
 #include <string.h>
 
 HashTable *
-init_hash_table(size_t capacity)
+init_hashtable(size_t capacity)
 {
     assert(capacity > 0);
 
@@ -31,19 +31,11 @@ init_hash_table(size_t capacity)
 }
 
 void
-free_hash_table(HashTable *ht)
+free_hashtable(HashTable *ht)
 {
     assert(ht != NULL);
 
-    for (int i = 0; i < ht->capacity; i++) {
-        int entry_count = ht->entry_zipper[i].entry_count;
-        Entry *p = ht->entry_zipper[i].head, *pre;
-        for (int j = 0; j < entry_count; j++) {
-            pre = p;
-            p = p->next;
-            free(pre);
-        }
-    }
+    hashtable_clear(ht);
     free(ht->entry_zipper);
     free(ht);
 }
@@ -64,8 +56,11 @@ djb_hash(char *key)
     return hash;
 }
 
+/*
+ * 失败返回 -1，成功返回 hashtable 的大小
+ */
 int
-hash_set(HashTable *ht, char *key, void *value)
+hashtable_set(HashTable *ht, char *key, void *value)
 {
     assert(ht != NULL && key != NULL);  // False 时触发
 
@@ -97,11 +92,11 @@ hash_set(HashTable *ht, char *key, void *value)
         ht->size++;
     }
 
-    return 0;
+    return ht->size;
 }
 
 void *
-hash_get(HashTable *ht, char *key)
+hashtable_get(HashTable *ht, char *key)
 {
     assert(ht != NULL && key != NULL);
 
@@ -124,7 +119,7 @@ hash_get(HashTable *ht, char *key)
 }
 
 void *
-hash_del(HashTable *ht, char *key)
+hashtable_del(HashTable *ht, char *key)
 {
     assert(ht != NULL && key != NULL);
 
@@ -161,4 +156,20 @@ hash_del(HashTable *ht, char *key)
         }
     }
     return NULL;
+}
+
+void
+hashtable_clear(HashTable *ht)
+{
+    for (int i = 0; i < ht->capacity; i++) {
+        int entry_count = ht->entry_zipper[i].entry_count;
+        Entry *head = ht->entry_zipper[i].head, *p;
+        for (int j = 0; j < entry_count; j++) {
+            p = head;
+            head = head->next;
+            free(p);
+        }
+        ht->entry_zipper[i].entry_count = 0;
+    }
+    ht->size = 0;
 }

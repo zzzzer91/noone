@@ -7,13 +7,12 @@
 #include "log.h"
 #include <stdlib.h>
 
-#define CAPACITY 1024*64
-
 void
 test_hash_key()
 {
-    char *table = malloc(sizeof(char) * CAPACITY);
-    memset(table, 0, sizeof(char) * CAPACITY);
+    size_t capacity = 1024*64;
+    char *table = malloc(sizeof(char) * capacity);
+    memset(table, 0, sizeof(char) * capacity);
 
     int key_count = 0;
     int collisions = 0;  // 碰撞数
@@ -26,7 +25,7 @@ test_hash_key()
             s[1] = c2;
             for (char c3 = 'a'; c3 <= 'z'; c3++) {
                 s[s_len-1] = c3;
-                size_t key = djb_hash(s) % CAPACITY;
+                size_t key = djb_hash(s) % capacity;
                 if (table[key] == 1) {
                     collisions++;
                 } else {
@@ -36,8 +35,8 @@ test_hash_key()
             }
         }
     }
-    LOGGER_INFO("test_lru, table 大小：%d，key 数：%d，碰撞数：%d，碰撞率：%f",
-            CAPACITY ,key_count, collisions, collisions / (float)key_count);
+    LOGGER_INFO("test_lru, table 大小：%ld，key 数：%d，碰撞数：%d，碰撞率：%f",
+            capacity ,key_count, collisions, collisions / (float)key_count);
 
     free(table);
 }
@@ -45,20 +44,32 @@ test_hash_key()
 void
 test_table()
 {
-    HashTable *ht = init_hash_table(CAPACITY);
+    size_t capacity = 8;
+    HashTable *ht = init_hashtable(capacity);
     char s1[] = "rm.api.weibo.com";
     char s2[] = "clients4.google.com";
-    hash_set(ht, s1, (void *)123L);
-    hash_set(ht, s1, (void *)456L);
-    hash_set(ht, s2, (void *)789L);
-    EXPECT_EQ_LONG(2L, ht->size);
-    EXPECT_EQ_LONG(456L, (long)hash_get(ht, s1));
-    EXPECT_EQ_LONG(789L, (long)hash_get(ht, s2));
-    EXPECT_EQ_LONG(789L, (long)hash_del(ht, s2));
-    EXPECT_EQ_LONG((long)NULL, (long)hash_del(ht, s2));
-    EXPECT_EQ_LONG(1L, ht->size);
+    char s3[] = "www.bilibili.com";
+    char s4[] = "api.unsplash.com";
+    char s5[] = "api.bilibili.com";
+    hashtable_set(ht, s1, (void *) 1L);
+    hashtable_set(ht, s1, (void *) 2L);
+    hashtable_set(ht, s2, (void *) 3L);
+    hashtable_set(ht, s3, (void *) 4L);
+    hashtable_set(ht, s4, (void *) 5L);
+    hashtable_set(ht, s5, (void *) 6L);
+    EXPECT_EQ_LONG(5L, ht->size);
+    EXPECT_EQ_LONG(2L, (long) hashtable_get(ht, s1));
+    EXPECT_EQ_LONG(3L, (long) hashtable_get(ht, s2));
+    EXPECT_EQ_LONG(3L, (long) hashtable_del(ht, s2));
+    EXPECT_EQ_LONG((long)NULL, (long) hashtable_del(ht, s2));
+    EXPECT_EQ_LONG(4L, (long) hashtable_get(ht, s3));
+    EXPECT_EQ_LONG(5L, (long) hashtable_get(ht, s4));
+    EXPECT_EQ_LONG(6L, (long) hashtable_get(ht, s5));
+    EXPECT_EQ_LONG(4L, ht->size);
+    hashtable_clear(ht);
+    EXPECT_EQ_LONG(0L, ht->size);
 
-    free_hash_table(ht);
+    free_hashtable(ht);
 }
 
 void
