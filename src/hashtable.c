@@ -51,18 +51,17 @@ free_hash_table(HashTable *ht)
 /*
  * djb
  */
-size_t
-hash_key(size_t capacity, char *key)
+inline size_t
+djb_hash(char *key)
 {
-    assert(capacity > 0 && key != NULL);
     /* 5381 和 33。说是经过大量实验，这两个的结果碰撞小，哈希结果分散 */
     register size_t hash = 5381;
 
     char c;
     while ((c = *key++)) {
-        hash = ((hash << 5U) + hash) + c; /* hash * 33 + c */
+        hash = ((hash << 5U) + hash) + c; /* hashcode * 33 + c */
     }
-    return hash % capacity;
+    return hash;
 }
 
 int
@@ -70,8 +69,8 @@ hash_set(HashTable *ht, char *key, void *value)
 {
     assert(ht != NULL && key != NULL);  // False 时触发
 
-    size_t hash = hash_key(ht->capacity, key);
-    EntryZipper *ez = &ht->entry_zipper[hash];
+    size_t hashcode = djb_hash(key) % ht->capacity;
+    EntryZipper *ez = &ht->entry_zipper[hashcode];
 
     // 可能存在相同的 key，则更新
     Entry *p = ez->head;
@@ -90,7 +89,7 @@ hash_set(HashTable *ht, char *key, void *value)
         }
         strncpy(e->key, key, KEY_LEN);
         e->value = value;
-        e->hash = hash;
+        e->hashcode = hashcode;
 
         e->next = ez->head;  // 插入拉链头
         ez->head = e;
@@ -106,8 +105,8 @@ hash_get(HashTable *ht, char *key)
 {
     assert(ht != NULL && key != NULL);
 
-    size_t hash = hash_key(ht->capacity, key);
-    EntryZipper *ez = &ht->entry_zipper[hash];
+    size_t hashcode = djb_hash(key) % ht->capacity;
+    EntryZipper *ez = &ht->entry_zipper[hashcode];
 
     if (ez->entry_count == 0) {
         return NULL;
@@ -129,8 +128,8 @@ hash_del(HashTable *ht, char *key)
 {
     assert(ht != NULL && key != NULL);
 
-    size_t hash = hash_key(ht->capacity, key);
-    EntryZipper *ez = &ht->entry_zipper[hash];
+    size_t hashcode = djb_hash(key) % ht->capacity;
+    EntryZipper *ez = &ht->entry_zipper[hashcode];
 
     void *v;
     if (ez->entry_count != 0) {

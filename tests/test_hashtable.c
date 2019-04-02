@@ -26,7 +26,7 @@ test_hash_key()
             s[1] = c2;
             for (char c3 = 'a'; c3 <= 'z'; c3++) {
                 s[s_len-1] = c3;
-                size_t key = hash_key(CAPACITY, s);
+                size_t key = djb_hash(s) % CAPACITY;
                 if (table[key] == 1) {
                     collisions++;
                 } else {

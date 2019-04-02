@@ -12,7 +12,7 @@
 typedef struct Entry {
     char key[KEY_LEN+1];
     void *value;
-    size_t hash;         // hash 值
+    size_t hashcode;         // hashcode 值
     struct Entry *next;  // 采用拉链法
 } Entry;
 
@@ -31,7 +31,7 @@ HashTable *init_hash_table(size_t capacity);
 
 void free_hash_table(HashTable *ht);
 
-size_t hash_key(size_t capacity, char *key);
+size_t djb_hash(char *key);
 
 int hash_set(HashTable *ht, char *key, void *value);
 

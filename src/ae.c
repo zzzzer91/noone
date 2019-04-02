@@ -154,15 +154,15 @@ ae_run_loop(AeEventLoop *event_loop, AeCallback timeout_callback)
 
         // 检查超时事件
         if (timeout_callback) {
-            if (processed == 0) {  // epoll_wait() 未执行任何事件就返回
-                timeout_callback(event_loop, -1, NULL);
-            } else {  // 传入了超时回调函数
+            if (processed != 0) {
                 i += processed;
                 if (i == 1024) {  // 能达到这个次数代表触发的很频繁，那么可以开始踢掉一些旧事件
                     // 检查所有事件的最后激活时间，踢掉超时的事件
                     timeout_callback(event_loop, -1, NULL);
                     i = 0;
                 }
+            } else {  // epoll_wait() 未执行任何事件就返回
+                timeout_callback(event_loop, -1, NULL);
             }
         }
     }
