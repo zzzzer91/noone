@@ -57,6 +57,8 @@ test_table()
     EXPECT_EQ_LONG(789L, (long)hash_del(ht, s2));
     EXPECT_EQ_LONG((long)NULL, (long)hash_del(ht, s2));
     EXPECT_EQ_LONG(1L, ht->size);
+
+    free_hash_table(ht);
 }
 
 void

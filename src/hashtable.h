@@ -29,6 +29,8 @@ typedef struct HashTable {
 
 HashTable *init_hash_table(size_t capacity);
 
+void free_hash_table(HashTable *ht);
+
 size_t hash_key(size_t capacity, char *key);
 
 int hash_set(HashTable *ht, char *key, void *value);

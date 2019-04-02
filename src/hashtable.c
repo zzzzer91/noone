@@ -11,6 +11,8 @@
 HashTable *
 init_hash_table(size_t capacity)
 {
+    assert(capacity > 0);
+
     HashTable *hash_table = malloc(sizeof(HashTable));
     if (hash_table == NULL) {
         return NULL;
@@ -18,6 +20,7 @@ init_hash_table(size_t capacity)
 
     hash_table->entry_zipper = calloc(capacity, sizeof(EntryZipper));
     if (hash_table->entry_zipper == NULL) {
+        free(hash_table);
         return NULL;
     }
 
@@ -27,12 +30,31 @@ init_hash_table(size_t capacity)
     return hash_table;
 }
 
+void
+free_hash_table(HashTable *ht)
+{
+    assert(ht != NULL);
+
+    for (int i = 0; i < ht->capacity; i++) {
+        int entry_count = ht->entry_zipper[i].entry_count;
+        Entry *p = ht->entry_zipper[i].head, *pre;
+        for (int j = 0; j < entry_count; j++) {
+            pre = p;
+            p = p->next;
+            free(pre);
+        }
+    }
+    free(ht->entry_zipper);
+    free(ht);
+}
+
 /*
  * djb
  */
 size_t
 hash_key(size_t capacity, char *key)
 {
+    assert(capacity > 0 && key != NULL);
     /* 5381 和 33。说是经过大量实验，这两个的结果碰撞小，哈希结果分散 */
     register size_t hash = 5381;
 
@@ -46,7 +68,7 @@ hash_key(size_t capacity, char *key)
 int
 hash_set(HashTable *ht, char *key, void *value)
 {
-    assert(ht != NULL);  // False 时触发
+    assert(ht != NULL && key != NULL);  // False 时触发
 
     size_t hash = hash_key(ht->capacity, key);
     EntryZipper *ez = &ht->entry_zipper[hash];
@@ -82,7 +104,7 @@ hash_set(HashTable *ht, char *key, void *value)
 void *
 hash_get(HashTable *ht, char *key)
 {
-    assert(ht != NULL);
+    assert(ht != NULL && key != NULL);
 
     size_t hash = hash_key(ht->capacity, key);
     EntryZipper *ez = &ht->entry_zipper[hash];
@@ -105,7 +127,7 @@ hash_get(HashTable *ht, char *key)
 void *
 hash_del(HashTable *ht, char *key)
 {
-    assert(ht != NULL);
+    assert(ht != NULL && key != NULL);
 
     size_t hash = hash_key(ht->capacity, key);
     EntryZipper *ez = &ht->entry_zipper[hash];

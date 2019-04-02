@@ -18,6 +18,7 @@ init_seqqueue(int capacity)
     // 会损失一个位置，用于判断队满
     queue->data = calloc(capacity+1, sizeof(void *));
     if (queue->data == NULL) {
+        free(queue);
         return NULL;
     }
 
