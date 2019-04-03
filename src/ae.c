@@ -125,7 +125,7 @@ ae_delete_event_loop(AeEventLoop *event_loop)
  * 停止事件处理器
  */
 void
-ae_stop(AeEventLoop *event_loop)
+ae_stop_event_loop(AeEventLoop *event_loop)
 {
     event_loop->stop = 1;
 }
