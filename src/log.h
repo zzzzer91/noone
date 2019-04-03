@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#define NOONE_DEBUG 1
+#define NOONE_DEBUG 0
 
 #define LOGGER_PRINT(log_level, fmt, args...) \
     do { \
