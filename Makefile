@@ -1,9 +1,9 @@
 CC=gcc # 指定编译器
-CFLAGS=-O3
+CFLAGS=-O2 -std=gnu99  # centos7 上的 gcc 只支持 gnu99
 target=noone
 src=$(wildcard src/*.c) # 查找指定目录下所有 .c 文件，返回字符串
 obj=$(patsubst src/%.c, build/%.o, $(src)) # 把字符串中的 src/*.c 替换 build/*.o，返回字符串
-libs=-lcrypto
+libs=-lcrypto  # openssl
 
 # 找不到 .o 依赖时，自动执行下面语句，逐个生成 .o 文件
 $(target):$(obj)
