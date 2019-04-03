@@ -9,6 +9,8 @@
 #include "error.h"
 #include "cryptor.h"
 #include "log.h"
+#include "lru.h"
+#include "manager.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>      /* close() */
@@ -39,6 +41,7 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
         return;
     }
     nd->ssclient_fd = conn_fd;
+    nd->user_info = (NooneUserInfo *)data;
 
     if (ae_register_event(event_loop, conn_fd, AE_IN, tcp_read_ssclient, NULL, nd) < 0) {
         LOGGER_ERROR("fd: %d, ae_register_event", conn_fd);
@@ -61,9 +64,9 @@ handle_stage_init(int fd, NooneCryptorInfo *ci, NetData *nd)
 }
 
 static int
-handle_stage_header(NetData *nd)
+handle_stage_header(LruCache *lc, NetData *nd)
 {
-    if (parse_net_data_header(nd) < 0) {
+    if (parse_net_data_header(lc, nd) < 0) {
         return -1;
     }
 
@@ -108,7 +111,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     if (nd->ss_stage == STAGE_INIT) {
-        if (handle_stage_init(fd, event_loop->extra_data, nd) < 0) {
+        if (handle_stage_init(fd, nd->user_info->cryptor_info, nd) < 0) {
             LOGGER_ERROR("fd: %d, handle_stage_init", nd->ssclient_fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }
@@ -128,7 +131,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     nd->plaintext.len = ret;
 
     if (nd->ss_stage == STAGE_HEADER) {
-        if (handle_stage_header(nd) < 0) {
+        if (handle_stage_header(nd->user_info->lru_cache, nd) < 0) {
             LOGGER_ERROR("fd: %d, handle_stage_header", nd->ssclient_fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }

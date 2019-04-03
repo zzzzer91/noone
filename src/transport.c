@@ -169,7 +169,7 @@ init_net_data_cipher(int fd, NooneCryptorInfo *ci, NetData *nd)
  *     DST.PORT 字段：目的服务器的端口
  */
 int
-parse_net_data_header(NetData *nd)
+parse_net_data_header(LruCache *lc, NetData *nd)
 {
     int ret;
     struct addrinfo hints = {0};
@@ -219,10 +219,18 @@ parse_net_data_header(NetData *nd)
     snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
     nd->remote_port[5] = 0;
 
-    ret = getaddrinfo(nd->remote_domain, nd->remote_port, &hints, &nd->addr_listp);
-    if (ret != 0) {
-        LOGGER_ERROR("%s", gai_strerror(ret));
-        return -1;
+    nd->addr_listp = lru_cache_get(lc, nd->remote_domain);
+    if (nd->addr_listp == NULL) {
+        LOGGER_DEBUG("%s: DNS 查询！", nd->remote_domain);
+        ret = getaddrinfo(nd->remote_domain, nd->remote_port, &hints, &nd->addr_listp);
+        if (ret != 0) {
+            LOGGER_ERROR("%s", gai_strerror(ret));
+            return -1;
+        }
+        void *ele = lru_cache_set(lc, nd->remote_domain, nd->addr_listp);
+        if (ele != NULL) {
+            freeaddrinfo(ele);
+        }
     }
 
     if (nd->plaintext.len > 0) {
@@ -244,9 +252,9 @@ check_last_active(AeEventLoop *event_loop, int fd, void *data)
 {
     // 前面占了 6 个描述符，分别是：
     // stdin，stdout，stderr，tcp_server，udp_sever，epfd
-    int epfd = event_loop->epfd;
+    int max_listen_fd = event_loop->max_listen_fd;
     time_t current_time = time(NULL);
-    for (int j = event_loop->maxfd-1; j != epfd; j--) {
+    for (int j = event_loop->maxfd; j > max_listen_fd; j--) {
         AeEvent *fe = &event_loop->events[j];
         if (fe->mask != AE_NONE) {
             if ((current_time - fe->last_active) > AE_WAIT_SECONDS) {  // 踢出超时

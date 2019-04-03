@@ -23,8 +23,8 @@ init_lru_cache(size_t capacity)
         return NULL;
     }
 
-    // hashcode 表比例 64
-    lc->hash_table = init_hashtable(capacity * 64);
+    // hashcode 表比例 32
+    lc->hash_table = init_hashtable(capacity * 32);
     if (lc->hash_table == NULL) {
         free(lc);
         return NULL;
@@ -52,29 +52,31 @@ free_lru_cache(LruCache *lc)
     free(lc);
 }
 
-int
+/*
+ * 返回过期元素的 value，用于调用者释放
+ */
+void *
 lru_cache_set(LruCache *lc, char *key, void *value)
 {
     assert(lc != NULL && key != NULL);
 
     DnsEntry *de = malloc(sizeof(DnsEntry));
-    if (de == NULL) {
-        return -1;
+    if (de == NULL) { // TODO
+        return NULL;
     }
 
     strncpy(de->domain, key, LRU_DOMAIN_LEN);
-    void *ret = hashtable_get(lc->hash_table, key);
-    if (ret == NULL) {  // 防止 key 已经在队列中
-        de = seqqueue_append(lc->queue, de);
-        if (de != NULL) {  // 队满，弹出了最前面的元素
-            hashtable_del(lc->hash_table, de->domain);
-            free(de);
-            lc->size--;
-        }
+    void *old_cache = NULL;
+    // key 可以可能已经在队列中，这里把判断权交给调用者
+    de = seqqueue_append(lc->queue, de);
+    if (de != NULL) {  // 队满，弹出最前面的元素
+        old_cache = hashtable_del(lc->hash_table, de->domain);
+        free(de);
+        lc->size--;
     }
     lc->size = hashtable_set(lc->hash_table, key, value);
 
-    return 0;
+    return old_cache;
 }
 
 void *

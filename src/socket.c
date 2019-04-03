@@ -4,6 +4,7 @@
 
 #include "socket.h"
 #include <stdio.h>
+#include <string.h>
 #include <fcntl.h>       /* fcntl() */
 #include <sys/socket.h>  /* socket(), setsockopt() */
 #include <netinet/in.h>  /* struct sockaddr_in */
@@ -11,9 +12,21 @@
 #include <netdb.h>       /* getaddrinfo(), gai_strerror() */
 
 int
-tcp_server_fd_init(const char *addr, unsigned short port)
+tcp_server_fd_init(const char *port)
 {
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct addrinfo hints, *listp;
+    int ret;
+    /* 获取主机名可能对应的IP地址的列表 */
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM; /* TCP */
+    hints.ai_flags = AI_NUMERICSERV; /* 强制只能填端口号, 而不能是端口号对应的服务名 */
+    hints.ai_flags |= AI_PASSIVE;
+    if ((ret = getaddrinfo(NULL, port, &hints, &listp)) != 0) {
+        fprintf(stderr, "open_clientfd-getaddrinfo error: %s\n", gai_strerror(ret));
+        return -1;
+    }
+
+    int server_fd = socket(listp->ai_family, listp->ai_socktype, listp->ai_protocol);
     if (server_fd < 0) {
         return -1;
     }
@@ -25,13 +38,11 @@ tcp_server_fd_init(const char *addr, unsigned short port)
         return -1;
     }
 
-    struct sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(addr);
-    server_addr.sin_port = htons(port);
-    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    if (bind(server_fd, listp->ai_addr, listp->ai_addrlen) < 0) {
         return -1;
     }
+
+    freeaddrinfo(listp);
 
     if (listen(server_fd, MAX_LISTEN) < 0) {
         return -1;
@@ -41,20 +52,30 @@ tcp_server_fd_init(const char *addr, unsigned short port)
 }
 
 int
-udp_server_fd_init(const char *addr, unsigned short port)
+udp_server_fd_init(const char *port)
 {
-    int server_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    struct addrinfo hints, *listp;
+    int ret;
+    /* 获取主机名可能对应的IP地址的列表 */
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_DGRAM; /* TCP */
+    hints.ai_flags = AI_NUMERICSERV; /* 强制只能填端口号, 而不能是端口号对应的服务名 */
+    hints.ai_flags |= AI_PASSIVE;
+    if ((ret = getaddrinfo(NULL, port, &hints, &listp)) != 0) {
+        fprintf(stderr, "open_clientfd-getaddrinfo error: %s\n", gai_strerror(ret));
+        return -1;
+    }
+
+    int server_fd = socket(listp->ai_family, listp->ai_socktype, listp->ai_protocol);
     if (server_fd < 0) {
         return -1;
     }
 
-    struct sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(addr);
-    server_addr.sin_port = htons(port);
-    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    if (bind(server_fd, listp->ai_addr, listp->ai_addrlen) < 0) {
         return -1;
     }
+
+    freeaddrinfo(listp);
 
     // 注意 udp 不需要 listen()，也不需要设置端口复用
 

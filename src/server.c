@@ -10,12 +10,12 @@
 #include "error.h"
 #include "log.h"
 #include "transport.h"
+#include "lru.h"
+#include "manager.h"
 #include <unistd.h>
 #include <signal.h>
 
 /* test */
-#define SERVER_ADDR "127.0.0.1"
-#define SERVER_PORT 9527
 #define PASSWD (unsigned char *)"123123"
 
 int
@@ -27,44 +27,65 @@ main(int argc, char *argv[])
         PANIC("signal");
     }
 
-    // tcp
-    int tcp_server_fd = tcp_server_fd_init(SERVER_ADDR, SERVER_PORT);
-    if (tcp_server_fd < 0) {
-        PANIC("tcp_server_fd_init");
-    }
-    if (setnonblock(tcp_server_fd) < 0) {
-        PANIC("setnonblock");
-    }
-
-    // udp 可以和 tcp 绑定同一端口
-    int udp_server_fd = udp_server_fd_init(SERVER_ADDR, SERVER_PORT);
-    if (udp_server_fd < 0) {
-        PANIC("udp_server_fd_init");
-    }
-    if (setnonblock(udp_server_fd) < 0) {
-        PANIC("setnonblock");
-    }
-
     AeEventLoop *ae_ev_loop = ae_create_event_loop(AE_MAX_EVENTS);
     if (ae_ev_loop == NULL) {
         PANIC("ae_create_event_loop");
     }
 
-    NooneCryptorInfo *ci = init_noone_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
-    if (ci == NULL) {
-        PANIC("init_noone_cryptor_info");
+    int tcp_server_fd, udp_server_fd = -1;
+    int user_count = 1;
+    char *server_port_list[] = {"9529"};
+    NooneManager *noone_manager = init_manager(user_count);  // 全局变量
+    if (noone_manager == NULL) {
+        PANIC("init_users_info");
     }
-    ae_ev_loop->extra_data = ci;
+    for (int i = 0; i < user_count; i++) {
+        noone_manager->users_info[i].user_idx = i;
 
-    int ret = ae_register_event(ae_ev_loop, tcp_server_fd, AE_IN, tcp_accept_conn, NULL, NULL);
-    if (ret  < 0) {
-        PANIC("ae_register_event");
-    }
+        // tcp
+        tcp_server_fd = tcp_server_fd_init(server_port_list[i]);
+        if (tcp_server_fd < 0) {
+            PANIC("tcp_server_fd_init");
+        }
+        if (setnonblock(tcp_server_fd) < 0) {
+            PANIC("setnonblock");
+        }
+        int ret = ae_register_event(ae_ev_loop, tcp_server_fd,
+                AE_IN, tcp_accept_conn, NULL, &noone_manager->users_info[i]);
+        if (ret  < 0) {
+            PANIC("ae_register_event");
+        }
+        noone_manager->users_info[i].tcp_server_fd = tcp_server_fd;
 
-    ret = ae_register_event(ae_ev_loop, udp_server_fd, AE_IN, udp_accept_conn, NULL, NULL);
-    if (ret < 0) {
-        PANIC("ae_register_event");
+        // udp 可以和 tcp 绑定同一端口
+        udp_server_fd = udp_server_fd_init(server_port_list[i]);
+        if (udp_server_fd < 0) {
+            PANIC("udp_server_fd_init");
+        }
+        if (setnonblock(udp_server_fd) < 0) {
+            PANIC("setnonblock");
+        }
+        ret = ae_register_event(ae_ev_loop, udp_server_fd,
+                AE_IN, udp_accept_conn, NULL, &noone_manager->users_info[i]);
+        if (ret < 0) {
+            PANIC("ae_register_event");
+        }
+        noone_manager->users_info[i].udp_server_fd = udp_server_fd;
+
+        NooneCryptorInfo *ci = init_noone_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
+        if (ci == NULL) {
+            PANIC("init_noone_cryptor_info");
+        }
+        noone_manager->users_info[i].cryptor_info = ci;
+
+        LruCache *lc = init_lru_cache(1024);
+        if (lc == NULL) {
+            PANIC("init_lru_cache");
+        }
+        noone_manager->users_info[i].lru_cache = lc;
     }
+    ae_ev_loop->max_listen_fd = udp_server_fd;
+    ae_ev_loop->extra_data = noone_manager;
 
     ae_run_loop(ae_ev_loop, check_last_active);
 

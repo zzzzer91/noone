@@ -60,6 +60,9 @@ struct AeEventLoop {
     // 事件数组容量
     int event_set_size; /* max number of file descriptors tracked */
 
+    // 当前最大的监听描述符，大于这个的描述符，才能被踢掉
+    int max_listen_fd;
+
     // 目前已注册的最大描述符
     int maxfd;   /* highest file descriptor currently registered */
 

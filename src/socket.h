@@ -7,9 +7,9 @@
 
 #define MAX_LISTEN	2048
 
-int tcp_server_fd_init(const char *addr, unsigned short port);
+int tcp_server_fd_init(const char *port);
 
-int udp_server_fd_init(const char *addr, unsigned short port);
+int udp_server_fd_init(const char *port);
 
 int setnonblock(int sockfd);
 

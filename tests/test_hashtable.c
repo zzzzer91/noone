@@ -10,7 +10,7 @@
 void
 test_hash_key()
 {
-    size_t capacity = 1024*64;
+    size_t capacity = 1024*32;
     char *table = malloc(sizeof(char) * capacity);
     memset(table, 0, sizeof(char) * capacity);
 

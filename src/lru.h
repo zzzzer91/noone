@@ -19,7 +19,7 @@ LruCache *init_lru_cache(size_t capacity);
 
 void free_lru_cache(LruCache *lc);
 
-int lru_cache_set(LruCache *lc, char *key, void *value);
+void *lru_cache_set(LruCache *lc, char *key, void *value);
 
 void *lru_cache_get(LruCache *lc, char *key);
 

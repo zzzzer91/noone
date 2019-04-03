@@ -9,6 +9,8 @@
 #include "ae.h"
 #include "buffer.h"
 #include "log.h"
+#include "lru.h"
+#include "manager.h"
 #include <netdb.h>
 
 #define BUF_CAPACITY 16 * 1024
@@ -32,19 +34,21 @@ typedef enum SsStageType {
 
 typedef struct NetData {
 
+    NooneUserInfo *user_info;  // 用户索引
+
     int ssclient_fd;
 
     int remote_fd;
 
-    struct addrinfo *addr_listp;
+    int is_iv_send;
+
+    SsStageType ss_stage;
 
     char remote_domain[MAX_DOMAIN_LEN+1];
 
     char remote_port[MAX_PORT_LEN+1];
 
-    SsStageType ss_stage;
-
-    int is_iv_send;
+    struct addrinfo *addr_listp;
 
     NooneCipherCtx *cipher_ctx;
 
@@ -68,7 +72,7 @@ int write_net_data(int fd, Buffer *buf);
 
 int init_net_data_cipher(int fd, NooneCryptorInfo *ci, NetData *nd);
 
-int parse_net_data_header(NetData *nd);
+int parse_net_data_header(LruCache *lc, NetData *nd);
 
 void check_last_active(AeEventLoop *event_loop, int fd, void *data);
 
