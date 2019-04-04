@@ -48,6 +48,9 @@ typedef struct AeEvent {
     // 最后激活时间，用于踢掉超时连接
     time_t last_active;
 
+    // 事件双向链表
+    struct AeEvent *prev, *next;
+
 } AeEvent;
 
 /*
@@ -68,6 +71,10 @@ struct AeEventLoop {
 
     // 已注册的文件事件
     AeEvent *events; /* Registered events */
+
+    // 事件会以最后激活时间排序，用于踢出超时事件
+    // 最新被激活的事件，会被放置到头部
+    AeEvent *events_head, *events_tail;
 
     // 事件槽，只用来放置 epoll_wait() 已就绪事件
     struct epoll_event *ready_events;

@@ -15,48 +15,30 @@
  *
  * 如果已经关联了某个/某些事件，那么这是一个 MOD 操作。
  */
-static int
-ae_api_add_event(AeEventLoop *event_loop, int fd, uint32_t mask)
-{
-    int fe_mask = event_loop->events[fd].mask;
-
-    if (fe_mask != mask) {
-        int op = fe_mask == AE_NONE ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
-
-        struct epoll_event ee;
-        ee.events = mask;
-        ee.data.u64 = 0; /* avoid valgrind warning */
-        ee.data.fd = fd;
-
-        if (epoll_ctl(event_loop->epfd, op, fd, &ee) == -1) {
-            return -1;
-        }
-    }
-
-    return 0;
-}
+#define AE_EPOLL_ADD_EVENT(event_loop, fd, mask, op) \
+    ({\
+        struct epoll_event ee; \
+        ee.events = mask; \
+        ee.data.fd = fd; \
+        epoll_ctl(event_loop->epfd, op, fd, &ee); \
+    })
 
 /*
- * 从 fd 中删除给定事件
+ * 删除事件
  */
-static int
-ae_api_del_event(AeEventLoop *event_loop, int fd)
-{
-    /* Note, Kernel < 2.6.9 requires a non null event pointer even for
-     * EPOLL_CTL_DEL. */
-    return epoll_ctl(event_loop->epfd, EPOLL_CTL_DEL, fd, NULL);
-}
+#define AE_EPOLL_DEL_EVENT(event_loop, fd) \
+    ({ \
+        epoll_ctl(event_loop->epfd, EPOLL_CTL_DEL, fd, NULL); \
+    })
 
 /*
  * 获取可执行事件，timeout 单位毫秒
  */
-static int
-ae_api_poll(AeEventLoop *event_loop, int timeout)
-{
-    // 等待时间
-    return epoll_wait(event_loop->epfd, event_loop->ready_events,
-            event_loop->event_set_size, timeout);
-}
+#define AE_EPOLL_POLL(event_loop, timeout) \
+    ({ \
+        epoll_wait(event_loop->epfd, event_loop->ready_events, \
+                event_loop->event_set_size, timeout); \
+    })
 
 /*
  * 创建事件处理器
@@ -175,24 +157,32 @@ int
 ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         AeCallback *rcallback, AeCallback *wcallback, void *client_data)
 {
-    if (fd >= event_loop->event_set_size) {
-        return -1;
-    }
-
-    // 监听指定 fd 的指定事件
-    if (ae_api_add_event(event_loop, fd, mask) == -1) {
+    if (fd >= event_loop->event_set_size || mask == AE_NONE) {
         return -1;
     }
 
     // 取出文件事件结构
     AeEvent *fe = &event_loop->events[fd];
+    int fe_mask = fe->mask;
 
-    fe->last_active = time(NULL);
+    if (fe_mask != mask) {
+        int op = fe_mask == AE_NONE ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
-    fe->fd = fd;
+        // 监听指定 fd 的指定事件
+        if (AE_EPOLL_ADD_EVENT(event_loop, fd, mask, op) == -1) {
+            return -1;
+        }
 
-    // 设置文件事件类型，以及事件的处理器
-    fe->mask = mask;
+        fe->fd = fd;
+
+        // 如果有需要，更新事件处理器的最大 fd
+        if (fd > event_loop->maxfd) {
+            event_loop->maxfd = fd;
+        }
+
+        // 设置文件事件类型，以及事件的处理器
+        fe->mask = mask;
+    }
 
     // 读写事件
     fe->rcallback = rcallback;
@@ -201,10 +191,7 @@ ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
     // 私有数据
     fe->client_data = client_data;
 
-    // 如果有需要，更新事件处理器的最大 fd
-    if (fd > event_loop->maxfd) {
-        event_loop->maxfd = fd;
-    }
+    fe->last_active = time(NULL);
 
     return 0;
 }
@@ -243,7 +230,7 @@ ae_unregister_event(AeEventLoop *event_loop, int fd)
     fe->mask = AE_NONE;
 
     // 取消对给定 fd 的给定事件的监视
-    return ae_api_del_event(event_loop, fd);
+    return AE_EPOLL_DEL_EVENT(event_loop, fd);
 }
 
 /* Process every pending time event, then every pending file event
@@ -262,7 +249,7 @@ ae_process_events(AeEventLoop *event_loop)
     if (event_loop->maxfd != -1) {
 
         // 处理文件事件，这里设置时间的原因是，每隔一段时间返回，然后踢掉超时事件
-        int numevents = ae_api_poll(event_loop, AE_WAIT_SECONDS*1000);
+        int numevents = AE_EPOLL_POLL(event_loop, AE_WAIT_SECONDS*1000);
 
         for (int i = 0; i < numevents; i++) {
             int fd = event_loop->ready_events[i].data.fd;

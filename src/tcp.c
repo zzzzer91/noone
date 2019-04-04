@@ -156,7 +156,9 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
         LOGGER_ERROR("fd: %d, tcp_read_ssclient, ae_register_event", nd->ssclient_fd);
         CLEAR_SSCLIENT(event_loop, nd);
     }
-    if (ae_unregister_event(event_loop, fd) < 0) {
+    // 相当于不触发这个事件
+    if (ae_register_event(event_loop, fd,
+            EPOLLERR, NULL, NULL, NULL) < 0) {
         LOGGER_ERROR("fd: %d, tcp_read_ssclient, ae_unregister_event", nd->ssclient_fd);
         CLEAR_SSCLIENT(event_loop, nd);
     }
@@ -218,9 +220,12 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
         LOGGER_ERROR("fd: %d, tcp_read_remote, ae_register_event", nd->ssclient_fd);
         CLEAR_SSCLIENT(event_loop, nd);
     }
-    if (ae_unregister_event(event_loop, fd) < 0) {
-        LOGGER_ERROR("fd: %d, tcp_read_remote, ae_unregister_event", nd->ssclient_fd);
-        CLEAR_SSCLIENT(event_loop, nd);
+    if (nd->remote_fd != -1) {  // 对端已关闭
+        if (ae_register_event(event_loop, fd,
+                              EPOLLERR, NULL, NULL, NULL) < 0) {
+            LOGGER_ERROR("fd: %d, tcp_read_remote, ae_unregister_event", nd->ssclient_fd);
+            CLEAR_SSCLIENT(event_loop, nd);
+        }
     }
 }
 
