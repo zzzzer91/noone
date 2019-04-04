@@ -157,7 +157,7 @@ int
 ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         AeCallback *rcallback, AeCallback *wcallback, void *client_data)
 {
-    if (fd >= event_loop->event_set_size || mask == AE_NONE) {
+    if (fd < 0 || fd >= event_loop->event_set_size || mask == AE_NONE) {
         return -1;
     }
 
@@ -202,7 +202,7 @@ ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
 int
 ae_unregister_event(AeEventLoop *event_loop, int fd)
 {
-    if (fd >= event_loop->event_set_size) {
+    if (fd < 0 || fd >= event_loop->event_set_size) {
         return -1;
     }
 
