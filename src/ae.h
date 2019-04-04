@@ -73,7 +73,7 @@ struct AeEventLoop {
     AeEvent *events; /* Registered events */
 
     // 事件会以最后激活时间排序，用于踢出超时事件
-    // 最新被激活的事件，会被放置到头部
+    // 最新被激活的事件，会被放置到尾部
     AeEvent *events_head, *events_tail;
 
     // 事件槽，只用来放置 epoll_wait() 已就绪事件
