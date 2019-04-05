@@ -69,6 +69,19 @@ lru_cache_get(LruCache *lc, char *key)
     return hashtable_get(lc->hash_table, key);
 }
 
+void *
+lru_cache_del(LruCache *lc, char *key)
+{
+    assert(lc != NULL && key != NULL);
+
+    void *v = hashtable_del(lc->hash_table, key);
+    if (v != NULL) {
+        lc->size--;
+    }
+
+    return v;
+}
+
 void
 lru_cache_clear(LruCache *lc)
 {

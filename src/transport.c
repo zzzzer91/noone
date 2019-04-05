@@ -122,9 +122,10 @@ write_net_data(int fd, Buffer *buf)
 }
 
 int
-init_net_data_cipher(int fd, NooneCryptorInfo *ci, NetData *nd)
+init_net_data_cipher(NetData *nd)
 {
-    if (read(fd, nd->cipher_ctx->iv, ci->iv_len) < ci->iv_len) {
+    NooneCryptorInfo *ci = nd->user_info->cryptor_info;
+    if (read(nd->ssclient_fd, nd->cipher_ctx->iv, ci->iv_len) < ci->iv_len) {
         return -1;
     }
     nd->cipher_ctx->iv[ci->iv_len] = 0;
@@ -169,7 +170,7 @@ init_net_data_cipher(int fd, NooneCryptorInfo *ci, NetData *nd)
  *     DST.PORT 字段：目的服务器的端口
  */
 int
-parse_net_data_header(LruCache *lc, NetData *nd)
+parse_net_data_header(NetData *nd)
 {
     int ret;
     struct addrinfo hints = {0};
@@ -219,6 +220,7 @@ parse_net_data_header(LruCache *lc, NetData *nd)
     snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
     nd->remote_port[5] = 0;
 
+    LruCache *lc = nd->user_info->lru_cache;
     nd->addr_listp = lru_cache_get(lc, nd->remote_domain);
     if (nd->addr_listp == NULL) {
         LOGGER_DEBUG("%s: DNS 查询！", nd->remote_domain);

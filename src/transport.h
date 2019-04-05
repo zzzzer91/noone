@@ -70,9 +70,9 @@ int read_net_data(int fd, Buffer *buf);
 
 int write_net_data(int fd, Buffer *buf);
 
-int init_net_data_cipher(int fd, NooneCryptorInfo *ci, NetData *nd);
+int init_net_data_cipher(NetData *nd);
 
-int parse_net_data_header(LruCache *lc, NetData *nd);
+int parse_net_data_header(NetData *nd);
 
 void check_last_active(AeEventLoop *event_loop, int fd, void *data);
 

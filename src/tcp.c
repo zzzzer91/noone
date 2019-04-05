@@ -65,9 +65,9 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 }
 
 static int
-handle_stage_init(int fd, NooneCryptorInfo *ci, NetData *nd)
+handle_stage_init(NetData *nd)
 {
-    if (init_net_data_cipher(fd, ci, nd) < 0) {
+    if (init_net_data_cipher(nd) < 0) {
         return -1;
     }
 
@@ -77,9 +77,9 @@ handle_stage_init(int fd, NooneCryptorInfo *ci, NetData *nd)
 }
 
 static int
-handle_stage_header(LruCache *lc, NetData *nd)
+handle_stage_header(NetData *nd)
 {
-    if (parse_net_data_header(lc, nd) < 0) {
+    if (parse_net_data_header(nd) < 0) {
         return -1;
     }
 
@@ -107,6 +107,9 @@ handle_stage_handshake(NetData *nd)
     if (connect(fd, nd->addr_listp->ai_addr, nd->addr_listp->ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
             close(fd);
+            freeaddrinfo(nd->addr_listp);
+            nd->addr_listp = NULL;
+            lru_cache_del(nd->user_info->lru_cache, nd->remote_domain);
             return -1;
         }
     }
@@ -124,7 +127,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     if (nd->ss_stage == STAGE_INIT) {
-        if (handle_stage_init(fd, nd->user_info->cryptor_info, nd) < 0) {
+        if (handle_stage_init(nd) < 0) {
             LOGGER_ERROR("fd: %d, handle_stage_init", nd->ssclient_fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }
@@ -144,7 +147,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
     nd->plaintext.len = ret;
 
     if (nd->ss_stage == STAGE_HEADER) {
-        if (handle_stage_header(nd->user_info->lru_cache, nd) < 0) {
+        if (handle_stage_header(nd) < 0) {
             LOGGER_ERROR("fd: %d, handle_stage_header", nd->ssclient_fd);
             CLEAR_SSCLIENT(event_loop, nd);
         }

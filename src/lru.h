@@ -21,6 +21,8 @@ int lru_cache_set(LruCache *lc, char *key, void *value, void **oldvalue);
 
 void *lru_cache_get(LruCache *lc, char *key);
 
+void *lru_cache_del(LruCache *lc, char *key);
+
 void lru_cache_clear(LruCache *lc);
 
 #endif  /* _NOONE_LRU_H_ */

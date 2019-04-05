@@ -105,6 +105,6 @@ test_table()
 void
 test_hashtable()
 {
-    test_hash_key();
+    // test_hash_key();
     test_table();
 }
