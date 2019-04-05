@@ -10,7 +10,6 @@
 #include "cryptor.h"
 #include "log.h"
 #include "lru.h"
-#include "manager.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>      /* close() */

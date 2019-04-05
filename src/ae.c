@@ -40,6 +40,30 @@
                 event_loop->event_set_size, timeout); \
     })
 
+/* Process every pending time event, then every pending file event
+ * (that may be registered by time event callbacks just processed).
+ *
+ * 处理所有已到达的时间事件，以及所有已就绪的文件事件。
+ *
+ * The function returns the number of events processed.
+ * 函数的返回值为已处理事件的数量
+ */
+#define ae_process_events(event_loop, timeout) \
+    do { \
+        int numevents = AE_EPOLL_POLL(event_loop, timeout); \
+        for (int i = 0; i < numevents; i++) { \
+            uint32_t mask = event_loop->ready_events[i].events; \
+            int fd = event_loop->ready_events[i].data.fd; \
+            AeEvent *fe = &event_loop->events[fd]; \
+            if (fe->mask & mask & AE_IN) { \
+                fe->rcallback(event_loop, fd, fe->client_data); \
+            } \
+            if (fe->mask & mask & AE_OUT) { \
+                fe->wcallback(event_loop, fd, fe->client_data); \
+            } \
+        } \
+    } while (0)
+
 /*
  * 创建事件处理器
  */
@@ -129,22 +153,17 @@ ae_run_loop(AeEventLoop *event_loop, AeCallback timeout_callback)
 {
     event_loop->stop = 0;
 
-    int i = 0;
+    int count = 0;
     while (!event_loop->stop) {
         // 开始处理事件
-        int processed = ae_process_events(event_loop);
+        ae_process_events(event_loop, AE_WAIT_SECONDS*1000);
 
         // 检查超时事件
         if (timeout_callback) {
-            if (processed != 0) {
-                i += processed;
-                if (i == 1024) {  // 能达到这个次数代表触发的很频繁，那么可以开始踢掉一些旧事件
-                    // 检查所有事件的最后激活时间，踢掉超时的事件
-                    timeout_callback(event_loop, -1, NULL);
-                    i = 0;
-                }
-            } else {  // epoll_wait() 未执行任何事件就返回
+            count++;
+            if (count == 1024) {
                 timeout_callback(event_loop, -1, NULL);
+                count = 0;
             }
         }
     }
@@ -214,7 +233,6 @@ ae_unregister_event(AeEventLoop *event_loop, int fd)
         return 0;
     }
 
-    // 计算新 maxfd
     if (fd == event_loop->maxfd) {
         /* Update the max fd */
         int j;
@@ -229,44 +247,5 @@ ae_unregister_event(AeEventLoop *event_loop, int fd)
 
     fe->mask = AE_NONE;
 
-    // 取消对给定 fd 的给定事件的监视
     return AE_EPOLL_DEL_EVENT(event_loop, fd);
-}
-
-/* Process every pending time event, then every pending file event
- * (that may be registered by time event callbacks just processed).
- *
- * 处理所有已到达的时间事件，以及所有已就绪的文件事件。
- *
- * The function returns the number of events processed.
- * 函数的返回值为已处理事件的数量
- */
-int
-ae_process_events(AeEventLoop *event_loop)
-{
-    int processed = 0;
-
-    if (event_loop->maxfd != -1) {
-
-        // 处理文件事件，这里设置时间的原因是，每隔一段时间返回，然后踢掉超时事件
-        int numevents = AE_EPOLL_POLL(event_loop, AE_WAIT_SECONDS*1000);
-
-        for (int i = 0; i < numevents; i++) {
-            int fd = event_loop->ready_events[i].data.fd;
-
-            // 从已就绪数组中获取事件
-            AeEvent *fe = &event_loop->events[fd];
-
-            if (fe->mask & AE_IN) {
-                fe->rcallback(event_loop, fd, fe->client_data);
-            }
-            if (fe->mask & AE_OUT) {
-                fe->wcallback(event_loop, fd, fe->client_data);
-            }
-
-            processed++;
-        }
-    }
-
-    return processed; /* return the number of processed file/time events */
 }
