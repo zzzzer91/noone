@@ -44,7 +44,7 @@ hashtable_destory(HashTable *ht)
 /*
  * djb
  */
-inline size_t
+size_t
 djb_hash(char *key)
 {
     /* 5381 和 33。说是经过大量实验，这两个的结果碰撞小，哈希结果分散 */

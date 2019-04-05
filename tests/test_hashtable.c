@@ -17,13 +17,13 @@ test_hash_key()
     int key_count = 0;
     int collisions = 0;  // 碰撞数
 
-    char s[32] = "0a123456789a";
+    char s[32] = "0a123456789a0";
     size_t s_len = strlen(s);
     for (char c1 = '0'; c1 <= '9'; c1++) {
         s[0] = c1;
         for (char c2 = 'a'; c2 <= 'z'; c2++) {
             s[1] = c2;
-            for (char c3 = 'a'; c3 <= 'z'; c3++) {
+            for (char c3 = '0'; c3 <= '9'; c3++) {
                 s[s_len-1] = c3;
                 size_t key = djb_hash(s) % capacity;
                 if (table[key] == 1) {
@@ -105,6 +105,6 @@ test_table()
 void
 test_hashtable()
 {
-    // test_hash_key();
+    test_hash_key();
     test_table();
 }

@@ -14,7 +14,7 @@ typedef struct Entry {
     void *value;
     size_t hashcode;
     struct Entry *zipper_prev, *zipper_next;  // 采用拉链法
-    struct Entry *list_prev, *list_next;  // 双向链表，按插入时间排序
+    struct Entry *list_prev, *list_next;  // 双向链表，按时间排序，最近的在队首
 } Entry;
 
 typedef struct ZipperEntry {
