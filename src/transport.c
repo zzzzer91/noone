@@ -227,9 +227,13 @@ parse_net_data_header(LruCache *lc, NetData *nd)
             LOGGER_ERROR("%s", gai_strerror(ret));
             return -1;
         }
-        void *ele = lru_cache_set(lc, nd->remote_domain, nd->addr_listp);
-        if (ele != NULL) {
-            freeaddrinfo(ele);
+        void *oldvalue;
+        ret = lru_cache_set(lc, nd->remote_domain, nd->addr_listp, &oldvalue);
+        if (ret < 0) {
+            return -1;
+        }
+        if (oldvalue != NULL) {
+            freeaddrinfo(oldvalue);
         }
     }
 

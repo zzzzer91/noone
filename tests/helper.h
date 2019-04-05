@@ -30,6 +30,9 @@ int test_pass;   /* 测试通过用例 */
 #define EXPECT_EQ_LONG(expect, actual) \
     EXPECT_EQ_BASE((expect) == (actual), expect, actual, "%ld")
 
+#define EXPECT_EQ_POINTER(expect, actual) \
+    EXPECT_EQ_BASE((expect) == (actual), expect, actual, "%p")
+
 #define EXPECT_EQ_STRING(expect, actual, alength) \
     EXPECT_EQ_BASE( \
         sizeof(expect)-1 == (alength) && memcmp(expect, actual, alength) == 0, \

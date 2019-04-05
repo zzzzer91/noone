@@ -8,7 +8,6 @@
 #include "test_cryptor.c"
 #include "test_ae.c"
 #include "test_hashtable.c"
-#include "test_queue.c"
 #include "test_lru.c"
 
 int
@@ -18,7 +17,6 @@ main(void)
     test_cryptor();
     test_ae();
     test_hashtable();
-    test_queue();
     test_lru();
     // test_error();
 

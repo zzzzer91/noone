@@ -6,20 +6,18 @@
 #define _NOONE_LRU_H_
 
 #include "hashtable.h"
-#include "queue.h"
 
 typedef struct LruCache {
     HashTable *hash_table;
-    SeqQueue *queue;
     size_t capacity;
     size_t size;
 } LruCache;
 
-LruCache *init_lru_cache(size_t capacity);
+LruCache *lru_cache_init(size_t capacity);
 
-void free_lru_cache(LruCache *lc);
+void lru_cache_destory(LruCache *lc);
 
-void *lru_cache_set(LruCache *lc, char *key, void *value);
+int lru_cache_set(LruCache *lc, char *key, void *value, void **oldvalue);
 
 void *lru_cache_get(LruCache *lc, char *key);
 

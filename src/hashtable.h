@@ -7,29 +7,31 @@
 
 #include <stddef.h>
 
-#define KEY_LEN 64
+#define MAX_HASH_KEY_LEN 64
 
 typedef struct Entry {
-    char key[KEY_LEN+1];
+    char key[MAX_HASH_KEY_LEN+1];
     void *value;
-    size_t hashcode;         // hashcode 值
-    struct Entry *next;  // 采用拉链法
+    size_t hashcode;
+    struct Entry *zipper_prev, *zipper_next;  // 采用拉链法
+    struct Entry *list_prev, *list_next;  // 双向链表，按插入时间排序
 } Entry;
 
-typedef struct EntryZipper {
-    Entry *head;  // 指向拉链头部
+typedef struct ZipperEntry {
+    Entry *zipper_head;  // 指向拉链头部
     int entry_count;
-} EntryZipper;
+} ZipperEntry;
 
 typedef struct HashTable {
     size_t size;      // 表当前大小
     size_t capacity;  // 表容量
-    EntryZipper *entry_zipper;
+    ZipperEntry *zipper_entry;  // 指向拉链
+    Entry *list_head, *list_tail; // head 指向最近插入的元素
 } HashTable;
 
-HashTable *init_hashtable(size_t capacity);
+HashTable *hashtable_init(size_t capacity);
 
-void free_hashtable(HashTable *ht);
+void hashtable_destory(HashTable *ht);
 
 size_t djb_hash(char *key);
 
@@ -38,6 +40,8 @@ int hashtable_set(HashTable *ht, char *key, void *value);
 void *hashtable_get(HashTable *ht, char *key);
 
 void *hashtable_del(HashTable *ht, char *key);
+
+void *hashtable_remove_oldest(HashTable *ht);
 
 void hashtable_clear(HashTable *ht);
 

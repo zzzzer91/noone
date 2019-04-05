@@ -49,7 +49,7 @@ main(int argc, char *argv[])
         }
         ui->cryptor_info = ci;
 
-        LruCache *lc = init_lru_cache(1024);
+        LruCache *lc = lru_cache_init(10);
         if (lc == NULL) {
             PANIC("init_lru_cache");
         }

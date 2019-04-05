@@ -44,32 +44,62 @@ test_hash_key()
 void
 test_table()
 {
-    size_t capacity = 8;
-    HashTable *ht = init_hashtable(capacity);
+    size_t capacity = 6;
+    HashTable *ht = hashtable_init(capacity);
     char s1[] = "rm.api.weibo.com";
     char s2[] = "clients4.google.com";
     char s3[] = "www.bilibili.com";
     char s4[] = "api.unsplash.com";
     char s5[] = "api.bilibili.com";
+
     hashtable_set(ht, s1, (void *) 1L);
-    hashtable_set(ht, s1, (void *) 2L);
     hashtable_set(ht, s2, (void *) 3L);
     hashtable_set(ht, s3, (void *) 4L);
     hashtable_set(ht, s4, (void *) 5L);
     hashtable_set(ht, s5, (void *) 6L);
+    hashtable_set(ht, s1, (void *) 2L);
     EXPECT_EQ_LONG(5L, ht->size);
+
     EXPECT_EQ_LONG(2L, (long) hashtable_get(ht, s1));
     EXPECT_EQ_LONG(3L, (long) hashtable_get(ht, s2));
-    EXPECT_EQ_LONG(3L, (long) hashtable_del(ht, s2));
-    EXPECT_EQ_LONG((long)NULL, (long) hashtable_del(ht, s2));
     EXPECT_EQ_LONG(4L, (long) hashtable_get(ht, s3));
     EXPECT_EQ_LONG(5L, (long) hashtable_get(ht, s4));
     EXPECT_EQ_LONG(6L, (long) hashtable_get(ht, s5));
+
+    // 测试删除元素
+    EXPECT_EQ_LONG(3L, (long) hashtable_del(ht, s2));
+    EXPECT_EQ_POINTER(NULL, hashtable_del(ht, s2));
+    EXPECT_EQ_POINTER(NULL, hashtable_get(ht, s2));
     EXPECT_EQ_LONG(4L, ht->size);
+
+    // 测试时间优先队列
+    Entry *p = ht->list_head;
+    EXPECT_EQ_LONG(2L, (long)p->value);
+    p = p->list_next;
+    EXPECT_EQ_LONG(6L, (long)p->value);
+    p = p->list_next;
+    EXPECT_EQ_LONG(5L, (long)p->value);
+    p = p->list_next;
+    EXPECT_EQ_LONG(4L, (long)p->value);
+    p = p->list_next;
+    EXPECT_EQ_POINTER(NULL, p);
+
+    //
+    EXPECT_EQ_LONG(4L, (long)hashtable_remove_oldest(ht));
+    EXPECT_EQ_LONG(5L, (long)hashtable_remove_oldest(ht));
+    EXPECT_EQ_LONG(6L, (long)hashtable_remove_oldest(ht));
+    EXPECT_EQ_LONG(2L, (long)hashtable_remove_oldest(ht));
+    EXPECT_EQ_LONG(0L, ht->size);
+    EXPECT_EQ_POINTER(NULL, hashtable_remove_oldest(ht));
+    EXPECT_EQ_POINTER(NULL, ht->list_head);
+    EXPECT_EQ_POINTER(NULL, ht->list_tail);
+
     hashtable_clear(ht);
     EXPECT_EQ_LONG(0L, ht->size);
+    EXPECT_EQ_POINTER(NULL, ht->list_head);
+    EXPECT_EQ_POINTER(NULL, ht->list_tail);
 
-    free_hashtable(ht);
+    hashtable_destory(ht);
 }
 
 void
