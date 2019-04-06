@@ -251,23 +251,19 @@ parse_net_data_header(NetData *nd)
 /*
  * 检查所有时间的最后激活时间，踢掉超时的时间
  * 更新时间的操作，在 ae_register_event() 中进行。
- * TODO 性能不行
  */
 void
 check_last_active(AeEventLoop *event_loop, int fd, void *data)
 {
-    // 前面占了 6 个描述符，分别是：
-    // stdin，stdout，stderr，tcp_server，udp_sever，epfd
-    int max_listen_fd = event_loop->max_listen_fd;
     time_t current_time = time(NULL);
-    for (int j = event_loop->maxfd; j > max_listen_fd; j--) {
-        AeEvent *fe = &event_loop->events[j];
-        if (fe->mask != AE_NONE) {
-            if ((current_time - fe->last_active) > AE_WAIT_SECONDS) {  // 踢出超时
-                LOGGER_DEBUG("kill fd: %d", fe->fd);
-                NetData *nd = fe->client_data;  // ss_client 和 remote_client 共用 nd
-                CLEAR_SSCLIENT(event_loop, nd);
-            }
+    AeEvent *p = event_loop->list_tail;
+    while (p) {
+        if ((current_time - p->last_active) < AE_WAIT_SECONDS) {  // 踢出超时
+            break;  // 前面的没超时，说明后面的也不会，因为按时间排序
         }
+        NetData *nd = p->client_data;  // ss_client 和 remote_client 共用 nd
+        LOGGER_DEBUG("kill fd: %d", nd->ssclient_fd);
+        CLEAR_SSCLIENT(event_loop, nd);
+        p = p->list_prev;  // 从队尾往前循环
     }
 }

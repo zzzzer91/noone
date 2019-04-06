@@ -3,6 +3,7 @@
  */
 
 #include "hashtable.h"
+#include "dlist.h"
 #include <stdlib.h>
 #include <stddef.h>
 #include <assert.h>
@@ -27,6 +28,7 @@ hashtable_init(size_t capacity)
     hash_table->size = 0;
     hash_table->capacity = capacity;
     hash_table->list_head = NULL;
+    hash_table->list_tail = NULL;
 
     return hash_table;
 }
@@ -79,17 +81,9 @@ hashtable_set(HashTable *ht, char *key, void *value)
             p->value = value;
 
             // 更新队列位置
-            if (p->list_prev != NULL) {  // 不在队列头
-                p->list_prev->list_next = p->list_next;
-                if (p->list_next != NULL) {  // 不在队列尾
-                    p->list_next->list_prev = p->list_prev;
-                } else {  // 在队列尾，需更新队尾指针
-                    ht->list_tail = p->list_prev;
-                }
-                p->list_prev = NULL;
-                p->list_next = ht->list_head;
-                ht->list_head->list_prev = p;
-                ht->list_head = p;
+            if (p->list_prev != NULL) {  // 否则已在队列头，不动
+                DLIST_DEL(ht->list_head, ht->list_tail, p);
+                DLIST_ADD_HEAD(ht->list_head, ht->list_tail, p);
             }
 
             return ht->size;
@@ -115,14 +109,7 @@ hashtable_set(HashTable *ht, char *key, void *value)
     ze->zipper_head = e;
 
     // 放在队列头
-    e->list_prev = NULL;
-    if (ht->list_head != NULL) {
-        ht->list_head->list_prev = e;
-    } else {
-        ht->list_tail = e;  // 插入的是队列中第一个元素，更新尾指针
-    }
-    e->list_next = ht->list_head;
-    ht->list_head = e;
+    DLIST_ADD_HEAD(ht->list_head, ht->list_tail, e);
 
     ze->entry_count++;
     ht->size++;
@@ -173,22 +160,9 @@ hashtable_del(HashTable *ht, char *key)
                     p->zipper_next->zipper_prev = p->list_prev;
                 }
             }
+
             // 从队列中删除
-            if (p->list_prev == NULL) { // 处于队列头
-                ht->list_head = p->list_next;  // 更新头指针
-                if (ht->list_head != NULL) {
-                    ht->list_head->list_prev = NULL;
-                } else { // 已处于队列，队列中就一个元素
-                    ht->list_tail = NULL;
-                }
-            } else {
-                p->list_prev->list_next = p->list_next;
-                if (p->list_next != NULL) {
-                    p->list_next->list_prev = p->list_prev;
-                } else {  // 处于队列尾
-                    ht->list_tail = p->list_prev; // 更新队尾指针
-                }
-            }
+            DLIST_DEL(ht->list_head, ht->list_tail, p);
 
             free(p);
 

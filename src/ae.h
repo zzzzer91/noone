@@ -21,7 +21,7 @@
 typedef struct AeEventLoop AeEventLoop;
 
 /*
- * 事件接口
+ * 事件回调接口
  */
 typedef void AeCallback(AeEventLoop *event_loop, int fd, void *data);
 
@@ -34,6 +34,7 @@ typedef struct AeEvent {
 
     // 监听事件类型掩码，
     // 值可以是 AE_IN 或 AE_OUT，或同时
+    // AE_NONE 代表无监听事件
     int mask;
 
     // 读事件
@@ -49,7 +50,7 @@ typedef struct AeEvent {
     time_t last_active;
 
     // 事件双向链表
-    struct AeEvent *prev, *next;
+    struct AeEvent *list_prev, *list_next;
 
 } AeEvent;
 
@@ -60,27 +61,25 @@ struct AeEventLoop {
     // epoll_event 实例描述符
     int epfd;
 
-    // 事件数组容量
-    int event_set_size; /* max number of file descriptors tracked */
+    // max number of file descriptors tracked
+    int event_set_size;
 
-    // 当前最大的监听描述符，大于这个的描述符，才能被踢掉
-    int max_listen_fd;
+    // highest file descriptor currently registered
+    int maxfd;
 
-    // 目前已注册的最大描述符
-    int maxfd;   /* highest file descriptor currently registered */
-
-    // 已注册的文件事件
-    AeEvent *events; /* Registered events */
-
-    // 事件会以最后激活时间排序，用于踢出超时事件
-    // 最新被激活的事件，会被放置到尾部
-    AeEvent *events_head, *events_tail;
+    // 事件处理器的开关
+    // 1 代表关闭
+    int stop;
 
     // 事件槽，只用来放置 epoll_wait() 已就绪事件
     struct epoll_event *ready_events;
 
-    // 事件处理器的开关
-    int stop;
+    // Registered events
+    AeEvent *events;
+
+    // 事件会以最后激活时间排序，用于踢出超时事件
+    // 最新被激活的事件，会被放置到头部
+    AeEvent *list_head, *list_tail;
 
     // 可以携带一些其他数据
     void *extra_data;
@@ -96,5 +95,6 @@ int ae_get_event_set_size(AeEventLoop *event_loop);
 int ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         AeCallback *rcallback, AeCallback *wcallback, void *client_data);
 int ae_unregister_event(AeEventLoop *event_loop, int fd);
+void ae_remove_event_from_list(AeEventLoop *event_loop, int fd);
 
 #endif  /* _NOONE_AE_H_ */

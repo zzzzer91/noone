@@ -89,13 +89,14 @@ void check_last_active(AeEventLoop *event_loop, int fd, void *data);
         if (nd->ssclient_fd != -1) { \
             ae_unregister_event(event_loop, nd->ssclient_fd); \
             close(nd->ssclient_fd); \
+            nd->ssclient_fd = -1; \
         } \
         if (nd->remote_fd != -1) { \
             ae_unregister_event(event_loop, nd->remote_fd); \
             close(nd->remote_fd); \
+            nd->remote_fd = -1; \
         } \
         free_net_data(nd); \
-        return; \
     } while (0)
 
 #define CLEAR_REMOTE(event_loop, nd) \

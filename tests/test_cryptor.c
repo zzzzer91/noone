@@ -24,7 +24,7 @@ bytes_to_hex(unsigned char *data, size_t len, char *buf)
 }
 
 static void
-test_encrypt_and_decrypt()
+test_aes128ctr_encrypt_and_decrypt()
 {
 // aes-128-ctr
 #define PASSWD_TO_KEY "e99a18c428cb38d5f260853678922e0388fc221acae10caf2921f7435051325c"
@@ -96,6 +96,6 @@ test_encrypt_and_decrypt_fail()
 void
 test_cryptor()
 {
-    test_encrypt_and_decrypt();
+    test_aes128ctr_encrypt_and_decrypt();
     test_encrypt_and_decrypt_fail();
 }

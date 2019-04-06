@@ -4,6 +4,7 @@
 
 #include "ae.h"
 #include "log.h"
+#include "dlist.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/epoll.h>
@@ -47,6 +48,10 @@
  *
  * The function returns the number of events processed.
  * 函数的返回值为已处理事件的数量
+ *
+ * note the fe->mask & mask & ... code: maybe an already processed
+ * event removed an element that fired and we still didn't
+ * processed, so we check if the event is still valid.
  */
 #define ae_process_events(event_loop, timeout) \
     do { \
@@ -76,7 +81,7 @@ ae_create_event_loop(int event_set_size)
     }
 
     // 创建 epoll 实例
-    event_loop->epfd = epoll_create(AE_MAX_EVENTS);
+    event_loop->epfd = epoll_create(event_set_size);
     if (event_loop->epfd == -1) {
         free(event_loop);
         return NULL;
@@ -91,9 +96,10 @@ ae_create_event_loop(int event_set_size)
     }
     /* Events with mask == AE_NONE are not set. So let's initialize the
      * vector with it. */
-    // 初始化监听事件
     for (int i = 0; i < event_set_size; i++) {
         event_loop->events[i].mask = AE_NONE;
+        event_loop->events[i].list_prev = NULL;
+        event_loop->events[i].list_next = NULL;
     }
 
     // 初始化事件槽空间，放置 epoll_wait() 已就绪事件
@@ -110,6 +116,9 @@ ae_create_event_loop(int event_set_size)
 
     event_loop->stop = 0;
     event_loop->maxfd = -1;
+
+    event_loop->list_head = NULL;
+    event_loop->list_tail = NULL;
 
     // 返回事件循环
     return event_loop;
@@ -153,18 +162,13 @@ ae_run_loop(AeEventLoop *event_loop, AeCallback timeout_callback)
 {
     event_loop->stop = 0;
 
-    int count = 0;
     while (!event_loop->stop) {
         // 开始处理事件
         ae_process_events(event_loop, AE_WAIT_SECONDS*1000);
 
         // 检查超时事件
         if (timeout_callback) {
-            count++;
-            if (count == 1024) {
-                timeout_callback(event_loop, -1, NULL);
-                count = 0;
-            }
+            timeout_callback(event_loop, -1, NULL);
         }
     }
 }
@@ -185,6 +189,7 @@ ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
     int fe_mask = fe->mask;
 
     if (fe_mask != mask) {
+        // 判断是注册还是修改
         int op = fe_mask == AE_NONE ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
         // 监听指定 fd 的指定事件
@@ -210,6 +215,17 @@ ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
     // 私有数据
     fe->client_data = client_data;
 
+    // 更新事件队列位置
+    if (fe_mask == AE_NONE) {  // 新注册事件，加入队列
+        DLIST_ADD_HEAD(event_loop->list_head, event_loop->list_tail, fe);
+    } else {  // 已注册事件，则更新位置
+        if (fe->list_prev != NULL) {  // 否则已在头部，不需要动
+            DLIST_DEL(event_loop->list_head, event_loop->list_tail, fe);
+            DLIST_ADD_HEAD(event_loop->list_head, event_loop->list_tail, fe);
+        }
+    }
+
+    // 更新最后激活时间
     fe->last_active = time(NULL);
 
     return 0;
@@ -247,5 +263,15 @@ ae_unregister_event(AeEventLoop *event_loop, int fd)
 
     fe->mask = AE_NONE;
 
+    // 从队列中删除
+    DLIST_DEL(event_loop->list_head, event_loop->list_tail, fe);
+
     return AE_EPOLL_DEL_EVENT(event_loop, fd);
+}
+
+void
+ae_remove_event_from_list(AeEventLoop *event_loop, int fd)
+{
+    AeEvent *fe = &event_loop->events[fd];
+    DLIST_DEL(event_loop->list_head, event_loop->list_tail, fe);
 }
