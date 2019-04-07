@@ -126,21 +126,9 @@ int
 init_net_data_cipher(NetData *nd)
 {
     NooneCryptorInfo *ci = nd->user_info->cryptor_info;
-    if (read(nd->ssclient_fd, nd->cipher_ctx->iv, ci->iv_len) < ci->iv_len) {
-        return -1;
-    }
-    nd->cipher_ctx->iv[ci->iv_len] = 0;
-    nd->cipher_ctx->iv_len = ci->iv_len;
-
-    memcpy(nd->cipher_ctx->cipher_name, ci->cipher_name, ci->cipher_name_len);
-    nd->cipher_ctx->cipher_name[ci->cipher_name_len] = 0;
-    nd->cipher_ctx->cipher_name_len = ci->cipher_name_len;
-
-    memcpy(nd->cipher_ctx->key, ci->key, ci->key_len);
-    nd->cipher_ctx->key[ci->key_len] = 0;
-    nd->cipher_ctx->key_len = ci->key_len;
 
     EVP_CIPHER_CTX *ctx;
+
     ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx->iv);
     if (ctx == NULL) {
         return -1;

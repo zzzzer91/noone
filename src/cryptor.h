@@ -23,11 +23,7 @@ typedef struct NooneCryptorInfo {
 } NooneCryptorInfo;
 
 typedef struct NooneCipherCtx {
-    char cipher_name[MAX_CIPHER_NAME_LEN];
-    unsigned char key[MAX_KEY_LEN+1];
     unsigned char iv[MAX_IV_LEN+1];
-    int cipher_name_len;
-    int key_len;
     int iv_len;
     EVP_CIPHER_CTX *encrypt_ctx;
     EVP_CIPHER_CTX *decrypt_ctx;

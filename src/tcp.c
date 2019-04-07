@@ -66,6 +66,13 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 static int
 handle_stage_init(NetData *nd)
 {
+    NooneCryptorInfo *ci = nd->user_info->cryptor_info;
+    if (read(nd->ssclient_fd, nd->cipher_ctx->iv, ci->iv_len) < ci->iv_len) {
+        return -1;
+    }
+    nd->cipher_ctx->iv[ci->iv_len] = 0;
+    nd->cipher_ctx->iv_len = ci->iv_len;
+
     if (init_net_data_cipher(nd) < 0) {
         return -1;
     }
