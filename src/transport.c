@@ -22,14 +22,12 @@ init_net_data()
     nd->ssclient_fd = -1;
     nd->remote_fd = -1;
     nd->ss_stage = STAGE_INIT;
-    nd->addr_listp = NULL;
+    nd->remote_addr = NULL;
     memset(nd->remote_domain, 0, sizeof(nd->remote_domain));
     memset(nd->remote_port, 0, sizeof(nd->remote_port));
     nd->cipher_ctx = init_noone_cipher_ctx();
-    nd->ciphertext = init_buffer(BUF_CAPACITY);
-    nd->plaintext = init_buffer(BUF_CAPACITY);
-    nd->remote = init_buffer(BUF_CAPACITY*2);
-    nd->remote_cipher = init_buffer(BUF_CAPACITY*2);
+    nd->remote_buf = init_buffer(BUF_CAPACITY);
+    nd->client_buf = init_buffer(BUF_CAPACITY*2);
     nd->is_iv_send = 0;
 
     return nd;
@@ -39,10 +37,8 @@ void
 free_net_data(NetData *nd)
 {
     free_noone_cipher_ctx(nd->cipher_ctx);
-    free_buffer(nd->ciphertext);
-    free_buffer(nd->plaintext);
-    free_buffer(nd->remote);
-    free_buffer(nd->remote_cipher);
+    free_buffer(nd->remote_buf);
+    free_buffer(nd->client_buf);
 
     free(nd);
 }
@@ -59,12 +55,12 @@ free_net_data(NetData *nd)
  *    write_net_data() 同理。
  */
 int
-read_net_data(int fd, Buffer *buf)
+read_net_data(int fd, unsigned char *buf, size_t capacity, size_t *len)
 {
     int close_flag = 0;
-    size_t nleft = buf->capacity;
+    size_t nleft = capacity;
     ssize_t nread, sum = 0;
-    unsigned char *p = buf->data;
+    unsigned char *p = buf;
     while (nleft > 0) {
         // 若没设置非阻塞 socket，这里会一直阻塞直到读到 nleft 字节内容。
         // 这是没法接受的。
@@ -87,17 +83,20 @@ read_net_data(int fd, Buffer *buf)
         p += nread;
         sum += nread;
     }
-    buf->len = sum;
+    *len = sum;
     return close_flag;
 }
 
+/*
+ * 把缓冲区数据写给远端
+ */
 int
 write_net_data(int fd, Buffer *buf)
 {
     int close_flag = 0;
     size_t nleft = buf->len;
-    ssize_t nwritten;
-    unsigned char *p = buf->data;
+    ssize_t nwritten, sum = 0;
+    unsigned char *p = buf->data + buf->idx;
     while (nleft > 0) {
         // 阻塞 socket 会一直等，
         // 非阻塞 socket 会在未成功发送时将 errno 设为 EAGAIN
@@ -117,8 +116,10 @@ write_net_data(int fd, Buffer *buf)
         }
         nleft -= nwritten;
         p += nwritten;
+        sum += nwritten;
     }
     buf->len = nleft;
+    buf->idx += sum;
     return close_flag;
 }
 
@@ -165,36 +166,36 @@ parse_net_data_header(NetData *nd)
     struct addrinfo hints = {0};
     hints.ai_socktype = SOCK_STREAM;
 
-    int atty = nd->plaintext->data[0];
-    nd->plaintext->idx += 1;
-    nd->plaintext->len -= 1;
+    int atty = nd->remote_buf->data[0];
+    nd->remote_buf->idx += 1;
+    nd->remote_buf->len -= 1;
     if (atty == ATYP_DOMAIN) {
-        size_t domain_len = nd->plaintext->data[nd->plaintext->idx];  // 域名长度
+        size_t domain_len = nd->remote_buf->data[nd->remote_buf->idx];  // 域名长度
         if (domain_len > MAX_DOMAIN_LEN) {
             LOGGER_ERROR("domain_len too long!");
             return -1;
         }
-        nd->plaintext->idx += 1;
-        nd->plaintext->len -= 1;
+        nd->remote_buf->idx += 1;
+        nd->remote_buf->len -= 1;
 
-        memcpy(nd->remote_domain, nd->plaintext->data+nd->plaintext->idx, domain_len);
+        memcpy(nd->remote_domain, nd->remote_buf->data+nd->remote_buf->idx, domain_len);
         nd->remote_domain[domain_len] = 0;  // 加上 '\0'
-        nd->plaintext->idx += domain_len;
-        nd->plaintext->len -= domain_len;
+        nd->remote_buf->idx += domain_len;
+        nd->remote_buf->len -= domain_len;
 
         hints.ai_family = AF_UNSPEC;
     } else if (atty == ATYP_IPV4) {
-        inet_ntop(AF_INET, nd->plaintext->data+nd->plaintext->idx,
+        inet_ntop(AF_INET, nd->remote_buf->data+nd->remote_buf->idx,
                 nd->remote_domain, sizeof(nd->remote_domain));
-        nd->plaintext->idx += 4;
-        nd->plaintext->len -= 4;
+        nd->remote_buf->idx += 4;
+        nd->remote_buf->len -= 4;
 
         hints.ai_family = AF_INET;
     } else if (atty == ATYP_IPV6) {
-        inet_ntop(AF_INET6, nd->plaintext->data+nd->plaintext->idx,
+        inet_ntop(AF_INET6, nd->remote_buf->data+nd->remote_buf->idx,
                 nd->remote_domain, sizeof(nd->remote_domain));
-        nd->plaintext->idx += 16;
-        nd->plaintext->len -= 16;
+        nd->remote_buf->idx += 16;
+        nd->remote_buf->len -= 16;
 
         hints.ai_family = AF_INET6;
     } else {
@@ -203,23 +204,23 @@ parse_net_data_header(NetData *nd)
     }
 
     uint16_t port;
-    memcpy(&port, nd->plaintext->data+nd->plaintext->idx, 2);
-    nd->plaintext->idx += 2;
-    nd->plaintext->len -= 2;
+    memcpy(&port, nd->remote_buf->data+nd->remote_buf->idx, 2);
+    nd->remote_buf->idx += 2;
+    nd->remote_buf->len -= 2;
     snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
     nd->remote_port[5] = 0;
 
     LruCache *lc = nd->user_info->lru_cache;
-    nd->addr_listp = lru_cache_get(lc, nd->remote_domain);
-    if (nd->addr_listp == NULL) {
+    nd->remote_addr = lru_cache_get(lc, nd->remote_domain);
+    if (nd->remote_addr == NULL) {
         LOGGER_DEBUG("%s: DNS 查询！", nd->remote_domain);
-        ret = getaddrinfo(nd->remote_domain, nd->remote_port, &hints, &nd->addr_listp);
+        ret = getaddrinfo(nd->remote_domain, nd->remote_port, &hints, &nd->remote_addr);
         if (ret != 0) {
             LOGGER_ERROR("%s", gai_strerror(ret));
             return -1;
         }
         void *oldvalue;
-        ret = lru_cache_set(lc, nd->remote_domain, nd->addr_listp, &oldvalue);
+        ret = lru_cache_set(lc, nd->remote_domain, nd->remote_addr, &oldvalue);
         if (ret < 0) {
             return -1;
         }
@@ -228,11 +229,12 @@ parse_net_data_header(NetData *nd)
         }
     }
 
-    if (nd->plaintext->len > 0) {
-        memcpy(nd->plaintext->data, nd->plaintext->data+nd->plaintext->idx, nd->plaintext->len);
+    if (nd->remote_buf->len > 0) {
+        memcpy(nd->remote_buf->data,
+                nd->remote_buf->data+nd->remote_buf->idx, nd->remote_buf->len);
     }
 
-    nd->plaintext->idx = 0;
+    nd->remote_buf->idx = 0;
 
     return 0;
 }

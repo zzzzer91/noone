@@ -1,7 +1,7 @@
 /*
  * Created by zzzzer on 4/6/19.
  *
- * 双向链表操作, item 结构体需有 list_prev 和 _listnext 两个指针成员
+ * 双向链表操作, item 结构体需有 list_prev 和 list_next 两个指针成员
  */
 
 #ifndef _NOONE_DLIST_H_

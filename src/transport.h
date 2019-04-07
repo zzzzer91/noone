@@ -46,19 +46,15 @@ typedef struct NetData {
 
     char remote_port[MAX_PORT_LEN+1];
 
-    struct addrinfo *addr_listp;
+    struct addrinfo *remote_addr;
 
     NooneUserInfo *user_info;  // 用户索引
 
     NooneCipherCtx *cipher_ctx;
 
-    Buffer *plaintext;
+    Buffer *remote_buf;  // 要发给 remote 的数据
 
-    Buffer *ciphertext;     // 如果加密前和加密后长度不一，可能会溢出？
-
-    Buffer *remote;
-
-    Buffer *remote_cipher;  // 如果加密前和加密后长度不一，可能会溢出？
+    Buffer *client_buf;  // 要发给 client 的数据
 
 } NetData;
 
@@ -66,7 +62,7 @@ NetData *init_net_data();
 
 void free_net_data(NetData *nd);
 
-int read_net_data(int fd, Buffer *buf);
+int read_net_data(int fd, unsigned char *buf, size_t capacity, size_t *len);
 
 int write_net_data(int fd, Buffer *buf);
 
@@ -76,13 +72,13 @@ int parse_net_data_header(NetData *nd);
 
 void check_last_active(AeEventLoop *event_loop, int fd, void *data);
 
-#define ENCRYPT(nd) \
-    encrypt((nd)->cipher_ctx->encrypt_ctx, (nd)->remote->data, (nd)->remote->len, \
-            (nd)->remote_cipher->data)
+#define ENCRYPT(nd, buf, buf_len) \
+    encrypt((nd)->cipher_ctx->encrypt_ctx, (buf), (buf_len), \
+            (nd)->client_buf->data)
 
-#define DECRYPT(nd) \
-    decrypt((nd)->cipher_ctx->decrypt_ctx, (nd)->ciphertext->data, (nd)->ciphertext->len, \
-            (nd)->plaintext->data)
+#define DECRYPT(nd, buf, buf_len) \
+    decrypt((nd)->cipher_ctx->decrypt_ctx, (buf), (buf_len), \
+            (nd)->remote_buf->data)
 
 #define CLEAR_SSCLIENT(event_loop, nd) \
     do { \
