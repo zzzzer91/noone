@@ -26,10 +26,10 @@ init_net_data()
     memset(nd->remote_domain, 0, sizeof(nd->remote_domain));
     memset(nd->remote_port, 0, sizeof(nd->remote_port));
     nd->cipher_ctx = init_noone_cipher_ctx();
-    init_buffer(&nd->ciphertext, BUF_CAPACITY);
-    init_buffer(&nd->plaintext, BUF_CAPACITY);
-    init_buffer(&nd->remote, BUF_CAPACITY*2);
-    init_buffer(&nd->remote_cipher, BUF_CAPACITY*2);
+    nd->ciphertext = init_buffer(BUF_CAPACITY);
+    nd->plaintext = init_buffer(BUF_CAPACITY);
+    nd->remote = init_buffer(BUF_CAPACITY*2);
+    nd->remote_cipher = init_buffer(BUF_CAPACITY*2);
     nd->is_iv_send = 0;
 
     return nd;
@@ -39,10 +39,10 @@ void
 free_net_data(NetData *nd)
 {
     free_noone_cipher_ctx(nd->cipher_ctx);
-    free_buffer(&nd->ciphertext);
-    free_buffer(&nd->plaintext);
-    free_buffer(&nd->remote);
-    free_buffer(&nd->remote_cipher);
+    free_buffer(nd->ciphertext);
+    free_buffer(nd->plaintext);
+    free_buffer(nd->remote);
+    free_buffer(nd->remote_cipher);
 
     free(nd);
 }
@@ -78,6 +78,7 @@ read_net_data(int fd, Buffer *buf)
             } else if (errno == EINTR) {
                 nread = 0;
             } else {
+                LOGGER_ERROR("read_net_data");
                 close_flag = 1;
                 break;
             }
@@ -176,36 +177,36 @@ parse_net_data_header(NetData *nd)
     struct addrinfo hints = {0};
     hints.ai_socktype = SOCK_STREAM;
 
-    int atty = nd->plaintext.data[0];
-    nd->plaintext.idx += 1;
-    nd->plaintext.len -= 1;
+    int atty = nd->plaintext->data[0];
+    nd->plaintext->idx += 1;
+    nd->plaintext->len -= 1;
     if (atty == ATYP_DOMAIN) {
-        size_t domain_len = nd->plaintext.data[nd->plaintext.idx];  // 域名长度
+        size_t domain_len = nd->plaintext->data[nd->plaintext->idx];  // 域名长度
         if (domain_len > MAX_DOMAIN_LEN) {
             LOGGER_ERROR("domain_len too long!");
             return -1;
         }
-        nd->plaintext.idx += 1;
-        nd->plaintext.len -= 1;
+        nd->plaintext->idx += 1;
+        nd->plaintext->len -= 1;
 
-        memcpy(nd->remote_domain, nd->plaintext.data+nd->plaintext.idx, domain_len);
+        memcpy(nd->remote_domain, nd->plaintext->data+nd->plaintext->idx, domain_len);
         nd->remote_domain[domain_len] = 0;  // 加上 '\0'
-        nd->plaintext.idx += domain_len;
-        nd->plaintext.len -= domain_len;
+        nd->plaintext->idx += domain_len;
+        nd->plaintext->len -= domain_len;
 
         hints.ai_family = AF_UNSPEC;
     } else if (atty == ATYP_IPV4) {
-        inet_ntop(AF_INET, nd->plaintext.data+nd->plaintext.idx,
+        inet_ntop(AF_INET, nd->plaintext->data+nd->plaintext->idx,
                 nd->remote_domain, sizeof(nd->remote_domain));
-        nd->plaintext.idx += 4;
-        nd->plaintext.len -= 4;
+        nd->plaintext->idx += 4;
+        nd->plaintext->len -= 4;
 
         hints.ai_family = AF_INET;
     } else if (atty == ATYP_IPV6) {
-        inet_ntop(AF_INET6, nd->plaintext.data+nd->plaintext.idx,
+        inet_ntop(AF_INET6, nd->plaintext->data+nd->plaintext->idx,
                 nd->remote_domain, sizeof(nd->remote_domain));
-        nd->plaintext.idx += 16;
-        nd->plaintext.len -= 16;
+        nd->plaintext->idx += 16;
+        nd->plaintext->len -= 16;
 
         hints.ai_family = AF_INET6;
     } else {
@@ -214,9 +215,9 @@ parse_net_data_header(NetData *nd)
     }
 
     uint16_t port;
-    memcpy(&port, nd->plaintext.data+nd->plaintext.idx, 2);
-    nd->plaintext.idx += 2;
-    nd->plaintext.len -= 2;
+    memcpy(&port, nd->plaintext->data+nd->plaintext->idx, 2);
+    nd->plaintext->idx += 2;
+    nd->plaintext->len -= 2;
     snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
     nd->remote_port[5] = 0;
 
@@ -239,11 +240,11 @@ parse_net_data_header(NetData *nd)
         }
     }
 
-    if (nd->plaintext.len > 0) {
-        memcpy(nd->plaintext.data, nd->plaintext.data+nd->plaintext.idx, nd->plaintext.len);
+    if (nd->plaintext->len > 0) {
+        memcpy(nd->plaintext->data, nd->plaintext->data+nd->plaintext->idx, nd->plaintext->len);
     }
 
-    nd->plaintext.idx = 0;
+    nd->plaintext->idx = 0;
 
     return 0;
 }

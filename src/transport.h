@@ -34,8 +34,6 @@ typedef enum SsStageType {
 
 typedef struct NetData {
 
-    NooneUserInfo *user_info;  // 用户索引
-
     int ssclient_fd;
 
     int remote_fd;
@@ -50,15 +48,17 @@ typedef struct NetData {
 
     struct addrinfo *addr_listp;
 
+    NooneUserInfo *user_info;  // 用户索引
+
     NooneCipherCtx *cipher_ctx;
 
-    Buffer plaintext;
+    Buffer *plaintext;
 
-    Buffer ciphertext;     // 如果加密前和加密后长度不一，可能会溢出？
+    Buffer *ciphertext;     // 如果加密前和加密后长度不一，可能会溢出？
 
-    Buffer remote;
+    Buffer *remote;
 
-    Buffer remote_cipher;  // 如果加密前和加密后长度不一，可能会溢出？
+    Buffer *remote_cipher;  // 如果加密前和加密后长度不一，可能会溢出？
 
 } NetData;
 
@@ -77,12 +77,12 @@ int parse_net_data_header(NetData *nd);
 void check_last_active(AeEventLoop *event_loop, int fd, void *data);
 
 #define ENCRYPT(nd) \
-    encrypt((nd)->cipher_ctx->encrypt_ctx, (nd)->remote.data, (nd)->remote.len, \
-            (nd)->remote_cipher.data)
+    encrypt((nd)->cipher_ctx->encrypt_ctx, (nd)->remote->data, (nd)->remote->len, \
+            (nd)->remote_cipher->data)
 
 #define DECRYPT(nd) \
-    decrypt((nd)->cipher_ctx->decrypt_ctx, (nd)->ciphertext.data, (nd)->ciphertext.len, \
-            (nd)->plaintext.data)
+    decrypt((nd)->cipher_ctx->decrypt_ctx, (nd)->ciphertext->data, (nd)->ciphertext->len, \
+            (nd)->plaintext->data)
 
 #define CLEAR_SSCLIENT(event_loop, nd) \
     do { \

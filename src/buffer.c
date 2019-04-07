@@ -4,48 +4,28 @@
 
 #include "buffer.h"
 #include <stdlib.h>
+#include <assert.h>
 
-int
-init_buffer(Buffer *buf, size_t capacity)
+Buffer *
+init_buffer(size_t capacity)
 {
-    buf->data = malloc(capacity*sizeof(unsigned char));
-    if (buf->data == NULL) {
-        return -1;
+    assert(capacity > 0);
+    Buffer *buf = malloc(sizeof(Buffer) + sizeof(char)*capacity);
+    if (buf == NULL) {
+        return NULL;
     }
 
     buf->capacity = capacity;
     buf->idx = 0;
     buf->len = 0;
 
-    return 0;
+    return buf;
 }
 
 void
 free_buffer(Buffer *buf)
 {
-    if (buf->data != NULL) {
-        free(buf->data);
-    }
+    assert(buf != NULL);
 
-    buf->capacity = 0;
-    buf->idx = 0;
-    buf->len = 0;
-}
-
-int
-resize_buffer(Buffer *buf, size_t new_size)
-{
-    if (buf == NULL || new_size == 0) {
-        return -1;
-    }
-
-    unsigned char *new_ptr = realloc(buf, new_size*sizeof(unsigned char));
-    if (new_ptr == NULL) {
-        return -1;
-    }
-
-    buf->data = new_ptr;
-    buf->capacity = new_size;
-
-    return 0;
+    free(buf);
 }
