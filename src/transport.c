@@ -26,8 +26,8 @@ init_net_data()
     memset(nd->remote_domain, 0, sizeof(nd->remote_domain));
     memset(nd->remote_port, 0, sizeof(nd->remote_port));
     nd->cipher_ctx = init_noone_cipher_ctx();
-    nd->remote_buf = init_buffer(BUF_CAPACITY);
-    nd->client_buf = init_buffer(BUF_CAPACITY*2);
+    nd->remote_buf = init_buffer(CLIENT_BUF_CAPACITY);
+    nd->client_buf = init_buffer(REMOTE_BUF_CAPACITY);
     nd->is_iv_send = 0;
 
     return nd;
@@ -55,12 +55,12 @@ free_net_data(NetData *nd)
  *    write_net_data() 同理。
  */
 int
-read_net_data(int fd, unsigned char *buf, size_t capacity, size_t *len)
+read_net_data(int fd, char *buf, size_t capacity, size_t *len)
 {
     int close_flag = 0;
     size_t nleft = capacity;
     ssize_t nread, sum = 0;
-    unsigned char *p = buf;
+    char *p = buf;
     while (nleft > 0) {
         // 若没设置非阻塞 socket，这里会一直阻塞直到读到 nleft 字节内容。
         // 这是没法接受的。
@@ -96,7 +96,7 @@ write_net_data(int fd, Buffer *buf)
     int close_flag = 0;
     size_t nleft = buf->len;
     ssize_t nwritten, sum = 0;
-    unsigned char *p = buf->data + buf->idx;
+    char *p = buf->data + buf->idx;
     while (nleft > 0) {
         // 阻塞 socket 会一直等，
         // 非阻塞 socket 会在未成功发送时将 errno 设为 EAGAIN

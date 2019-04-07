@@ -13,7 +13,8 @@
 #include "manager.h"
 #include <netdb.h>
 
-#define BUF_CAPACITY 16 * 1024
+#define CLIENT_BUF_CAPACITY 16 * 1024
+#define REMOTE_BUF_CAPACITY 32 * 1024
 #define MAX_DOMAIN_LEN 64
 #define MAX_PORT_LEN 5
 
@@ -62,7 +63,7 @@ NetData *init_net_data();
 
 void free_net_data(NetData *nd);
 
-int read_net_data(int fd, unsigned char *buf, size_t capacity, size_t *len);
+int read_net_data(int fd, char *buf, size_t capacity, size_t *len);
 
 int write_net_data(int fd, Buffer *buf);
 
@@ -73,12 +74,12 @@ int parse_net_data_header(NetData *nd);
 void check_last_active(AeEventLoop *event_loop, int fd, void *data);
 
 #define ENCRYPT(nd, buf, buf_len) \
-    encrypt((nd)->cipher_ctx->encrypt_ctx, (buf), (buf_len), \
-            (nd)->client_buf->data)
+    encrypt((nd)->cipher_ctx->encrypt_ctx, (unsigned char *)(buf), (buf_len), \
+            (unsigned char *)(nd)->client_buf->data)
 
 #define DECRYPT(nd, buf, buf_len) \
-    decrypt((nd)->cipher_ctx->decrypt_ctx, (buf), (buf_len), \
-            (nd)->remote_buf->data)
+    decrypt((nd)->cipher_ctx->decrypt_ctx, (unsigned char *)(buf), (buf_len), \
+            (unsigned char *)(nd)->remote_buf->data)
 
 #define CLEAR_SSCLIENT(event_loop, nd) \
     do { \

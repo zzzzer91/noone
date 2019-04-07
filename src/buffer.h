@@ -11,7 +11,7 @@ typedef struct Buffer {
     size_t capacity;
     size_t len;
     size_t idx;
-    unsigned char data[0];
+    char data[0];
 } Buffer;
 
 Buffer *init_buffer(size_t capacity);

@@ -140,7 +140,7 @@ tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data)
         }
     }
 
-    unsigned char buf[BUF_CAPACITY];
+    char buf[CLIENT_BUF_CAPACITY];
     size_t buf_len;
     int close_flag = read_net_data(fd, buf, sizeof(buf), &buf_len);
     if (close_flag == 1) {  // ss_client 关闭
@@ -227,7 +227,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
 
-    unsigned char buf[BUF_CAPACITY];
+    char buf[REMOTE_BUF_CAPACITY];
     size_t buf_len;
     int close_flag = read_net_data(fd, buf, sizeof(buf), &buf_len);
     if (close_flag == 1) {
