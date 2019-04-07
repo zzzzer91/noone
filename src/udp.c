@@ -62,7 +62,7 @@ udp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
         }
     }
 
-    unsigned char buf[BUF_CAPACITY];
+    unsigned char buf[CLIENT_BUF_CAPACITY];
     struct sockaddr_in addr;
     socklen_t addr_len = sizeof(addr);
     size_t buf_len = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr *)&addr, &addr_len);

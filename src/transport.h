@@ -49,7 +49,7 @@ typedef struct NetData {
 
     struct addrinfo *remote_addr;
 
-    NooneUserInfo *user_info;  // 用户索引
+    NooneUserInfo *user_info;  // 指向用户信息
 
     NooneCipherCtx *cipher_ctx;
 
