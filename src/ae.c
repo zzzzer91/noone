@@ -170,7 +170,7 @@ ae_run_loop(AeEventLoop *event_loop, AeTimeoutCallback callback)
         // 检查超时事件
         if (callback) {
             count++;
-            if (count == 512) {
+            if (count == 128) {
                 callback(event_loop);
                 count = 0;
             }

@@ -229,12 +229,18 @@ check_last_active(AeEventLoop *event_loop)
     time_t current_time = time(NULL);
     AeEvent *p = event_loop->list_tail;
     while (p) {
-        if ((current_time - p->last_active) < AE_WAIT_SECONDS) {  // 踢出超时
+        if ((current_time - p->last_active) < AE_WAIT_SECONDS) {
             break;  // 前面的没超时，说明后面的也不会，因为按时间排序
         }
-        NetData *nd = p->client_data;  // ss_client 和 remote_client 共用 nd
-        LOGGER_DEBUG("kill fd: %d", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
+        NetData *nd = p->client_data;  // ss_client 和 remote 共用 nd
+        int fd = p->fd;
+        LOGGER_DEBUG("kill fd: %d", fd);
+        if (fd == nd->client_fd) {
+            CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
+        } else {  // 是远程 fd，不关闭本地
+            CLEAR_REMOTE(event_loop, nd);
+        }
+
         p = p->list_prev;  // 从队尾往前循环
     }
 }

@@ -81,7 +81,7 @@ void check_last_active(AeEventLoop *event_loop);
     decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
             (uint8_t *)(nd)->remote_buf->data)
 
-#define CLEAR_SSCLIENT(event_loop, nd) \
+#define CLEAR_CLIENT(event_loop, nd) \
     do { \
         ae_unregister_event(event_loop, nd->client_fd); \
         close(nd->client_fd); \
@@ -98,7 +98,7 @@ void check_last_active(AeEventLoop *event_loop);
 #define CLEAR_CLIENT_AND_REMOTE(event_loop, nd) \
     do { \
         if (nd->client_fd != -1) { \
-            CLEAR_SSCLIENT(event_loop, nd); \
+            CLEAR_CLIENT(event_loop, nd); \
         } \
         if (nd->remote_fd != -1) { \
             CLEAR_REMOTE(event_loop, nd);\
