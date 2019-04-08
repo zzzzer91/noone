@@ -16,14 +16,14 @@ handle_stage_init(NetData *nd)
 
     struct sockaddr_in conn_addr;
     socklen_t conn_addr_len = sizeof(conn_addr);
-    if (recvfrom(nd->ssclient_fd, nd->cipher_ctx->iv, ci->iv_len, 0,
+    uint8_t iv[MAX_IV_LEN];
+    if (recvfrom(nd->ssclient_fd, iv, ci->iv_len, 0,
             (struct sockaddr *)&conn_addr, &conn_addr_len) < ci->iv_len) {
         return -1;
     }
-    nd->cipher_ctx->iv[ci->iv_len] = 0;
-    nd->cipher_ctx->iv_len = ci->iv_len;
 
-    if (init_net_data_cipher(nd) < 0) {
+    nd->cipher_ctx = init_noone_cipher_ctx(ci->cipher_name, ci->key, iv);
+    if (nd->cipher_ctx == NULL) {
         return -1;
     }
 

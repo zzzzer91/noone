@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <assert.h>
 #include <arpa/inet.h>   /* inet_ntoa() */
 
 NetData *
@@ -36,6 +37,8 @@ init_net_data()
 void
 free_net_data(NetData *nd)
 {
+    assert(nd != NULL);
+
     free_noone_cipher_ctx(nd->cipher_ctx);
     free_buffer(nd->remote_buf);
     free_buffer(nd->client_buf);
@@ -74,7 +77,6 @@ read_net_data(int fd, char *buf, size_t capacity, size_t *len)
             } else if (errno == EINTR) {
                 nread = 0;
             } else {
-                LOGGER_ERROR("read_net_data");
                 close_flag = 1;
                 break;
             }
@@ -121,28 +123,6 @@ write_net_data(int fd, Buffer *buf)
     buf->len = nleft;
     buf->idx += sum;
     return close_flag;
-}
-
-int
-init_net_data_cipher(NetData *nd)
-{
-    NooneCryptorInfo *ci = nd->user_info->cryptor_info;
-
-    EVP_CIPHER_CTX *ctx;
-
-    ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx->iv);
-    if (ctx == NULL) {
-        return -1;
-    }
-    nd->cipher_ctx->encrypt_ctx = ctx;
-
-    ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx->iv);
-    if (ctx == NULL) {
-        return -1;
-    }
-    nd->cipher_ctx->decrypt_ctx = ctx;
-
-    return 0;
 }
 
 /*

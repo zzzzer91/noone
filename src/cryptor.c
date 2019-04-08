@@ -9,7 +9,7 @@
 #include <assert.h>
 
 void
-crypto_md5(const unsigned char *data, size_t data_len, unsigned char *buf)
+crypto_md5(const uint8_t *data, size_t data_len, uint8_t *buf)
 {
     EVP_Digest(data, data_len, buf, NULL, EVP_md5(), NULL);
 }
@@ -23,11 +23,11 @@ crypto_md5(const unsigned char *data, size_t data_len, unsigned char *buf)
  *   aes-256 的 key 为 32 字节，iv 为 16 字节
  */
 void
-bytes_to_key(const unsigned char *passwd,
-        unsigned char *key, size_t key_len,
-        unsigned char *iv, size_t iv_len)
+bytes_to_key(const uint8_t *passwd,
+             uint8_t *key, size_t key_len,
+             uint8_t *iv, size_t iv_len)
 {
-    unsigned char buf[128];
+    uint8_t buf[128];
 
     size_t key_and_iv_len = key_len + iv_len;
 
@@ -44,10 +44,9 @@ bytes_to_key(const unsigned char *passwd,
     }
 
     memcpy(key, buf, key_len);
-    key[key_len] = 0;
+
     if (iv != NULL) {
         memcpy(iv, buf + key_len, iv_len);
-        iv[iv_len] = 0;
     }
 }
 
@@ -68,7 +67,7 @@ get_cipher(const char *cipher_name) {
 
 NooneCryptorInfo *
 init_noone_cryptor_info(const char *name,
-        const unsigned char *passwd, size_t key_len, size_t iv_len)
+        const uint8_t *passwd, size_t key_len, size_t iv_len)
 {
     NooneCryptorInfo *ci = malloc(sizeof(NooneCryptorInfo));
     if (ci == NULL) {
@@ -80,7 +79,7 @@ init_noone_cryptor_info(const char *name,
     ci->cipher_name[name_len] = 0;
     ci->cipher_name_len = name_len;
 
-    bytes_to_key(passwd, ci->key, key_len, NULL, iv_len);
+    bytes_to_key(passwd, ci->key, key_len, ci->iv, iv_len);
     ci->key_len = key_len;
     ci->iv_len = iv_len;
 
@@ -98,7 +97,7 @@ free_noone_cryptor_info(NooneCryptorInfo *cryptor_info)
 NooneCipherCtx *
 init_noone_cipher_ctx()
 {
-    NooneCipherCtx *cipher_ctx = calloc(1, sizeof(NooneCipherCtx));
+    NooneCipherCtx *cipher_ctx = malloc(sizeof(NooneCipherCtx));
     if (cipher_ctx == NULL) {
         return NULL;
     }
@@ -122,7 +121,7 @@ free_noone_cipher_ctx(NooneCipherCtx *cipher_ctx)
 
 EVP_CIPHER_CTX *
 init_evp_cipher_ctx(const EVP_CIPHER *cipher,
-        const unsigned char *key, const unsigned char *iv, int op)
+        const uint8_t *key, const uint8_t *iv, int op)
 {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (ctx == NULL) {
@@ -139,8 +138,8 @@ init_evp_cipher_ctx(const EVP_CIPHER *cipher,
  * 加密失败，返回 0。
  */
 size_t
-encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
-        size_t plaintext_len, unsigned char *ciphertext)
+encrypt(EVP_CIPHER_CTX *ctx, uint8_t *plaintext,
+        size_t plaintext_len, uint8_t *ciphertext)
 {
     size_t ciphertext_len;
     int outlen;
@@ -162,8 +161,8 @@ encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
  * 解密失败，返回 0。
  */
 size_t
-decrypt(EVP_CIPHER_CTX *ctx, unsigned char *ciphertext,
-        size_t ciphertext_len, unsigned char *plaintext)
+decrypt(EVP_CIPHER_CTX *ctx, uint8_t *ciphertext,
+        size_t ciphertext_len, uint8_t *plaintext)
 {
     size_t plaintext_len;
     int outlen;

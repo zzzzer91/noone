@@ -67,13 +67,18 @@ static int
 handle_stage_init(NetData *nd)
 {
     NooneCryptorInfo *ci = nd->user_info->cryptor_info;
-    if (read(nd->ssclient_fd, nd->cipher_ctx->iv, ci->iv_len) < ci->iv_len) {
+
+    if (read(nd->ssclient_fd, nd->iv, ci->iv_len) < ci->iv_len) {
         return -1;
     }
-    nd->cipher_ctx->iv[ci->iv_len] = 0;
-    nd->cipher_ctx->iv_len = ci->iv_len;
 
-    if (init_net_data_cipher(nd) < 0) {
+    nd->cipher_ctx->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->iv);
+    if (nd->cipher_ctx->decrypt_ctx == NULL) {
+        return -1;
+    }
+
+    nd->cipher_ctx->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->iv);
+    if (nd->cipher_ctx->encrypt_ctx == NULL) {
         return -1;
     }
 
@@ -268,7 +273,9 @@ tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     if (nd->is_iv_send == 0) {
-        if (write(fd, nd->cipher_ctx->iv, nd->cipher_ctx->iv_len) < nd->cipher_ctx->iv_len) {
+        NooneCryptorInfo *ci = nd->user_info->cryptor_info;
+
+        if (write(fd, nd->iv, ci->iv_len) < ci->iv_len) {
             LOGGER_ERROR("fd: %d, write iv error!", nd->ssclient_fd);
             CLEAR_SSCLIENT(event_loop, nd);
             return;

@@ -35,6 +35,12 @@ typedef enum SsStageType {
 
 typedef struct NetData {
 
+    char remote_domain[MAX_DOMAIN_LEN+1];
+
+    char remote_port[MAX_PORT_LEN+1];
+
+    uint8_t iv[MAX_IV_LEN];
+
     int ssclient_fd;
 
     int remote_fd;
@@ -42,10 +48,6 @@ typedef struct NetData {
     int is_iv_send;
 
     SsStageType ss_stage;
-
-    char remote_domain[MAX_DOMAIN_LEN+1];
-
-    char remote_port[MAX_PORT_LEN+1];
 
     struct addrinfo *remote_addr;
 
@@ -67,19 +69,17 @@ int read_net_data(int fd, char *buf, size_t capacity, size_t *len);
 
 int write_net_data(int fd, Buffer *buf);
 
-int init_net_data_cipher(NetData *nd);
-
 int parse_net_data_header(NetData *nd);
 
 void check_last_active(AeEventLoop *event_loop, int fd, void *data);
 
 #define ENCRYPT(nd, buf, buf_len) \
-    encrypt((nd)->cipher_ctx->encrypt_ctx, (unsigned char *)(buf), (buf_len), \
-            (unsigned char *)(nd)->client_buf->data)
+    encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \
+            (uint8_t *)(nd)->client_buf->data)
 
 #define DECRYPT(nd, buf, buf_len) \
-    decrypt((nd)->cipher_ctx->decrypt_ctx, (unsigned char *)(buf), (buf_len), \
-            (unsigned char *)(nd)->remote_buf->data)
+    decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
+            (uint8_t *)(nd)->remote_buf->data)
 
 #define CLEAR_SSCLIENT(event_loop, nd) \
     do { \

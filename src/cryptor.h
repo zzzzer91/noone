@@ -16,37 +16,37 @@
 
 typedef struct NooneCryptorInfo {
     char cipher_name[MAX_CIPHER_NAME_LEN];
-    unsigned char key[MAX_KEY_LEN+1];
+    uint8_t key[MAX_KEY_LEN];
+    uint8_t iv[MAX_IV_LEN];
     int cipher_name_len;
     int key_len;
     int iv_len;
 } NooneCryptorInfo;
 
 typedef struct NooneCipherCtx {
-    unsigned char iv[MAX_IV_LEN+1];
-    int iv_len;
     EVP_CIPHER_CTX *encrypt_ctx;
     EVP_CIPHER_CTX *decrypt_ctx;
 } NooneCipherCtx;
 
-void crypto_md5(const unsigned char *data, size_t data_len, unsigned char *buf);
+void crypto_md5(const uint8_t *data, size_t data_len, uint8_t *buf);
 
-void bytes_to_key(const unsigned char *passwd,
-             unsigned char *key, size_t key_len,
-             unsigned char *iv, size_t iv_len);
+void bytes_to_key(const uint8_t *passwd,
+                  uint8_t *key, size_t key_len,
+                  uint8_t *iv, size_t iv_len);
 
 const EVP_CIPHER *get_cipher(const char *cipher_name);
 
 NooneCryptorInfo *init_noone_cryptor_info(const char *name,
-        const unsigned char *passwd, size_t key_len, size_t iv_len);
+        const uint8_t *passwd, size_t key_len, size_t iv_len);
 
 void free_noone_cryptor_info(NooneCryptorInfo *cryptor_info);
 
 NooneCipherCtx *init_noone_cipher_ctx();
+
 void free_noone_cipher_ctx(NooneCipherCtx *cipher_ctx);
 
 EVP_CIPHER_CTX *init_evp_cipher_ctx(const EVP_CIPHER *cipher,
-        const unsigned char *key, const unsigned char *iv, int op);
+        const uint8_t *key, const uint8_t *iv, int op);
 
 #define INIT_ENCRYPT_CTX(cipher_name, key, iv) \
     init_evp_cipher_ctx(get_cipher(cipher_name), key, iv, 1)
@@ -54,10 +54,10 @@ EVP_CIPHER_CTX *init_evp_cipher_ctx(const EVP_CIPHER *cipher,
 #define INIT_DECRYPT_CTX(cipher_name, key, iv) \
     init_evp_cipher_ctx(get_cipher(cipher_name), key, iv, 0)
 
-size_t encrypt(EVP_CIPHER_CTX *ctx, unsigned char *plaintext,
-        size_t plaintext_len, unsigned char *ciphertext);
+size_t encrypt(EVP_CIPHER_CTX *ctx, uint8_t *plaintext,
+        size_t plaintext_len, uint8_t *ciphertext);
 
-size_t decrypt(EVP_CIPHER_CTX *ctx, unsigned char *ciphertext,
-        size_t ciphertext_len, unsigned char *plaintext);
+size_t decrypt(EVP_CIPHER_CTX *ctx, uint8_t *ciphertext,
+        size_t ciphertext_len, uint8_t *plaintext);
 
 #endif  /* _NOONE_CRYPTO_H_ */
