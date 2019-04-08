@@ -80,7 +80,7 @@ main(int argc, char *argv[])
 //            PANIC("setnonblock");
 //        }
 //        ret = ae_register_event(ae_ev_loop, udp_server_fd,
-//                AE_IN, udp_accept_conn, NULL, ui);
+//                AE_IN, udp_read_client, NULL, ui);
 //        if (ret < 0) {
 //            PANIC("ae_register_event");
 //        }
