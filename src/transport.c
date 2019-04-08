@@ -20,7 +20,7 @@ init_net_data()
         return NULL;
     }
 
-    nd->ssclient_fd = -1;
+    nd->client_fd = -1;
     nd->remote_fd = -1;
     nd->ss_stage = STAGE_INIT;
     nd->remote_addr = NULL;
@@ -224,7 +224,7 @@ parse_net_data_header(NetData *nd)
  * 更新时间的操作，在 ae_register_event() 中进行。
  */
 void
-check_last_active(AeEventLoop *event_loop, int fd, void *data)
+check_last_active(AeEventLoop *event_loop)
 {
     time_t current_time = time(NULL);
     AeEvent *p = event_loop->list_tail;
@@ -233,8 +233,8 @@ check_last_active(AeEventLoop *event_loop, int fd, void *data)
             break;  // 前面的没超时，说明后面的也不会，因为按时间排序
         }
         NetData *nd = p->client_data;  // ss_client 和 remote_client 共用 nd
-        LOGGER_DEBUG("kill fd: %d", nd->ssclient_fd);
-        CLEAR_SSCLIENT(event_loop, nd);
+        LOGGER_DEBUG("kill fd: %d", nd->client_fd);
+        CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
         p = p->list_prev;  // 从队尾往前循环
     }
 }

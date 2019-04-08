@@ -41,7 +41,7 @@ typedef struct NetData {
 
     uint8_t iv[MAX_IV_LEN];
 
-    int ssclient_fd;
+    int client_fd;
 
     int remote_fd;
 
@@ -71,7 +71,7 @@ int write_net_data(int fd, Buffer *buf);
 
 int parse_net_data_header(NetData *nd);
 
-void check_last_active(AeEventLoop *event_loop, int fd, void *data);
+void check_last_active(AeEventLoop *event_loop);
 
 #define ENCRYPT(nd, buf, buf_len) \
     encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \
@@ -83,17 +83,9 @@ void check_last_active(AeEventLoop *event_loop, int fd, void *data);
 
 #define CLEAR_SSCLIENT(event_loop, nd) \
     do { \
-        if (nd->ssclient_fd != -1) { \
-            ae_unregister_event(event_loop, nd->ssclient_fd); \
-            close(nd->ssclient_fd); \
-            nd->ssclient_fd = -1; \
-        } \
-        if (nd->remote_fd != -1) { \
-            ae_unregister_event(event_loop, nd->remote_fd); \
-            close(nd->remote_fd); \
-            nd->remote_fd = -1; \
-        } \
-        free_net_data(nd); \
+        ae_unregister_event(event_loop, nd->client_fd); \
+        close(nd->client_fd); \
+        nd->client_fd = -1; \
     } while (0)
 
 #define CLEAR_REMOTE(event_loop, nd) \
@@ -101,6 +93,17 @@ void check_last_active(AeEventLoop *event_loop, int fd, void *data);
         ae_unregister_event(event_loop, nd->remote_fd); \
         close(nd->remote_fd); \
         nd->remote_fd = -1; \
+    } while (0)
+
+#define CLEAR_CLIENT_AND_REMOTE(event_loop, nd) \
+    do { \
+        if (nd->client_fd != -1) { \
+            CLEAR_SSCLIENT(event_loop, nd); \
+        } \
+        if (nd->remote_fd != -1) { \
+            CLEAR_REMOTE(event_loop, nd);\
+        } \
+        free_net_data(nd); \
     } while (0)
 
 #endif  /* _NOONE_TRANSPORT_H_ */

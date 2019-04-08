@@ -17,7 +17,7 @@ handle_stage_init(NetData *nd)
     struct sockaddr_in conn_addr;
     socklen_t conn_addr_len = sizeof(conn_addr);
     uint8_t iv[MAX_IV_LEN];
-    if (recvfrom(nd->ssclient_fd, iv, ci->iv_len, 0,
+    if (recvfrom(nd->client_fd, iv, ci->iv_len, 0,
             (struct sockaddr *)&conn_addr, &conn_addr_len) < ci->iv_len) {
         return -1;
     }
@@ -57,7 +57,7 @@ udp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
     if (nd->ss_stage == STAGE_INIT) {
         if (handle_stage_init(nd) < 0) {
             LOGGER_ERROR("udp_accept_conn, handle_stage_init");
-            CLEAR_SSCLIENT(event_loop, nd);
+            CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
             return;
         }
     }
@@ -70,7 +70,7 @@ udp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
     size_t ret = DECRYPT(nd, buf, buf_len);
     if (ret == 0) {
         LOGGER_ERROR("udp_accept_conn, DECRYPT");
-        CLEAR_SSCLIENT(event_loop, nd);
+        CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
         return;
     }
     nd->remote_buf->len = ret;
@@ -78,7 +78,7 @@ udp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
     if (nd->ss_stage == STAGE_HEADER) {
         if (handle_stage_header(nd) < 0) {
             LOGGER_ERROR("udp_accept_conn, handle_stage_header");
-            CLEAR_SSCLIENT(event_loop, nd);
+            CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
             return;
         }
     }
@@ -101,7 +101,7 @@ udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 }
 
 void
-udp_write_ssclient(AeEventLoop *event_loop, int fd, void *data)
+udp_write_client(AeEventLoop *event_loop, int fd, void *data)
 {
 
 }

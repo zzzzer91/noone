@@ -9,7 +9,7 @@
 #include <time.h>
 
 #define AE_MAX_EVENTS 4096
-#define AE_WAIT_SECONDS 90
+#define AE_WAIT_SECONDS 60
 
 /*
  * 文件事件状态
@@ -24,6 +24,8 @@ typedef struct AeEventLoop AeEventLoop;
  * 事件回调接口
  */
 typedef void AeCallback(AeEventLoop *event_loop, int fd, void *data);
+
+typedef void AeTimeoutCallback(AeEventLoop *event_loop);
 
 /*
  * File event structure
@@ -88,7 +90,7 @@ struct AeEventLoop {
 /* Prototypes */
 AeEventLoop *ae_create_event_loop(int event_set_size);
 void ae_delete_event_loop(AeEventLoop *event_loop);
-void ae_run_loop(AeEventLoop *event_loop, AeCallback timeout_callback);
+void ae_run_loop(AeEventLoop *event_loop, AeTimeoutCallback callback);
 void ae_stop_event_loop(AeEventLoop *event_loop);
 int ae_get_event_set_size(AeEventLoop *event_loop);
 

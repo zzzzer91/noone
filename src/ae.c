@@ -158,17 +158,22 @@ ae_get_event_set_size(AeEventLoop *event_loop)
  * 事件处理器的主循环
  */
 void
-ae_run_loop(AeEventLoop *event_loop, AeCallback timeout_callback)
+ae_run_loop(AeEventLoop *event_loop, AeTimeoutCallback callback)
 {
     event_loop->stop = 0;
 
+    int count = 0;
     while (!event_loop->stop) {
         // 开始处理事件
         ae_process_events(event_loop, AE_WAIT_SECONDS*1000);
 
         // 检查超时事件
-        if (timeout_callback) {
-            timeout_callback(event_loop, -1, NULL);
+        if (callback) {
+            count++;
+            if (count == 512) {
+                callback(event_loop);
+                count = 0;
+            }
         }
     }
 }

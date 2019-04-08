@@ -9,9 +9,9 @@
 
 void tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data);
 
-void tcp_read_ssclient(AeEventLoop *event_loop, int fd, void *data);
+void tcp_read_client(AeEventLoop *event_loop, int fd, void *data);
 
-void tcp_write_ssclient(AeEventLoop *event_loop, int fd, void *data);
+void tcp_write_client(AeEventLoop *event_loop, int fd, void *data);
 
 void tcp_read_remote(AeEventLoop *event_loop, int fd, void *data);
 
