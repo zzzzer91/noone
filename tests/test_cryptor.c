@@ -4,7 +4,6 @@
 
 #include "helper.h"
 #include "cryptor.h"
-#include "transport.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,78 +23,68 @@ bytes_to_hex(unsigned char *data, size_t len, char *buf)
 }
 
 static void
-test_aes128ctr_encrypt_and_decrypt()
+test_bytes_to_key()
 {
-// aes-128-ctr
-#define PASSWD_TO_KEY "e99a18c428cb38d5f260853678922e0388fc221acae10caf2921f7435051325c"
-#define PASSWD_TO_IV "1243734da46f16a118114ad51cfd48e2"
-
-    NooneCryptorInfo *ci = init_noone_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
-    NetData *nd = init_net_data();
-
-    bytes_to_key(PASSWD, ci->key, ci->key_len, nd->cipher_ctx->iv, ci->iv_len);
+    size_t key_len = 32;
+    size_t iv_len = 16;
+    unsigned char key[MAX_KEY_LEN];
+    unsigned char iv[MAX_IV_LEN];
+    bytes_to_key(PASSWD, key, key_len, iv, iv_len);
 
     char *key_hex = malloc(MAX_KEY_LEN*2+1);
-    size_t key_hex_len = bytes_to_hex(ci->key, ci->key_len, key_hex);
-    EXPECT_EQ_STRING(PASSWD_TO_KEY, key_hex, key_hex_len);
+    size_t key_hex_len = bytes_to_hex(key, key_len, key_hex);
+    EXPECT_EQ_STRING("e99a18c428cb38d5f260853678922e0388fc221acae10caf2921f7435051325c",
+                     key_hex, key_hex_len);
     free(key_hex);
 
     char *iv_hex = malloc(MAX_IV_LEN*2+1);
-    size_t iv_hex_len = bytes_to_hex(nd->cipher_ctx->iv, ci->iv_len, iv_hex);
-    EXPECT_EQ_STRING(PASSWD_TO_IV, iv_hex, iv_hex_len);
+    size_t iv_hex_len = bytes_to_hex(iv, iv_len, iv_hex);
+    EXPECT_EQ_STRING("1243734da46f16a118114ad51cfd48e2", iv_hex, iv_hex_len);
     free(iv_hex);
-
-    // 加密
-    nd->cipher_ctx->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx->iv);
-    strcpy((char *)nd->plaintext.data, "你好");
-    nd->plaintext.len = strlen((char *)nd->plaintext.data);
-    nd->ciphertext.len = encrypt(nd->cipher_ctx->encrypt_ctx,
-            nd->plaintext.data, nd->plaintext.len, nd->ciphertext.data);
-    // 测试多次加密，一次解密
-    nd->ciphertext.len += encrypt(nd->cipher_ctx->encrypt_ctx,
-            nd->plaintext.data, nd->plaintext.len, nd->ciphertext.data+nd->plaintext.len);
-
-    // 解密
-    nd->cipher_ctx->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx->iv);
-    nd->plaintext.len = decrypt(nd->cipher_ctx->decrypt_ctx,
-            nd->ciphertext.data, nd->ciphertext.len, nd->plaintext.data);
-
-    EXPECT_EQ_LONG(12L, nd->plaintext.len);
-    EXPECT_EQ_STRING("你好你好", nd->plaintext.data, nd->plaintext.len);
-
-    free(ci);
-    free_net_data(nd);
 }
 
 static void
-test_encrypt_and_decrypt_fail()
+test_aes128ctr_encrypt_and_decrypt()
 {
     NooneCryptorInfo *ci = init_noone_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
-    NetData *nd = init_net_data();
 
-    bytes_to_key(PASSWD, ci->key, ci->key_len, nd->cipher_ctx->iv, ci->iv_len);
-    nd->cipher_ctx->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->cipher_ctx->iv);
-    strcpy((char *)nd->plaintext.data, "你好");
-    nd->plaintext.len = strlen((char *)nd->plaintext.data);
-    encrypt(nd->cipher_ctx->encrypt_ctx,
-            nd->plaintext.data, nd->plaintext.len, nd->plaintext.data);
+    NooneCipherCtx *c_ctx = init_noone_cipher_ctx();
+    // 加密
+    c_ctx->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, ci->iv);
+    char plaintext[256];
+    char ciphertext[256];
+    strcpy(plaintext, "你好");
+    size_t plaintext_len = strlen(plaintext);
+    size_t ciphertext_len = encrypt(c_ctx->encrypt_ctx,
+            (uint8_t *)plaintext, plaintext_len, (uint8_t *)ciphertext);
+    EXPECT_EQ_LONG(plaintext_len, ciphertext_len);
+    // 解密
+    c_ctx->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, ci->iv);
+    char plaintext_result[256];
+    size_t plaintext_len_result = decrypt(c_ctx->decrypt_ctx,
+            (uint8_t *)ciphertext, ciphertext_len, (uint8_t *)plaintext_result);
+    EXPECT_EQ_LONG(plaintext_len, plaintext_len_result);
+    EXPECT_EQ_STRING("你好", plaintext_result, plaintext_len_result);
 
-    // 解密失败
-    bytes_to_key((unsigned char *)"123123123123",
-            ci->key, ci->key_len, nd->cipher_ctx->iv, ci->iv_len);
-    nd->cipher_ctx->decrypt_ctx = INIT_DECRYPT_CTX(
-            ci->cipher_name, ci->key, nd->cipher_ctx->iv);
-    size_t ret = decrypt(nd->cipher_ctx->decrypt_ctx,
-            nd->plaintext.data, nd->ciphertext.len, nd->plaintext.data);
-    EXPECT_EQ_LONG(0L, ret);
+    // 测试多次加密，一次解密
+    ciphertext_len = encrypt(c_ctx->encrypt_ctx,
+            (uint8_t *)plaintext, plaintext_len, (uint8_t *)ciphertext);
+    ciphertext_len += encrypt(c_ctx->encrypt_ctx,
+            (uint8_t *)plaintext, plaintext_len, (uint8_t *)ciphertext+ciphertext_len);
+    EXPECT_EQ_LONG(plaintext_len*2, ciphertext_len);
+    // 解密
+    plaintext_len_result = decrypt(c_ctx->decrypt_ctx,
+            (uint8_t *)ciphertext, ciphertext_len, (uint8_t *)plaintext_result);
+    EXPECT_EQ_LONG(plaintext_len*2, plaintext_len_result);
+    EXPECT_EQ_STRING("你好你好", plaintext_result, plaintext_len_result);
 
-    free(ci);
-    free_net_data(nd);
+    free_noone_cipher_ctx(c_ctx);
+    free_noone_cryptor_info(ci);
 }
 
 void
 test_cryptor()
 {
+    test_bytes_to_key();
     test_aes128ctr_encrypt_and_decrypt();
-    test_encrypt_and_decrypt_fail();
 }
