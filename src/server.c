@@ -17,6 +17,7 @@
 
 /* test */
 #define PASSWD (unsigned char *)"123123"
+#define SERVER "127.0.0.1"
 
 int
 main(int argc, char *argv[])
@@ -33,7 +34,7 @@ main(int argc, char *argv[])
     }
 
     int tcp_server_fd, udp_server_fd;
-    char *server_port_list[] = {"9529"};
+    uint16_t server_port_list[] = {9529};
     NooneManager *noone_manager = init_manager(1);
     if (noone_manager == NULL) {
         PANIC("init_users_info");
@@ -56,7 +57,7 @@ main(int argc, char *argv[])
         ui->lru_cache = lc;
 
         // tcp
-        tcp_server_fd = tcp_server_fd_init(server_port_list[i]);
+        tcp_server_fd = tcp_server_fd_init(SERVER, server_port_list[i]);
         if (tcp_server_fd < 0) {
             PANIC("tcp_server_fd_init");
         }

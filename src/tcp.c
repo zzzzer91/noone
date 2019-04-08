@@ -102,7 +102,7 @@ handle_stage_header(NetData *nd)
 static int
 handle_stage_handshake(NetData *nd)
 {
-    int fd = socket(nd->remote_addr->ai_family, nd->remote_addr->ai_socktype, 0);
+    int fd = socket(nd->remote_addr->ai_family, SOCK_STREAM, 0);
     if (fd < 0) {
         return -1;
     }

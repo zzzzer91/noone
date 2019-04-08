@@ -10,6 +10,7 @@
 #include "buffer.h"
 #include "log.h"
 #include "lru.h"
+#include "socket.h"
 #include "manager.h"
 #include <netdb.h>
 
