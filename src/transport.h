@@ -69,7 +69,7 @@ int read_net_data(int fd, char *buf, size_t capacity, size_t *len);
 
 int write_net_data(int fd, Buffer *buf);
 
-MyAddrInfo * parse_net_data_header(Buffer *buf, LruCache *lc);
+MyAddrInfo *parse_net_data_header(Buffer *buf, LruCache *lc);
 
 #define ENCRYPT(nd, buf, buf_len) \
     encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \

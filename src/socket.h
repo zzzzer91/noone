@@ -10,12 +10,11 @@
 #define MAX_LISTEN	2048
 
 typedef struct MyAddrInfo {
-    uint8_t ai_family;
     socklen_t ai_addrlen;
     union {
         struct sockaddr_in sin;
         struct sockaddr_in6 sin6;
-    };
+    } ai_addr;
 } MyAddrInfo;
 
 int tcp_server_fd_init(const char *addr, uint16_t port);

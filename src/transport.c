@@ -188,18 +188,8 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
 
             // 创建 addr_info
             addr_info = malloc(sizeof(MyAddrInfo));
-            addr_info->ai_family = addr_list->ai_family;
             addr_info->ai_addrlen = addr_list->ai_addrlen;
-            if (addr_info->ai_family == AF_INET) {
-                memcpy(&addr_info->sin, addr_list->ai_addr, sizeof(addr_info->sin));
-            } else if (addr_info->ai_family == AF_INET6) {
-                memcpy(&addr_info->sin6, addr_list->ai_addr, sizeof(addr_info->sin6));
-            } else {
-                LOGGER_ERROR("Unsupported ai_family!");
-                free(addr_info);
-                freeaddrinfo(addr_list);
-                return NULL;
-            }
+            memcpy(&addr_info->ai_addr, addr_list->ai_addr, addr_info->ai_addrlen);
             freeaddrinfo(addr_list);
 
             // 加入 lru
@@ -215,22 +205,22 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
         }
     } else if (atty == ATYP_IPV4) {
         addr_info = malloc(sizeof(MyAddrInfo));
-        addr_info->ai_family = AF_INET;
-        addr_info->ai_addrlen = sizeof(addr_info->sin);
-        memcpy(&addr_info->sin.sin_addr, buf->data+buf->idx, 4);
+        addr_info->ai_addr.sin.sin_family = AF_INET;
+        addr_info->ai_addrlen = sizeof(addr_info->ai_addr.sin);
+        memcpy(&addr_info->ai_addr.sin.sin_addr, buf->data+buf->idx, 4);
         buf->idx += 4;
         buf->len -= 4;
-        memcpy(&addr_info->sin.sin_port, buf->data+buf->idx, 2);
+        memcpy(&addr_info->ai_addr.sin.sin_port, buf->data+buf->idx, 2);
         buf->idx += 2;
         buf->len -= 2;
     } else if (atty == ATYP_IPV6) {
         addr_info = malloc(sizeof(MyAddrInfo));
-        addr_info->ai_family = AF_INET6;
-        addr_info->ai_addrlen = sizeof(addr_info->sin6);
-        memcpy(&addr_info->sin6.sin6_addr, buf->data+buf->idx, 16);
+        addr_info->ai_addr.sin6.sin6_family = AF_INET6;
+        addr_info->ai_addrlen = sizeof(addr_info->ai_addr.sin6);
+        memcpy(&addr_info->ai_addr.sin6.sin6_addr, buf->data+buf->idx, 16);
         buf->idx += 16;
         buf->len -= 16;
-        memcpy(&addr_info->sin6.sin6_port, buf->data+buf->idx, 2);
+        memcpy(&addr_info->ai_addr.sin6.sin6_port, buf->data+buf->idx, 2);
         buf->idx += 2;
         buf->len -= 2;
     } else {

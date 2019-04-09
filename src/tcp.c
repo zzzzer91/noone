@@ -9,6 +9,7 @@
 #include "cryptor.h"
 #include "log.h"
 #include "lru.h"
+#include <string.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -113,7 +114,7 @@ handle_stage_header(NetData *nd)
 static int
 handle_stage_handshake(NetData *nd)
 {
-    int fd = socket(nd->remote_addr->ai_family, SOCK_STREAM, 0);
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         LOGGER_ERROR("socket");
         return -1;
@@ -126,14 +127,15 @@ handle_stage_handshake(NetData *nd)
     // 注意：当设置非阻塞 socket 后，tcp 三次握手会异步进行，
     // 所以可能会出现三次握手还未完成，就进行 write，
     // 此时 write 会把 errno 置为 EAGAIN
-    // LOGGER_INFO("fd: %d, connecting %s:%s", nd->client_fd, nd->remote_domain, nd->remote_port);
-    if (connect(fd, (struct sockaddr *)&nd->remote_addr->sin, nd->remote_addr->ai_addrlen) < 0) {
+    LOGGER_INFO("fd: %d, connecting", nd->client_fd);
+    if (connect(fd, (struct sockaddr *)&nd->remote_addr->ai_addr,
+            nd->remote_addr->ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
             close(fd);
             free(nd->remote_addr);
             nd->remote_addr = NULL;
             lru_cache_del(nd->user_info->lru_cache, nd->remote_domain);
-            LOGGER_ERROR("fd: %d, connect", fd);
+            LOGGER_ERROR("fd: %d, connect, %s", fd, strerror(errno));
             return -1;
         }
     }
@@ -250,9 +252,11 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     int close_flag = read_net_data(fd, buf, sizeof(buf), &buf_len);
     if (close_flag == 1) {
         LOGGER_DEBUG("fd: %d, tcp_read_remote, remote close!", nd->client_fd);
-        CLEAR_REMOTE(event_loop, nd);
         if (buf_len == 0) {
+            CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
             return;
+        } else {  // 对端已关闭，但还有数据写给 client
+            CLEAR_REMOTE(event_loop, nd);
         }
     }
 
@@ -269,7 +273,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
         return;
     }
-    if (nd->remote_fd != -1) {  // 对端已关闭
+    if (nd->remote_fd != -1) {
         if (UNREGISTER_REMOTE() < 0) {
             LOGGER_ERROR("fd: %d, tcp_read_remote, UNREGISTER_REMOTE", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
@@ -310,12 +314,14 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
         return;
     }
-    if (nd->remote_fd != -1) {  // 对端已关闭
+    if (nd->remote_fd != -1) {
         if (REGISTER_READ_REMOTE() < 0) {
             LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_REMOTE", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
             return;
         }
+    } else {  // 对端已关闭
+        CLEAR_CLIENT_AND_REMOTE(event_loop, nd);  // 对端已清理过
     }
 }
 
@@ -332,6 +338,6 @@ tcp_handle_timeout(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
     } else {  // 是远程 fd，不关闭本地
         LOGGER_DEBUG("kill remote fd: %d", fd);
-        CLEAR_REMOTE(event_loop, nd);
+        CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
     }
 }
