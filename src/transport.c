@@ -207,6 +207,7 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
         addr_info = malloc(sizeof(MyAddrInfo));
         addr_info->ai_addr.sin.sin_family = AF_INET;
         addr_info->ai_addrlen = sizeof(addr_info->ai_addr.sin);
+        // 已经是网络字节序
         memcpy(&addr_info->ai_addr.sin.sin_addr, buf->data+buf->idx, 4);
         buf->idx += 4;
         buf->len -= 4;
