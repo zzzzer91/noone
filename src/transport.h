@@ -65,10 +65,6 @@ NetData *init_net_data();
 
 void free_net_data(NetData *nd);
 
-int read_net_data(int fd, char *buf, size_t capacity, size_t *len);
-
-int write_net_data(int fd, Buffer *buf);
-
 MyAddrInfo *parse_net_data_header(Buffer *buf, LruCache *lc);
 
 #define ENCRYPT(nd, buf, buf_len) \
