@@ -9,7 +9,7 @@
 #include <time.h>
 
 #define AE_MAX_EVENTS 4096
-#define AE_WAIT_SECONDS 60
+#define AE_WAIT_SECONDS 60  // epoll_wait() 和 踢出事件的超时时间
 
 /*
  * 文件事件状态
@@ -98,6 +98,8 @@ int ae_get_event_set_size(AeEventLoop *event_loop);
 int ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         AeCallback *rcallback, AeCallback *wcallback, AeCallback *tcallback, void *data);
 int ae_unregister_event(AeEventLoop *event_loop, int fd);
+
 void ae_remove_event_from_list(AeEventLoop *event_loop, int fd);
+void ae_add_event_to_list(AeEventLoop *event_loop, int fd);
 
 #endif  /* _NOONE_AE_H_ */

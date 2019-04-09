@@ -70,7 +70,7 @@ main(int argc, char *argv[])
             PANIC("ae_register_event");
         }
         ui->tcp_server_fd = tcp_server_fd;
-        ae_remove_event_from_list(ae_ev_loop, tcp_server_fd);  // 从超时队列移除
+        ae_remove_event_from_list(ae_ev_loop, tcp_server_fd);  // 从超时队列移除，并且以后也不会加入
 
         // udp 可以和 tcp 绑定同一端口
 //        udp_server_fd = udp_server_fd_init(server_port_list[i]);

@@ -324,8 +324,10 @@ tcp_handle_timeout(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;  // ss_client 和 remote 共用 nd
     if (fd == nd->client_fd) {
+        LOGGER_DEBUG("kill client fd: %d", fd);
         CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
     } else {  // 是远程 fd，不关闭本地
+        LOGGER_DEBUG("kill remote fd: %d", fd);
         CLEAR_REMOTE(event_loop, nd);
     }
 }

@@ -3,7 +3,6 @@
  */
 
 #include "ae.h"
-#include "log.h"
 #include "dlist.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -82,7 +81,6 @@
             } \
             if (p->tcallback != NULL) { \
                 int fd = p->fd; \
-                LOGGER_DEBUG("kill fd: %d", fd); \
                 p->tcallback(event_loop, fd, p->data); \
             } \
             p = p->list_prev; \
@@ -288,9 +286,22 @@ ae_unregister_event(AeEventLoop *event_loop, int fd)
     return AE_EPOLL_DEL_EVENT(event_loop, fd);
 }
 
+/*
+ * 从双向时间顺序队列中移除，
+ * 并且根据 ae_register_event() 中的逻辑（prev 为 NULL，会被当作已在队列头部），
+ * 即时再次调用 ae_register_event()，也不会再将该事件加入队列，
+ * 除非调用 ae_add_event_to_list（）。
+ */
 void
 ae_remove_event_from_list(AeEventLoop *event_loop, int fd)
 {
     AeEvent *fe = &event_loop->events[fd];
     DLIST_DEL(event_loop->list_head, event_loop->list_tail, fe);
+}
+
+void
+ae_add_event_to_list(AeEventLoop *event_loop, int fd)
+{
+    AeEvent *fe = &event_loop->events[fd];
+    DLIST_ADD_HEAD(event_loop->list_head, event_loop->list_tail, fe);
 }
