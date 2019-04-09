@@ -16,7 +16,7 @@
 
 #define CLIENT_BUF_CAPACITY 16 * 1024
 #define REMOTE_BUF_CAPACITY 32 * 1024
-#define MAX_DOMAIN_LEN 64
+#define MAX_DOMAIN_LEN 63
 #define MAX_PORT_LEN 5
 
 // ATYP
@@ -49,7 +49,7 @@ typedef struct NetData {
 
     SsStageType ss_stage;
 
-    struct addrinfo *remote_addr;
+    MyAddrInfo *remote_addr;
 
     NooneUserInfo *user_info;  // 指向用户信息
 
@@ -69,7 +69,7 @@ int read_net_data(int fd, char *buf, size_t capacity, size_t *len);
 
 int write_net_data(int fd, Buffer *buf);
 
-int parse_net_data_header(NetData *nd);
+MyAddrInfo * parse_net_data_header(Buffer *buf, LruCache *lc);
 
 #define ENCRYPT(nd, buf, buf_len) \
     encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \

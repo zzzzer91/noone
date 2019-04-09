@@ -11,7 +11,7 @@
 
 typedef struct MyAddrInfo {
     uint8_t ai_family;
-    socklen_t addrlen;
+    socklen_t ai_addrlen;
     union {
         struct sockaddr_in sin;
         struct sockaddr_in6 sin6;

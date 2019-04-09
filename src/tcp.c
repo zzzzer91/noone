@@ -99,10 +99,12 @@ handle_stage_init(NetData *nd)
 static int
 handle_stage_header(NetData *nd)
 {
-    if (parse_net_data_header(nd) < 0) {
+    MyAddrInfo *remote_addr = parse_net_data_header(nd->remote_buf, nd->user_info->lru_cache);
+    if (remote_addr == NULL) {
         return -1;
     }
 
+    nd->remote_addr = remote_addr;
     nd->ss_stage = STAGE_HANDSHAKE;
 
     return 0;
@@ -113,6 +115,7 @@ handle_stage_handshake(NetData *nd)
 {
     int fd = socket(nd->remote_addr->ai_family, SOCK_STREAM, 0);
     if (fd < 0) {
+        LOGGER_ERROR("socket");
         return -1;
     }
     if (setnonblock(fd) < 0) {
@@ -123,13 +126,14 @@ handle_stage_handshake(NetData *nd)
     // 注意：当设置非阻塞 socket 后，tcp 三次握手会异步进行，
     // 所以可能会出现三次握手还未完成，就进行 write，
     // 此时 write 会把 errno 置为 EAGAIN
-    LOGGER_INFO("fd: %d, connecting %s:%s", nd->client_fd, nd->remote_domain, nd->remote_port);
-    if (connect(fd, nd->remote_addr->ai_addr, nd->remote_addr->ai_addrlen) < 0) {
+    // LOGGER_INFO("fd: %d, connecting %s:%s", nd->client_fd, nd->remote_domain, nd->remote_port);
+    if (connect(fd, (struct sockaddr *)&nd->remote_addr->sin, nd->remote_addr->ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
             close(fd);
-            freeaddrinfo(nd->remote_addr);
+            free(nd->remote_addr);
             nd->remote_addr = NULL;
             lru_cache_del(nd->user_info->lru_cache, nd->remote_domain);
+            LOGGER_ERROR("fd: %d, connect", fd);
             return -1;
         }
     }

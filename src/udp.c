@@ -35,10 +35,12 @@ handle_stage_init(NetData *nd)
 static int
 handle_stage_header(NetData *nd)
 {
-    if (parse_net_data_header(nd) < 0) {
+    MyAddrInfo *remote_addr = parse_net_data_header(nd->remote_buf, nd->user_info->lru_cache);
+    if (remote_addr == NULL) {
         return -1;
     }
 
+    nd->remote_addr = remote_addr;
     nd->ss_stage = STAGE_UDP;
 
     return 0;

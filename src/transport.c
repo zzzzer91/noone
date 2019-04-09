@@ -8,7 +8,6 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <netdb.h>
 #include <assert.h>
 #include <arpa/inet.h>   /* inet_ntoa() */
 
@@ -142,82 +141,107 @@ write_net_data(int fd, Buffer *buf)
  * TODO
  * 判断头部长度是否合法
  */
-int
-parse_net_data_header(NetData *nd)
+MyAddrInfo *
+parse_net_data_header(Buffer *buf, LruCache *lc)
 {
-    int ret;
-    struct addrinfo hints = {0};
-    hints.ai_socktype = SOCK_STREAM;
+    MyAddrInfo *addr_info = NULL;
 
-    int atty = nd->remote_buf->data[0];
-    nd->remote_buf->idx += 1;
-    nd->remote_buf->len -= 1;
+    int atty = buf->data[0];
+    buf->idx += 1;
+    buf->len -= 1;
     if (atty == ATYP_DOMAIN) {
-        size_t domain_len = nd->remote_buf->data[nd->remote_buf->idx];  // 域名长度
-        if (domain_len > MAX_DOMAIN_LEN) {
-            LOGGER_ERROR("domain_len too long!");
-            return -1;
+        size_t domain_len = buf->data[buf->idx];  // 域名长度
+        if (domain_len > MAX_DOMAIN_LEN || domain_len < 4) {
+            LOGGER_ERROR("domain_len error!");
+            return NULL;
         }
-        nd->remote_buf->idx += 1;
-        nd->remote_buf->len -= 1;
+        buf->idx += 1;
+        buf->len -= 1;
 
-        memcpy(nd->remote_domain, nd->remote_buf->data+nd->remote_buf->idx, domain_len);
-        nd->remote_domain[domain_len] = 0;  // 加上 '\0'
-        nd->remote_buf->idx += domain_len;
-        nd->remote_buf->len -= domain_len;
+        // 域名
+        char domain[MAX_DOMAIN_LEN+1];
+        memcpy(domain, buf->data+buf->idx, domain_len);
+        domain[domain_len] = 0;  // 加上 '\0'
+        buf->idx += domain_len;
+        buf->len -= domain_len;
 
-        hints.ai_family = AF_UNSPEC;
+        // 端口
+        uint16_t port;
+        memcpy(&port, buf->data+buf->idx, 2);
+        buf->idx += 2;
+        buf->len -= 2;
+        char port_str[MAX_PORT_LEN+1];
+        snprintf(port_str, MAX_DOMAIN_LEN, "%d", ntohs(port));
+
+        addr_info = lru_cache_get(lc, domain);
+        if (addr_info == NULL) {
+            LOGGER_DEBUG("%s: DNS 查询！", domain);
+            struct addrinfo *addr_list;
+            struct addrinfo hints = {0};
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_family = AF_UNSPEC;
+            int ret = getaddrinfo(domain, port_str, &hints, &addr_list);
+            if (ret != 0) {
+                LOGGER_ERROR("%s", gai_strerror(ret));
+                return NULL;
+            }
+
+            // 创建 addr_info
+            addr_info = malloc(sizeof(MyAddrInfo));
+            addr_info->ai_family = addr_list->ai_family;
+            addr_info->ai_addrlen = addr_list->ai_addrlen;
+            if (addr_info->ai_family == AF_INET) {
+                memcpy(&addr_info->sin, addr_list->ai_addr, sizeof(addr_info->sin));
+            } else if (addr_info->ai_family == AF_INET6) {
+                memcpy(&addr_info->sin6, addr_list->ai_addr, sizeof(addr_info->sin6));
+            } else {
+                LOGGER_ERROR("Unsupported ai_family!");
+                free(addr_info);
+                freeaddrinfo(addr_list);
+                return NULL;
+            }
+            freeaddrinfo(addr_list);
+
+            // 加入 lru
+            void *oldvalue;
+            ret = lru_cache_set(lc, domain, addr_info, &oldvalue);
+            if (ret < 0) {
+                free(addr_info);
+                return NULL;
+            }
+            if (oldvalue != NULL) {
+                free(oldvalue);
+            }
+        }
     } else if (atty == ATYP_IPV4) {
-        inet_ntop(AF_INET, nd->remote_buf->data+nd->remote_buf->idx,
-                nd->remote_domain, sizeof(nd->remote_domain));
-        nd->remote_buf->idx += 4;
-        nd->remote_buf->len -= 4;
-
-        hints.ai_family = AF_INET;
+        addr_info = malloc(sizeof(MyAddrInfo));
+        addr_info->ai_family = AF_INET;
+        addr_info->ai_addrlen = sizeof(addr_info->sin);
+        memcpy(&addr_info->sin.sin_addr, buf->data+buf->idx, 4);
+        buf->idx += 4;
+        buf->len -= 4;
+        memcpy(&addr_info->sin.sin_port, buf->data+buf->idx, 2);
+        buf->idx += 2;
+        buf->len -= 2;
     } else if (atty == ATYP_IPV6) {
-        inet_ntop(AF_INET6, nd->remote_buf->data+nd->remote_buf->idx,
-                nd->remote_domain, sizeof(nd->remote_domain));
-        nd->remote_buf->idx += 16;
-        nd->remote_buf->len -= 16;
-
-        hints.ai_family = AF_INET6;
+        addr_info = malloc(sizeof(MyAddrInfo));
+        addr_info->ai_family = AF_INET6;
+        addr_info->ai_addrlen = sizeof(addr_info->sin6);
+        memcpy(&addr_info->sin6.sin6_addr, buf->data+buf->idx, 16);
+        buf->idx += 16;
+        buf->len -= 16;
+        memcpy(&addr_info->sin6.sin6_port, buf->data+buf->idx, 2);
+        buf->idx += 2;
+        buf->len -= 2;
     } else {
-        LOGGER_ERROR("ATYP error！");
-        return -1;
+        LOGGER_ERROR("ATYP error！Maybe wrong password or decryption method.");
+        return NULL;
     }
 
-    uint16_t port;
-    memcpy(&port, nd->remote_buf->data+nd->remote_buf->idx, 2);
-    nd->remote_buf->idx += 2;
-    nd->remote_buf->len -= 2;
-    snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
-    nd->remote_port[5] = 0;
-
-    LruCache *lc = nd->user_info->lru_cache;
-    nd->remote_addr = lru_cache_get(lc, nd->remote_domain);
-    if (nd->remote_addr == NULL) {
-        LOGGER_DEBUG("%s: DNS 查询！", nd->remote_domain);
-        ret = getaddrinfo(nd->remote_domain, nd->remote_port, &hints, &nd->remote_addr);
-        if (ret != 0) {
-            LOGGER_ERROR("%s", gai_strerror(ret));
-            return -1;
-        }
-        void *oldvalue;
-        ret = lru_cache_set(lc, nd->remote_domain, nd->remote_addr, &oldvalue);
-        if (ret < 0) {
-            return -1;
-        }
-        if (oldvalue != NULL) {
-            freeaddrinfo(oldvalue);
-        }
+    if (buf->len > 0) {
+        memcpy(buf->data, buf->data+buf->idx, buf->len);
     }
+    buf->idx = 0;
 
-    if (nd->remote_buf->len > 0) {
-        memcpy(nd->remote_buf->data,
-                nd->remote_buf->data+nd->remote_buf->idx, nd->remote_buf->len);
-    }
-
-    nd->remote_buf->idx = 0;
-
-    return 0;
+    return addr_info;
 }
