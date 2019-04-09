@@ -101,6 +101,8 @@ init_noone_cipher_ctx()
     if (cipher_ctx == NULL) {
         return NULL;
     }
+    cipher_ctx->encrypt_ctx = NULL;
+    cipher_ctx->decrypt_ctx = NULL;
 
     return cipher_ctx;
 }

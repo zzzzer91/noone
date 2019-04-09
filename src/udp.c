@@ -45,18 +45,18 @@ handle_stage_header(NetData *nd)
 }
 
 void
-udp_read_client(AeEventLoop *event_loop, int fd, void *data)
+udp_read(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = init_net_data();
     if (nd == NULL) {
-        LOGGER_ERROR("udp_read_client, init_net_data");
+        LOGGER_ERROR("udp_read, init_net_data");
         return;
     }
     nd->user_info = (NooneUserInfo *)data;
 
     if (nd->ss_stage == STAGE_INIT) {
         if (handle_stage_init(nd) < 0) {
-            LOGGER_ERROR("udp_read_client, handle_stage_init");
+            LOGGER_ERROR("udp_read, handle_stage_init");
             CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
             return;
         }
@@ -69,7 +69,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     size_t ret = DECRYPT(nd, buf, buf_len);
     if (ret == 0) {
-        LOGGER_ERROR("udp_read_client, DECRYPT");
+        LOGGER_ERROR("udp_read, DECRYPT");
         CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
         return;
     }
@@ -77,7 +77,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->ss_stage == STAGE_HEADER) {
         if (handle_stage_header(nd) < 0) {
-            LOGGER_ERROR("udp_read_client, handle_stage_header");
+            LOGGER_ERROR("udp_read, handle_stage_header");
             CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
             return;
         }
@@ -88,22 +88,4 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     // sendto(fd)
-}
-
-void
-udp_write_remote(AeEventLoop *event_loop, int fd, void *data)
-{
-
-}
-
-void
-udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
-{
-
-}
-
-void
-udp_write_client(AeEventLoop *event_loop, int fd, void *data)
-{
-
 }

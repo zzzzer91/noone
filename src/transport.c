@@ -138,6 +138,9 @@ write_net_data(int fd, Buffer *buf)
  *     ATYP == 0x03：1 个字节表示域名长度，紧随其后的是对应的域名
  *     ATYP == 0x04：16 个字节的 IPv6 地址
  *     DST.PORT 字段：目的服务器的端口
+ *
+ * TODO
+ * 判断头部长度是否合法
  */
 int
 parse_net_data_header(NetData *nd)
@@ -217,30 +220,4 @@ parse_net_data_header(NetData *nd)
     nd->remote_buf->idx = 0;
 
     return 0;
-}
-
-/*
- * 检查所有时间的最后激活时间，踢掉超时的时间
- * 更新时间的操作，在 ae_register_event() 中进行。
- */
-void
-check_last_active(AeEventLoop *event_loop)
-{
-    time_t current_time = time(NULL);
-    AeEvent *p = event_loop->list_tail;
-    while (p) {
-        if ((current_time - p->last_active) < AE_WAIT_SECONDS) {
-            break;  // 前面的没超时，说明后面的也不会，因为按时间排序
-        }
-        NetData *nd = p->client_data;  // ss_client 和 remote 共用 nd
-        int fd = p->fd;
-        LOGGER_DEBUG("kill fd: %d", fd);
-        if (fd == nd->client_fd) {
-            CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
-        } else {  // 是远程 fd，不关闭本地
-            CLEAR_REMOTE(event_loop, nd);
-        }
-
-        p = p->list_prev;  // 从队尾往前循环
-    }
 }

@@ -53,7 +53,7 @@
  * event removed an element that fired and we still didn't
  * processed, so we check if the event is still valid.
  */
-#define ae_process_events(event_loop, timeout) \
+#define AE_PROCESS_EVENTS(event_loop, timeout) \
     do { \
         int numevents = AE_EPOLL_POLL(event_loop, timeout); \
         for (int i = 0; i < numevents; i++) { \
@@ -61,11 +61,31 @@
             int fd = event_loop->ready_events[i].data.fd; \
             AeEvent *fe = &event_loop->events[fd]; \
             if (fe->mask & mask & AE_IN) { \
-                fe->rcallback(event_loop, fd, fe->client_data); \
+                fe->rcallback(event_loop, fd, fe->data); \
             } \
             if (fe->mask & mask & AE_OUT) { \
-                fe->wcallback(event_loop, fd, fe->client_data); \
+                fe->wcallback(event_loop, fd, fe->data); \
             } \
+        } \
+    } while (0)
+
+/*
+ * 从双向链表尾部向前循环，按时间排序，尾部是最旧的事件
+ */
+#define AE_CHECK_TIMEOUT(event_loop) \
+    do { \
+        time_t current_time = time(NULL); \
+        AeEvent *p = event_loop->list_tail; \
+        while (p) { \
+            if ((current_time - p->last_active) < AE_WAIT_SECONDS) { \
+                break; \
+            } \
+            if (p->tcallback != NULL) { \
+                int fd = p->fd; \
+                LOGGER_DEBUG("kill fd: %d", fd); \
+                p->tcallback(event_loop, fd, p->data); \
+            } \
+            p = p->list_prev; \
         } \
     } while (0)
 
@@ -158,23 +178,16 @@ ae_get_event_set_size(AeEventLoop *event_loop)
  * 事件处理器的主循环
  */
 void
-ae_run_loop(AeEventLoop *event_loop, AeTimeoutCallback callback)
+ae_run_loop(AeEventLoop *event_loop)
 {
     event_loop->stop = 0;
 
-    int count = 0;
     while (!event_loop->stop) {
         // 开始处理事件
-        ae_process_events(event_loop, AE_WAIT_SECONDS*1000);
+        AE_PROCESS_EVENTS(event_loop, AE_WAIT_SECONDS*1000);
 
         // 检查超时事件
-        if (callback) {
-            count++;
-            if (count == 128) {
-                callback(event_loop);
-                count = 0;
-            }
-        }
+        AE_CHECK_TIMEOUT(event_loop);
     }
 }
 
@@ -183,7 +196,7 @@ ae_run_loop(AeEventLoop *event_loop, AeTimeoutCallback callback)
  */
 int
 ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-        AeCallback *rcallback, AeCallback *wcallback, void *client_data)
+        AeCallback *rcallback, AeCallback *wcallback, AeCallback *tcallback, void *data)
 {
     if (fd < 0 || fd >= event_loop->event_set_size || mask == AE_NONE) {
         return -1;
@@ -213,12 +226,13 @@ ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         fe->mask = mask;
     }
 
-    // 读写事件
+    // 回调
     fe->rcallback = rcallback;
     fe->wcallback = wcallback;
+    fe->tcallback = tcallback;
 
     // 私有数据
-    fe->client_data = client_data;
+    fe->data = data;
 
     // 更新事件队列位置
     if (fe_mask == AE_NONE) {  // 新注册事件，加入队列

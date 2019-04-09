@@ -7,12 +7,6 @@
 
 #include "ae.h"
 
-void udp_read_client(AeEventLoop *event_loop, int fd, void *data);
-
-void udp_write_remote(AeEventLoop *event_loop, int fd, void *data);
-
-void udp_read_remote(AeEventLoop *event_loop, int fd, void *data);
-
-void udp_write_client(AeEventLoop *event_loop, int fd, void *data);
+void udp_read(AeEventLoop *event_loop, int fd, void *data);
 
 #endif  /* _NOONE_UDP_H_ */

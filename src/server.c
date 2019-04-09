@@ -65,7 +65,7 @@ main(int argc, char *argv[])
             PANIC("setnonblock");
         }
         int ret = ae_register_event(ae_ev_loop, tcp_server_fd,
-                AE_IN, tcp_accept_conn, NULL, ui);
+                AE_IN, tcp_accept_conn, NULL, NULL, ui);
         if (ret  < 0) {
             PANIC("ae_register_event");
         }
@@ -81,16 +81,16 @@ main(int argc, char *argv[])
 //            PANIC("setnonblock");
 //        }
 //        ret = ae_register_event(ae_ev_loop, udp_server_fd,
-//                AE_IN, udp_read_client, NULL, ui);
+//                AE_IN, udp_read, NULL, NULL, ui);
 //        if (ret < 0) {
 //            PANIC("ae_register_event");
 //        }
 //        ui->udp_server_fd = udp_server_fd;
 //        ae_remove_event_from_list(ae_ev_loop, udp_server_fd);  // 从超时队列移除
     }
-    ae_ev_loop->extra_data = noone_manager;
+    ae_ev_loop->data = noone_manager;
 
-    ae_run_loop(ae_ev_loop, check_last_active);
+    ae_run_loop(ae_ev_loop);
 
     return 0;
 }

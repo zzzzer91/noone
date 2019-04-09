@@ -25,8 +25,6 @@ typedef struct AeEventLoop AeEventLoop;
  */
 typedef void AeCallback(AeEventLoop *event_loop, int fd, void *data);
 
-typedef void AeTimeoutCallback(AeEventLoop *event_loop);
-
 /*
  * File event structure
  */
@@ -45,8 +43,11 @@ typedef struct AeEvent {
     // 写事件
     AeCallback *wcallback;
 
+    // 超时之后的回调
+    AeCallback *tcallback;
+
     // 多路复用库的私有数据
-    void *client_data;
+    void *data;
 
     // 最后激活时间，用于踢掉超时连接
     time_t last_active;
@@ -84,18 +85,18 @@ struct AeEventLoop {
     AeEvent *list_head, *list_tail;
 
     // 可以携带一些其他数据
-    void *extra_data;
+    void *data;
 };
 
 /* Prototypes */
 AeEventLoop *ae_create_event_loop(int event_set_size);
 void ae_delete_event_loop(AeEventLoop *event_loop);
-void ae_run_loop(AeEventLoop *event_loop, AeTimeoutCallback callback);
+void ae_run_loop(AeEventLoop *event_loop);
 void ae_stop_event_loop(AeEventLoop *event_loop);
 int ae_get_event_set_size(AeEventLoop *event_loop);
 
 int ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-        AeCallback *rcallback, AeCallback *wcallback, void *client_data);
+        AeCallback *rcallback, AeCallback *wcallback, AeCallback *tcallback, void *data);
 int ae_unregister_event(AeEventLoop *event_loop, int fd);
 void ae_remove_event_from_list(AeEventLoop *event_loop, int fd);
 

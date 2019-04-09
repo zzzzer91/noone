@@ -30,8 +30,7 @@ typedef enum SsStageType {
     STAGE_DNS,        /* 查询 DNS，可能不进行这一步 */
     STAGE_HANDSHAKE,  /* TCP 和 remote 握手阶段 */
     STAGE_STREAM,     /* TCP 传输阶段 */
-    STAGE_UDP,
-    STAGE_DESTROYED = -1
+    STAGE_UDP
 } SsStageType;
 
 typedef struct NetData {
@@ -42,11 +41,11 @@ typedef struct NetData {
 
     uint8_t iv[MAX_IV_LEN];
 
+    int is_iv_send;
+
     int client_fd;
 
     int remote_fd;
-
-    int is_iv_send;
 
     SsStageType ss_stage;
 
@@ -71,8 +70,6 @@ int read_net_data(int fd, char *buf, size_t capacity, size_t *len);
 int write_net_data(int fd, Buffer *buf);
 
 int parse_net_data_header(NetData *nd);
-
-void check_last_active(AeEventLoop *event_loop);
 
 #define ENCRYPT(nd, buf, buf_len) \
     encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \

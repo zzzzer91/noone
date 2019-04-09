@@ -17,15 +17,24 @@
 #include <netinet/in.h>  /* struct sockaddr_in */
 
 #define REGISTER_READ_SSCLIENT() \
-    ae_register_event(event_loop, nd->client_fd, AE_IN, tcp_read_client, NULL, nd)
+    ae_register_event(event_loop, nd->client_fd, AE_IN, \
+            tcp_read_client, tcp_handle_timeout, NULL, nd)
+
 #define REGISTER_WRITE_SSCLIENT() \
-    ae_register_event(event_loop, nd->client_fd, AE_OUT, NULL, tcp_write_client, nd)
+    ae_register_event(event_loop, nd->client_fd, AE_OUT, NULL, \
+            tcp_write_client, tcp_handle_timeout, nd)
+
 #define REGISTER_READ_REMOTE() \
-    ae_register_event(event_loop, nd->remote_fd, AE_IN, tcp_read_remote, NULL, nd)
+    ae_register_event(event_loop, nd->remote_fd, AE_IN, \
+            tcp_read_remote, NULL, tcp_handle_timeout, nd)
+
 #define REGISTER_WRITE_REMOTE() \
-    ae_register_event(event_loop, nd->remote_fd, AE_OUT, NULL, tcp_write_remote, nd)
+    ae_register_event(event_loop, nd->remote_fd, AE_OUT, \
+            NULL, tcp_write_remote, tcp_handle_timeout, nd)
+
 #define UNREGISTER_SSCLIENT() \
     ae_unregister_event(event_loop, nd->client_fd)
+
 #define UNREGISTER_REMOTE() \
     ae_unregister_event(event_loop, nd->remote_fd)
 
@@ -303,5 +312,20 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
             CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
             return;
         }
+    }
+}
+
+/*
+ * 检查所有时间的最后激活时间，踢掉超时的时间
+ * 更新时间的操作，在 ae_register_event() 中进行。
+ */
+void
+tcp_handle_timeout(AeEventLoop *event_loop, int fd, void *data)
+{
+    NetData *nd = data;  // ss_client 和 remote 共用 nd
+    if (fd == nd->client_fd) {
+        CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
+    } else {  // 是远程 fd，不关闭本地
+        CLEAR_REMOTE(event_loop, nd);
     }
 }
