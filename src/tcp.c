@@ -19,11 +19,11 @@
 
 #define REGISTER_READ_SSCLIENT() \
     ae_register_event(event_loop, nd->client_fd, AE_IN, \
-            tcp_read_client, tcp_handle_timeout, NULL, nd)
+            tcp_read_client, NULL, tcp_handle_timeout, nd)
 
 #define REGISTER_WRITE_SSCLIENT() \
-    ae_register_event(event_loop, nd->client_fd, AE_OUT, NULL, \
-            tcp_write_client, tcp_handle_timeout, nd)
+    ae_register_event(event_loop, nd->client_fd, AE_OUT, \
+            NULL, tcp_write_client, tcp_handle_timeout, nd)
 
 #define REGISTER_READ_REMOTE() \
     ae_register_event(event_loop, nd->remote_fd, AE_IN, \
@@ -187,7 +187,7 @@ handle_stage_handshake(NetData *nd)
 {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
-        LOGGER_ERROR("socket");
+        LOGGER_ERROR("fd: %d, socket: %s", nd->client_fd, strerror(errno));
         return -1;
     }
     if (setnonblock(fd) < 0) {
@@ -206,7 +206,7 @@ handle_stage_handshake(NetData *nd)
             free(nd->remote_addr);
             nd->remote_addr = NULL;
             lru_cache_del(nd->user_info->lru_cache, nd->remote_domain);
-            LOGGER_ERROR("fd: %d, connect, %s", fd, strerror(errno));
+            LOGGER_ERROR("fd: %d, connect: %s", nd->client_fd, strerror(errno));
             return -1;
         }
     }
