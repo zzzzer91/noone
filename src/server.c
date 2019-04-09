@@ -17,7 +17,7 @@
 
 /* test */
 #define PASSWD (unsigned char *)"123123"
-#define SERVER "127.0.0.1"
+#define SERVER "0.0.0.0"
 
 int
 main(int argc, char *argv[])
