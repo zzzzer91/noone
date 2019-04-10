@@ -61,15 +61,6 @@ main(int argc, char *argv[])
         if (tcp_server_fd < 0) {
             PANIC("tcp_server_fd_init");
         }
-        if (set_nonblock(tcp_server_fd) < 0) {
-            PANIC("set_nonblock");
-        }
-        if (set_reuseaddr(tcp_server_fd) < 0) {
-            PANIC("set_reuseaddr");
-        }
-        if (set_fastopen(tcp_server_fd) < 0) {
-            PANIC("set_fastopen");
-        }
         int ret = ae_register_event(ae_ev_loop, tcp_server_fd,
                 AE_IN, tcp_accept_conn, NULL, NULL, ui);
         if (ret  < 0) {

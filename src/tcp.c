@@ -330,11 +330,16 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
     if (nd->remote_fd != -1) {  // 触发前，remote 可能已关闭
-        if (REGISTER_RW_REMOTE() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_RW_REMOTE", nd->client_fd);
+        if (REGISTER_WRITE_REMOTE() < 0) {
+            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTEts", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
             return;
         }
+    }
+    if (REGISTER_PAUSE_CLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_PAUSE_CLIENT", nd->client_fd);
+        CLEAR_CLIENT_AND_REMOTE();
+        return;
     }
 }
 
@@ -360,6 +365,12 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 
     if (REGISTER_READ_REMOTE() < 0) {
         LOGGER_ERROR("fd: %d, tcp_write_remote, REGISTER_READ_REMOTE", nd->client_fd);
+        CLEAR_CLIENT_AND_REMOTE();
+        return;
+    }
+
+    if (REGISTER_READ_CLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_write_remote, REGISTER_READ_CLIENT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
         return;
     }

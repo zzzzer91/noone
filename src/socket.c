@@ -23,6 +23,18 @@ tcp_server_fd_init(const char *addr, uint16_t port)
         SYS_ERROR("socket");
         return -1;
     }
+    if (set_nonblock(server_fd) < 0) {
+        SYS_ERROR("set_nonblock");
+        return -1;
+    }
+    if (set_reuseaddr(server_fd) < 0) {
+        SYS_ERROR("set_reuseaddr");
+        return -1;
+    }
+    if (set_fastopen(server_fd) < 0) {
+        SYS_ERROR("set_fastopen");
+        return -1;
+    }
 
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
