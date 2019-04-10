@@ -26,13 +26,17 @@
     decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
             (uint8_t *)(nd)->remote_buf->data)
 
-#define REGISTER_READ_SSCLIENT() \
+#define REGISTER_READ_CLIENT() \
     ae_register_event(event_loop, nd->client_fd, AE_IN, \
             tcp_read_client, NULL, tcp_handle_timeout, nd)
 
-#define REGISTER_WRITE_SSCLIENT() \
+#define REGISTER_WRITE_CLIENT() \
     ae_register_event(event_loop, nd->client_fd, AE_OUT, \
             NULL, tcp_write_client, tcp_handle_timeout, nd)
+
+#define REGISTER_PAUSE_CLIENT() \
+    ae_register_event(event_loop, nd->client_fd, EPOLLERR, \
+            NULL, NULL, tcp_handle_timeout, nd)
 
 #define REGISTER_READ_REMOTE() \
     ae_register_event(event_loop, nd->remote_fd, AE_IN, \
@@ -42,7 +46,15 @@
     ae_register_event(event_loop, nd->remote_fd, AE_OUT, \
             NULL, tcp_write_remote, tcp_handle_timeout, nd)
 
-#define UNREGISTER_SSCLIENT() \
+#define REGISTER_RW_REMOTE() \
+    ae_register_event(event_loop, nd->remote_fd, AE_OUT|AE_IN, \
+            tcp_read_remote, tcp_write_remote, tcp_handle_timeout, nd)
+
+#define REGISTER_PAUSE_REMOTE() \
+    ae_register_event(event_loop, nd->remote_fd, EPOLLERR, \
+            NULL, NULL, tcp_handle_timeout, nd)
+
+#define UNREGISTER_CLIENT() \
     ae_unregister_event(event_loop, nd->client_fd)
 
 #define UNREGISTER_REMOTE() \
@@ -50,7 +62,7 @@
 
 #define CLEAR_CLIENT() \
     do { \
-        UNREGISTER_SSCLIENT(); \
+        UNREGISTER_CLIENT(); \
         close(nd->client_fd); \
         nd->client_fd = -1; \
     } while (0)
@@ -196,6 +208,10 @@ handle_stage_handshake(NetData *nd)
         close(fd);
         return -1;
     }
+    if (set_nondelay(fd) < 0) {
+        close(fd);
+        return -1;
+    }
 
     // 注意：当设置非阻塞 socket 后，tcp 三次握手会异步进行，
     // 所以可能会出现三次握手还未完成，就进行 write，
@@ -253,8 +269,8 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
     nd->client_fd = conn_fd;
     nd->user_info = (NooneUserInfo *)data;
 
-    if (REGISTER_READ_SSCLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_accept_conn, REGISTER_READ_SSCLIENT", conn_fd);
+    if (REGISTER_READ_CLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_accept_conn, REGISTER_READ_CLIENT", conn_fd);
         close(conn_fd);
         free_net_data(nd);
         return;
@@ -314,16 +330,11 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
     if (nd->remote_fd != -1) {  // 触发前，remote 可能已关闭
-        if (REGISTER_WRITE_REMOTE() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTE", nd->client_fd);
+        if (REGISTER_RW_REMOTE() < 0) {
+            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_RW_REMOTE", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
             return;
         }
-    }
-    if (UNREGISTER_SSCLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_read_client, UNREGISTER_SSCLIENT", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
-        return;
     }
 }
 
@@ -349,12 +360,6 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 
     if (REGISTER_READ_REMOTE() < 0) {
         LOGGER_ERROR("fd: %d, tcp_write_remote, REGISTER_READ_REMOTE", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
-        return;
-    }
-
-    if (REGISTER_READ_SSCLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_write_remote, REGISTER_READ_SSCLIENT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
         return;
     }
@@ -386,14 +391,14 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->client_buf->len = ret;
 
-    if (REGISTER_WRITE_SSCLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_read_remote, REGISTER_WRITE_SSCLIENT", nd->client_fd);
+    if (REGISTER_WRITE_CLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_read_remote, REGISTER_WRITE_CLIENT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
         return;
     }
     if (nd->remote_fd != -1) {
-        if (UNREGISTER_REMOTE() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_read_remote, UNREGISTER_REMOTE", nd->client_fd);
+        if (REGISTER_PAUSE_REMOTE() < 0) {
+            LOGGER_ERROR("fd: %d, tcp_read_remote, REGISTER_PAUSE_REMOTE", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
             return;
         }
@@ -431,8 +436,8 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->client_buf->idx = 0;
 
-    if (REGISTER_READ_SSCLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_SSCLIENT", nd->client_fd);
+    if (REGISTER_READ_CLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_CLIENT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
         return;
     }

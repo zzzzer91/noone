@@ -32,8 +32,9 @@ def main():
     url = 'http://www.ruanyifeng.com/blog/'
     url = 'https://gamersky.com/'
 
-    while True:
-        get(url)
+    # while True:
+        # get(url)
+    get(url)
 
 
 if __name__ == '__main__':
