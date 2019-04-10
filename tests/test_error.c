@@ -11,7 +11,7 @@ test_panic()
 {
     int fd = open("不存在.txt", O_RDONLY);
     if (fd < 0) {
-        PANIC("open");
+        PANIC("open %d", fd);
     }
 }
 

@@ -21,7 +21,13 @@ int tcp_server_fd_init(const char *addr, uint16_t port);
 
 int udp_server_fd_init(const char *addr, uint16_t port);
 
-int setnonblock(int sockfd);
+int set_nonblock(int sockfd);
+
+int set_reuseaddr(int sockfd);
+
+int set_nondelay(int sockfd);
+
+int set_fastopen(int sockfd);
 
 #endif  /* _NOONE_SOCKET_H_ */
 

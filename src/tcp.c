@@ -3,6 +3,7 @@
  */
 
 #include "tcp.h"
+#include "error.h"
 #include "transport.h"
 #include "socket.h"
 #include "ae.h"
@@ -85,6 +86,7 @@
 static int
 read_net_data(int fd, void *buf, size_t capacity, int *close_flag)
 {
+    *close_flag = 0;
     size_t nleft = capacity;
     ssize_t nread;
     char *p = buf;
@@ -117,6 +119,7 @@ read_net_data(int fd, void *buf, size_t capacity, int *close_flag)
 static int
 write_net_data(int fd, void *buf, size_t n, int *close_flag)
 {
+    *close_flag = 0;
     size_t nleft = n;
     ssize_t nwritten;
     char *p = buf;
@@ -141,40 +144,6 @@ write_net_data(int fd, void *buf, size_t n, int *close_flag)
         p += nwritten;
     }
     return n - nleft;
-}
-
-void
-tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
-{
-    struct sockaddr_in conn_addr;
-    socklen_t conn_addr_len = sizeof(conn_addr);
-    int conn_fd = accept(fd, (struct sockaddr *)&conn_addr, &conn_addr_len);
-    if (conn_fd < 0) {
-        LOGGER_ERROR("fd: %d, tcp_accept_conn", conn_fd);
-        return;
-    }
-
-    if (setnonblock(conn_fd) < 0) {
-        LOGGER_ERROR("fd: %d, setnonblock", conn_fd);
-        close(conn_fd);
-        return;
-    }
-
-    NetData *nd = init_net_data();
-    if (nd == NULL) {
-        LOGGER_ERROR("fd: %d, init_net_data", conn_fd);
-        close(conn_fd);
-        return;
-    }
-    nd->client_fd = conn_fd;
-    nd->user_info = (NooneUserInfo *)data;
-
-    if (REGISTER_READ_SSCLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_accept_conn, REGISTER_READ_SSCLIENT", conn_fd);
-        close(conn_fd);
-        free_net_data(nd);
-        return;
-    }
 }
 
 static int
@@ -223,7 +192,7 @@ handle_stage_handshake(NetData *nd)
         LOGGER_ERROR("fd: %d, socket: %s", nd->client_fd, strerror(errno));
         return -1;
     }
-    if (setnonblock(fd) < 0) {
+    if (set_nonblock(fd) < 0) {
         close(fd);
         return -1;
     }
@@ -238,7 +207,8 @@ handle_stage_handshake(NetData *nd)
             close(fd);
             free(nd->remote_addr);
             nd->remote_addr = NULL;
-            lru_cache_remove(nd->user_info->lru_cache, nd->remote_domain);
+            // TODO
+            // lru_cache_remove(nd->user_info->lru_cache, nd->remote_domain);
             LOGGER_ERROR("fd: %d, connect: %s", nd->client_fd, strerror(errno));
             return -1;
         }
@@ -249,6 +219,46 @@ handle_stage_handshake(NetData *nd)
     nd->ss_stage = STAGE_STREAM;
 
     return 0;
+}
+
+void
+tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
+{
+    struct sockaddr_in conn_addr;
+    socklen_t conn_addr_len = sizeof(conn_addr);
+    int conn_fd = accept(fd, (struct sockaddr *)&conn_addr, &conn_addr_len);
+    if (conn_fd < 0) {
+        SYS_ERROR("fd: %d, accept", conn_fd);
+        return;
+    }
+
+    if (set_nonblock(conn_fd) < 0) {
+        SYS_ERROR("fd: %d, set_nonblock", conn_fd);
+        close(conn_fd);
+        return;
+    }
+
+    if (set_nondelay(conn_fd) < 0) {
+        SYS_ERROR("set_nondelay: %s", strerror(errno));
+        close(conn_fd);
+        return;
+    }
+
+    NetData *nd = init_net_data();
+    if (nd == NULL) {
+        LOGGER_ERROR("fd: %d, init_net_data", conn_fd);
+        close(conn_fd);
+        return;
+    }
+    nd->client_fd = conn_fd;
+    nd->user_info = (NooneUserInfo *)data;
+
+    if (REGISTER_READ_SSCLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_accept_conn, REGISTER_READ_SSCLIENT", conn_fd);
+        close(conn_fd);
+        free_net_data(nd);
+        return;
+    }
 }
 
 void

@@ -61,8 +61,14 @@ main(int argc, char *argv[])
         if (tcp_server_fd < 0) {
             PANIC("tcp_server_fd_init");
         }
-        if (setnonblock(tcp_server_fd) < 0) {
-            PANIC("setnonblock");
+        if (set_nonblock(tcp_server_fd) < 0) {
+            PANIC("set_nonblock");
+        }
+        if (set_reuseaddr(tcp_server_fd) < 0) {
+            PANIC("set_reuseaddr");
+        }
+        if (set_fastopen(tcp_server_fd) < 0) {
+            PANIC("set_fastopen");
         }
         int ret = ae_register_event(ae_ev_loop, tcp_server_fd,
                 AE_IN, tcp_accept_conn, NULL, NULL, ui);
@@ -77,8 +83,8 @@ main(int argc, char *argv[])
 //        if (udp_server_fd < 0) {
 //            PANIC("udp_server_fd_init");
 //        }
-//        if (setnonblock(udp_server_fd) < 0) {
-//            PANIC("setnonblock");
+//        if (set_nonblock(udp_server_fd) < 0) {
+//            PANIC("set_nonblock");
 //        }
 //        ret = ae_register_event(ae_ev_loop, udp_server_fd,
 //                AE_IN, udp_read, NULL, NULL, ui);

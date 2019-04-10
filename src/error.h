@@ -11,14 +11,18 @@
 #include <errno.h>
 #include <string.h>
 
-#define PANIC(s) \
+#define SYS_ERROR(s, args...) \
     do { \
         if (errno != 0) { \
-            char *err_msg = strerror(errno); \
-            LOGGER_ERROR(s ": %s", err_msg); \
+            LOGGER_ERROR(s ": %s", ##args, strerror(errno)); \
         } else {\
-            LOGGER_ERROR(s); \
+            LOGGER_ERROR(s, ##args); \
         } \
+    } while (0)
+
+#define PANIC(s, args...) \
+    do { \
+        SYS_ERROR(s, ##args);   \
         exit(1); \
     } while (0)
 

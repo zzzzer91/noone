@@ -3,12 +3,14 @@
  */
 
 #include "socket.h"
+#include "error.h"
 #include <stdio.h>
-#include <string.h>
+#include <unistd.h>
 #include <fcntl.h>       /* fcntl() */
 #include <sys/socket.h>  /* socket(), setsockopt() */
 #include <netinet/in.h>  /* struct sockaddr_in */
 #include <arpa/inet.h>   /* inet_addr() */
+#include <netinet/tcp.h>
 
 /*
  * 只支持 ipv4
@@ -18,13 +20,7 @@ tcp_server_fd_init(const char *addr, uint16_t port)
 {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {
-        return -1;
-    }
-
-    /* 端口复用, 本方主动关闭后, 不进行TIME_WAIT,
-     * TIME_WAIT原因是等待对方的ACK, 防止对方未收到FIN包 */
-    int on = 1;
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
+        SYS_ERROR("socket");
         return -1;
     }
 
@@ -33,10 +29,14 @@ tcp_server_fd_init(const char *addr, uint16_t port)
     server_addr.sin_addr.s_addr = inet_addr(addr);
     server_addr.sin_port = htons(port);
     if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        SYS_ERROR("bind");
+        close(server_fd);
         return -1;
     }
 
     if (listen(server_fd, MAX_LISTEN) < 0) {
+        SYS_ERROR("listen");
+        close(server_fd);
         return -1;
     }
 
@@ -51,6 +51,7 @@ udp_server_fd_init(const char *addr, uint16_t port)
 {
     int server_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (server_fd < 0) {
+        SYS_ERROR("socket");
         return -1;
     }
 
@@ -59,6 +60,8 @@ udp_server_fd_init(const char *addr, uint16_t port)
     server_addr.sin_addr.s_addr = inet_addr(addr);
     server_addr.sin_port = htons(port);
     if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        SYS_ERROR("bind");
+        close(server_fd);
         return -1;
     }
 
@@ -67,8 +70,11 @@ udp_server_fd_init(const char *addr, uint16_t port)
     return server_fd;
 }
 
+/*
+ * 设置非阻塞 socket
+ */
 int
-setnonblock(int sockfd)
+set_nonblock(int sockfd)
 {
     int flags;
     if ((flags = fcntl(sockfd, F_GETFL, 0)) < 0) {
@@ -79,4 +85,35 @@ setnonblock(int sockfd)
     }
     
     return 0;
+}
+
+/*
+ * 设置端口复用，本方主动关闭后，不进行 TIME_WAIT，
+ * TIME_WAIT 原因是等待对方的 ACK，防止对方未收到 FIN 包
+ */
+int set_reuseaddr(int sockfd)
+{
+    int on = 1;
+    return setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+}
+
+/*
+ * 关闭 TCP NAGLE 算法。
+ * 该算法是为了提高较慢的广域网传输效率，减小小分组的报文个数
+ */
+int
+set_nondelay(int sockfd)
+{
+    int on = 1;
+    return setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+}
+
+/*
+ * 开启 TCP fast open
+ */
+int
+set_fastopen(int sockfd)
+{
+    int on = 1;
+    return setsockopt(sockfd, IPPROTO_TCP, TCP_FASTOPEN, &on, sizeof(on));
 }
