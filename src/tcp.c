@@ -299,7 +299,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->remote_buf->len -= nwriten;
     if (nd->remote_buf->len > 0) {  // 没有写完，不能改变事件，要继续写
-        nd->remote_buf->idx -= nwriten;
+        nd->remote_buf->idx += nwriten;
         return;
     }
     nd->remote_buf->idx = 0;  // 写完，则重置写位置
@@ -383,7 +383,7 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->client_buf->len -= nwriten;
     if (nd->client_buf->len > 0) {
-        nd->client_buf->idx -= nwriten;
+        nd->client_buf->idx += nwriten;
         return;
     }
     nd->client_buf->idx = 0;
@@ -401,6 +401,7 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
         }
     } else {  // 对端已关闭
         CLEAR_CLIENT_AND_REMOTE(event_loop, nd);  // 对端已清理过
+        return;
     }
 }
 
