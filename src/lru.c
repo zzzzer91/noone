@@ -43,16 +43,22 @@ lru_cache_destory(LruCache *lc)
  * 传出过期元素的 value，用于调用者释放
  */
 int
-lru_cache_set(LruCache *lc, char *key, void *value, void **oldvalue)
+lru_cache_put(LruCache *lc, char *key, void *value, void **oldvalue)
 {
     assert(lc != NULL && key != NULL);
 
-    *oldvalue = NULL;
-    if (lc->size == lc->capacity) {
-        *oldvalue = hashtable_remove_oldest(lc->hash_table);
+    // 先判断是否已存在
+    void *tmp = hashtable_get(lc->hash_table, key);
+    if (tmp == NULL) {
+        if (lc->size == lc->capacity) {  // 已满，自动移除最旧元素
+            *oldvalue = hashtable_remove_oldest(lc->hash_table);
+            lc->size--;
+        }
+    } else { // key 已存在，是更新操作，不需要增加 size
         lc->size--;
     }
-    int ret = hashtable_set(lc->hash_table, key, value);
+
+    int ret = hashtable_put(lc->hash_table, key, value);
     if (ret < 0) {
         return -1;
     }
@@ -70,11 +76,11 @@ lru_cache_get(LruCache *lc, char *key)
 }
 
 void *
-lru_cache_del(LruCache *lc, char *key)
+lru_cache_remove(LruCache *lc, char *key)
 {
     assert(lc != NULL && key != NULL);
 
-    void *v = hashtable_del(lc->hash_table, key);
+    void *v = hashtable_remove(lc->hash_table, key);
     if (v != NULL) {
         lc->size--;
     }

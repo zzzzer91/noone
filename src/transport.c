@@ -115,7 +115,7 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
 
             // 加入 lru
             void *oldvalue;
-            ret = lru_cache_set(lc, domain, addr_info, &oldvalue);
+            ret = lru_cache_put(lc, domain, addr_info, &oldvalue);
             if (ret < 0) {
                 free(addr_info);
                 return NULL;

@@ -35,11 +35,11 @@ void hashtable_destory(HashTable *ht);
 
 size_t djb_hash(char *key);
 
-int hashtable_set(HashTable *ht, char *key, void *value);
+int hashtable_put(HashTable *ht, char *key, void *value);
 
 void *hashtable_get(HashTable *ht, char *key);
 
-void *hashtable_del(HashTable *ht, char *key);
+void *hashtable_remove(HashTable *ht, char *key);
 
 void *hashtable_remove_oldest(HashTable *ht);
 

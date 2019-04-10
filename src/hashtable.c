@@ -63,13 +63,9 @@ djb_hash(char *key)
  * 失败返回 -1，表满返回 0，成功返回 hashtable 的大小
  */
 int
-hashtable_set(HashTable *ht, char *key, void *value)
+hashtable_put(HashTable *ht, char *key, void *value)
 {
     assert(ht != NULL && key != NULL);  // False 时触发
-
-    if (ht->size == ht->capacity) {  // hashtable 满
-        return 0;
-    }
 
     size_t hashcode = djb_hash(key) % ht->capacity;
     ZipperEntry *ze = &ht->zipper_entry[hashcode];
@@ -91,7 +87,12 @@ hashtable_set(HashTable *ht, char *key, void *value)
         p = p->zipper_next;
     }
 
-    // 拉链中没有相同的 key
+
+    // 拉链中没有相同的 key，先判断满没满
+    if (ht->size == ht->capacity) {  // hashtable 满
+        return 0;
+    }
+
     Entry *e = malloc(sizeof(Entry));
     if (e == NULL) {
         return -1;
@@ -137,7 +138,7 @@ hashtable_get(HashTable *ht, char *key)
 }
 
 void *
-hashtable_del(HashTable *ht, char *key)
+hashtable_remove(HashTable *ht, char *key)
 {
     assert(ht != NULL && key != NULL);
 
@@ -187,7 +188,7 @@ hashtable_remove_oldest(HashTable *ht)
 
     Entry *p = ht->list_tail;
 
-    return hashtable_del(ht, p->key);
+    return hashtable_remove(ht, p->key);
 }
 
 void

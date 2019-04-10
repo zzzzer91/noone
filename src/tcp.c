@@ -205,7 +205,7 @@ handle_stage_handshake(NetData *nd)
             close(fd);
             free(nd->remote_addr);
             nd->remote_addr = NULL;
-            lru_cache_del(nd->user_info->lru_cache, nd->remote_domain);
+            lru_cache_remove(nd->user_info->lru_cache, nd->remote_domain);
             LOGGER_ERROR("fd: %d, connect: %s", nd->client_fd, strerror(errno));
             return -1;
         }

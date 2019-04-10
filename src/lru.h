@@ -17,11 +17,11 @@ LruCache *lru_cache_init(size_t capacity);
 
 void lru_cache_destory(LruCache *lc);
 
-int lru_cache_set(LruCache *lc, char *key, void *value, void **oldvalue);
+int lru_cache_put(LruCache *lc, char *key, void *value, void **oldvalue);
 
 void *lru_cache_get(LruCache *lc, char *key);
 
-void *lru_cache_del(LruCache *lc, char *key);
+void *lru_cache_remove(LruCache *lc, char *key);
 
 void lru_cache_clear(LruCache *lc);
 
