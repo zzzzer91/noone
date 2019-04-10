@@ -14,9 +14,10 @@
 #define SYS_ERROR(s, args...) \
     do { \
         if (errno != 0) { \
-            LOGGER_ERROR(s ": %s", ##args, strerror(errno)); \
+            LOGGER_ERROR("%s -> " s ": %s", __func__, ##args, strerror(errno)); \
+            errno = 0; \
         } else {\
-            LOGGER_ERROR(s, ##args); \
+            LOGGER_ERROR("%s -> " s, __func__, ##args); \
         } \
     } while (0)
 
