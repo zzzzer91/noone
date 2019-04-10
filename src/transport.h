@@ -67,37 +67,4 @@ void free_net_data(NetData *nd);
 
 MyAddrInfo *parse_net_data_header(Buffer *buf, LruCache *lc);
 
-#define ENCRYPT(nd, buf, buf_len) \
-    encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \
-            (uint8_t *)(nd)->client_buf->data)
-
-#define DECRYPT(nd, buf, buf_len) \
-    decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
-            (uint8_t *)(nd)->remote_buf->data)
-
-#define CLEAR_CLIENT(event_loop, nd) \
-    do { \
-        ae_unregister_event(event_loop, nd->client_fd); \
-        close(nd->client_fd); \
-        nd->client_fd = -1; \
-    } while (0)
-
-#define CLEAR_REMOTE(event_loop, nd) \
-    do { \
-        ae_unregister_event(event_loop, nd->remote_fd); \
-        close(nd->remote_fd); \
-        nd->remote_fd = -1; \
-    } while (0)
-
-#define CLEAR_CLIENT_AND_REMOTE(event_loop, nd) \
-    do { \
-        if (nd->client_fd != -1) { \
-            CLEAR_CLIENT(event_loop, nd); \
-        } \
-        if (nd->remote_fd != -1) { \
-            CLEAR_REMOTE(event_loop, nd);\
-        } \
-        free_net_data(nd); \
-    } while (0)
-
 #endif  /* _NOONE_TRANSPORT_H_ */
