@@ -99,7 +99,7 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
             struct addrinfo *addr_list;
             struct addrinfo hints = {0};
             hints.ai_socktype = SOCK_STREAM;
-            hints.ai_family = AF_UNSPEC;
+            hints.ai_family = AF_INET;
             char port_str[MAX_PORT_LEN+1];
             snprintf(port_str, MAX_DOMAIN_LEN, "%d", ntohs(port));
             int ret = getaddrinfo(domain, port_str, &hints, &addr_list);
