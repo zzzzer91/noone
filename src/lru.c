@@ -47,6 +47,8 @@ lru_cache_put(LruCache *lc, char *key, void *value, void **oldvalue)
 {
     assert(lc != NULL && key != NULL);
 
+    *oldvalue = NULL;
+
     // 先判断是否已存在
     void *tmp = hashtable_get(lc->hash_table, key);
     if (tmp == NULL) {
