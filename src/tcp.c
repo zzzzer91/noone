@@ -76,7 +76,6 @@
 
 #define CLEAR_CLIENT_AND_REMOTE() \
     do { \
-        LOGGER_ERROR("fd: %d, CLEAR_CLIENT_AND_REMOTE", nd->client_fd); \
         if (nd->client_fd != -1) { \
             CLEAR_CLIENT(); \
         } \
@@ -283,7 +282,6 @@ void
 tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_read_client", nd->client_fd);
 
     if (nd->ss_stage == STAGE_INIT) {
         if (handle_stage_init(nd) < 0) {
@@ -322,24 +320,20 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     if (nd->remote_buf->len != 0) {  // 等待缓冲区数据写完再读
+        // 不需要考虑重复注册问题
+        // ae_register_event() 中有相应处理逻辑
         if (REGISTER_PAUSE_CLIENT() < 0) {
             LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_PAUSE_CLIENT", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
         }
-        // 不需要考虑重复注册问题
-        // ae_register_event() 中有相应处理逻辑
-        if (nd->remote_fd != -1) {  // 触发前，remote 可能已关闭
-            if (REGISTER_RW_REMOTE() < 0) {
-                LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTE", nd->client_fd);
-                CLEAR_CLIENT_AND_REMOTE();
-            }
+        if (REGISTER_WRITE_REMOTE() < 0) {
+            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTE", nd->client_fd);
+            CLEAR_CLIENT_AND_REMOTE();
         }
     } else {
-        if (nd->remote_fd != -1) {
-            if (REGISTER_READ_REMOTE() < 0) {
-                LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_READ_REMOTE", nd->client_fd);
-                CLEAR_CLIENT_AND_REMOTE();
-            }
+        if (REGISTER_READ_REMOTE() < 0) {
+            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_READ_REMOTE", nd->client_fd);
+            CLEAR_CLIENT_AND_REMOTE();
         }
     }
 }
@@ -348,7 +342,6 @@ void
 tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_write_remote", nd->client_fd);
 
     int close_flag = 0;
     size_t nwriten = write_net_data(fd,
@@ -378,7 +371,6 @@ void
 tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_read_remote", nd->client_fd);
 
     int close_flag = 0;
     char buf[REMOTE_BUF_CAPACITY];
@@ -415,7 +407,6 @@ void
 tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_write_client", nd->client_fd);
 
     if (nd->is_iv_send == 0) {
         NooneCryptorInfo *ci = nd->user_info->cryptor_info;
