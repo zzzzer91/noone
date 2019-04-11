@@ -241,7 +241,6 @@ handle_stage_handshake(NetData *nd)
 void
 tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 {
-    LOGGER_DEBUG("fd: %d, tcp_accept_conn", fd);
     struct sockaddr_in conn_addr;
     socklen_t conn_addr_len = sizeof(conn_addr);
     int conn_fd = accept(fd, (struct sockaddr *)&conn_addr, &conn_addr_len);
@@ -249,6 +248,7 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
         SYS_ERROR("fd: %d, accept", conn_fd);
         return;
     }
+    LOGGER_DEBUG("fd: %d, tcp_accept_conn", conn_fd);
 
     if (set_nonblock(conn_fd) < 0) {
         SYS_ERROR("fd: %d, set_nonblock", conn_fd);
