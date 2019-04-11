@@ -83,6 +83,7 @@
             CLEAR_REMOTE();\
         } \
         free_net_data(nd); \
+        return; \
     } while (0)
 
 /*
@@ -286,7 +287,6 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         if (handle_stage_init(nd) < 0) {
             LOGGER_ERROR("fd: %d, handle_stage_init", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
-            return;
         }
     }
 
@@ -296,14 +296,12 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     if (close_flag == 1) {  // ss_client 关闭
         LOGGER_DEBUG("fd: %d, tcp_read_client, ssclient close!", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
-        return;
     }
 
     size_t ret = DECRYPT(nd, buf, nread);
     if (ret == 0) {
         LOGGER_ERROR("fd: %d, DECRYPT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
-        return;
     }
     nd->remote_buf->len = ret;
 
@@ -311,7 +309,6 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         if (handle_stage_header(nd) < 0) {
             LOGGER_ERROR("fd: %d, handle_stage_header", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
-            return;
         }
     }
 
@@ -319,7 +316,6 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         if (handle_stage_handshake(nd) < 0) {
             LOGGER_ERROR("fd: %d, handle_stage_handshake", fd);
             CLEAR_CLIENT_AND_REMOTE();
-            return;
         }
     }
 
@@ -331,10 +327,13 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     // ae_register_event() 中有相应处理逻辑
     if (nd->remote_fd != -1) {  // 触发前，remote 可能已关闭
         if (REGISTER_WRITE_REMOTE() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTEts", nd->client_fd);
+            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTE", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
-            return;
         }
+    }
+    if (REGISTER_PAUSE_CLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_PAUSE_CLIENT", nd->client_fd);
+        CLEAR_CLIENT_AND_REMOTE();
     }
 }
 
@@ -349,7 +348,6 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     if (close_flag == 1) {
         LOGGER_DEBUG("fd: %d, tcp_write_remote, remote close!", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
-        return;
     }
     nd->remote_buf->len -= nwriten;
     if (nd->remote_buf->len > 0) {  // 没有写完，不能改变事件，要继续写
@@ -361,7 +359,10 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     if (REGISTER_READ_REMOTE() < 0) {
         LOGGER_ERROR("fd: %d, tcp_write_remote, REGISTER_READ_REMOTE", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
-        return;
+    }
+    if (REGISTER_READ_CLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_write_remote, REGISTER_READ_CLIENT", nd->client_fd);
+        CLEAR_CLIENT_AND_REMOTE();
     }
 }
 
@@ -377,7 +378,6 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
         LOGGER_DEBUG("fd: %d, tcp_read_remote, remote close!", nd->client_fd);
         if (nread == 0) {
             CLEAR_CLIENT_AND_REMOTE();
-            return;
         } else {  // 对端已关闭，但还有数据写给 client
             CLEAR_REMOTE();
         }
@@ -387,21 +387,18 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     if (ret == 0) {
         LOGGER_ERROR("fd: %d, ENCRYPT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
-        return;
     }
     nd->client_buf->len = ret;
 
-    if (REGISTER_WRITE_CLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_read_remote, REGISTER_WRITE_CLIENT", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
-        return;
-    }
     if (nd->remote_fd != -1) {
         if (REGISTER_PAUSE_REMOTE() < 0) {
             LOGGER_ERROR("fd: %d, tcp_read_remote, REGISTER_PAUSE_REMOTE", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
-            return;
         }
+    }
+    if (REGISTER_WRITE_CLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_read_remote, REGISTER_WRITE_CLIENT", nd->client_fd);
+        CLEAR_CLIENT_AND_REMOTE();
     }
 }
 
@@ -416,7 +413,6 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
         if (write(fd, nd->iv, ci->iv_len) < ci->iv_len) {
             LOGGER_ERROR("fd: %d, write iv error!", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
-            return;
         }
         nd->is_iv_send = 1;
     }
@@ -427,29 +423,24 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     if (close_flag == 1) {
         LOGGER_DEBUG("fd: %d, tcp_write_client, ssclient close!", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
-        return;
     }
     nd->client_buf->len -= nwriten;
     if (nd->client_buf->len > 0) {
         nd->client_buf->idx += nwriten;
-        return;
     }
     nd->client_buf->idx = 0;
 
-    if (REGISTER_READ_CLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_CLIENT", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
-        return;
-    }
     if (nd->remote_fd != -1) {
         if (REGISTER_READ_REMOTE() < 0) {
             LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_REMOTE", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
-            return;
         }
     } else {  // 对端已关闭
-        CLEAR_CLIENT_AND_REMOTE();  // 对端已清理过
-        return;
+        CLEAR_CLIENT_AND_REMOTE();
+    }
+    if (REGISTER_READ_CLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_CLIENT", nd->client_fd);
+        CLEAR_CLIENT_AND_REMOTE();
     }
 }
 
@@ -460,10 +451,10 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
 void
 tcp_handle_timeout(AeEventLoop *event_loop, int fd, void *data)
 {
-    NetData *nd = data;  // ss_client 和 remote 共用 nd
+    NetData *nd = data;  // client 和 remote 共用 nd
     if (fd == nd->client_fd) {
         LOGGER_DEBUG("kill client fd: %d", fd);
-    } else {  // 是远程 fd，不关闭本地
+    } else {
         LOGGER_DEBUG("kill remote fd: %d", fd);
     }
     CLEAR_CLIENT_AND_REMOTE();
