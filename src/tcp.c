@@ -241,6 +241,7 @@ handle_stage_handshake(NetData *nd)
 void
 tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 {
+    LOGGER_DEBUG("fd: %d, tcp_accept_conn", fd);
     struct sockaddr_in conn_addr;
     socklen_t conn_addr_len = sizeof(conn_addr);
     int conn_fd = accept(fd, (struct sockaddr *)&conn_addr, &conn_addr_len);
@@ -281,6 +282,7 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 void
 tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 {
+    LOGGER_DEBUG("fd: %d, tcp_read_client", fd);
     NetData *nd = data;
 
     if (nd->ss_stage == STAGE_INIT) {
@@ -326,7 +328,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
     if (nd->remote_fd != -1) {  // 触发前，remote 可能已关闭
-        if (REGISTER_WRITE_REMOTE() < 0) {
+        if (REGISTER_RW_REMOTE() < 0) {
             LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTE", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
         }
@@ -340,6 +342,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 void
 tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
+    LOGGER_DEBUG("fd: %d, tcp_write_remote", fd);
     NetData *nd = data;
 
     int close_flag = 0;
@@ -369,6 +372,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 void
 tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
+    LOGGER_DEBUG("fd: %d, tcp_read_remote", fd);
     NetData *nd = data;
 
     int close_flag = 0;
@@ -405,6 +409,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 void
 tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
 {
+    LOGGER_DEBUG("fd: %d, tcp_write_client", fd);
     NetData *nd = data;
 
     if (nd->is_iv_send == 0) {
