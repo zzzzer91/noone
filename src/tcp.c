@@ -201,7 +201,7 @@ handle_stage_handshake(NetData *nd)
 {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
-        LOGGER_ERROR("fd: %d, socket: %s", nd->client_fd, strerror(errno));
+        SYS_ERROR("socket");
         return -1;
     }
     if (set_nonblock(fd) < 0) {
@@ -336,11 +336,6 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
             return;
         }
     }
-    if (REGISTER_PAUSE_CLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_PAUSE_CLIENT", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
-        return;
-    }
 }
 
 void
@@ -365,12 +360,6 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 
     if (REGISTER_READ_REMOTE() < 0) {
         LOGGER_ERROR("fd: %d, tcp_write_remote, REGISTER_READ_REMOTE", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
-        return;
-    }
-
-    if (REGISTER_READ_CLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_write_remote, REGISTER_READ_CLIENT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
         return;
     }
