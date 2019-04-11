@@ -46,6 +46,10 @@
     ae_register_event(event_loop, nd->remote_fd, AE_OUT, \
             NULL, tcp_write_remote, tcp_handle_timeout, nd)
 
+#define REGISTER_RW_REMOTE() \
+    ae_register_event(event_loop, nd->remote_fd, AE_OUT|AE_IN, \
+            tcp_read_remote, tcp_write_remote, tcp_handle_timeout, nd)
+
 #define REGISTER_PAUSE_REMOTE() \
     ae_register_event(event_loop, nd->remote_fd, EPOLLERR, \
             NULL, NULL, tcp_handle_timeout, nd)
@@ -316,21 +320,26 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         }
     }
 
-    if (nd->remote_buf->len == 0) {  // 解析完头部后，没有数据了
-        return;
-    }
-
-    // 不需要考虑重复注册问题
-    // ae_register_event() 中有相应处理逻辑
-    if (nd->remote_fd != -1) {  // 触发前，remote 可能已关闭
-        if (REGISTER_WRITE_REMOTE() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTE", nd->client_fd);
+    if (nd->remote_buf->len != 0) {  // 等待缓冲区数据写完再读
+        if (REGISTER_PAUSE_CLIENT() < 0) {
+            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_PAUSE_CLIENT", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
         }
-    }
-    if (REGISTER_PAUSE_CLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_PAUSE_CLIENT", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
+        // 不需要考虑重复注册问题
+        // ae_register_event() 中有相应处理逻辑
+        if (nd->remote_fd != -1) {  // 触发前，remote 可能已关闭
+            if (REGISTER_RW_REMOTE() < 0) {
+                LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_RW_REMOTE", nd->client_fd);
+                CLEAR_CLIENT_AND_REMOTE();
+            }
+        }
+    } else {
+        if (nd->remote_fd != -1) {
+            if (REGISTER_READ_REMOTE() < 0) {
+                LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_READ_REMOTE", nd->client_fd);
+                CLEAR_CLIENT_AND_REMOTE();
+            }
+        }
     }
 }
 
