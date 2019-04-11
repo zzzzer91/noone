@@ -329,7 +329,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         // 不需要考虑重复注册问题
         // ae_register_event() 中有相应处理逻辑
         if (nd->remote_fd != -1) {  // 触发前，remote 可能已关闭
-            if (REGISTER_WRITE_REMOTE() < 0) {
+            if (REGISTER_RW_REMOTE() < 0) {
                 LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTE", nd->client_fd);
                 CLEAR_CLIENT_AND_REMOTE();
             }
@@ -360,7 +360,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     nd->remote_buf->len -= nwriten;
     if (nd->remote_buf->len > 0) {  // 没有写完，不能改变事件，要继续写
         nd->remote_buf->idx += nwriten;
-        return;
+        return;  // 没写完，不能改变状态，因为缓冲区可能被覆盖
     }
     nd->remote_buf->idx = 0;  // 写完，则重置写位置
 
@@ -441,17 +441,28 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->client_buf->idx = 0;
 
-    if (nd->remote_fd != -1) {
-        if (REGISTER_READ_REMOTE() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_REMOTE", nd->client_fd);
+    if (nd->remote_buf->len > 0) {
+        if (nd->remote_fd != -1) {
+            if (REGISTER_RW_REMOTE() < 0) {
+                LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_WRITE_REMOTE", nd->client_fd);
+                CLEAR_CLIENT_AND_REMOTE();
+            }
+        } else {  // 对端已关闭
             CLEAR_CLIENT_AND_REMOTE();
         }
-    } else {  // 对端已关闭
-        CLEAR_CLIENT_AND_REMOTE();
-    }
-    if (REGISTER_READ_CLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_CLIENT", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
+    } else {
+        if (nd->remote_fd != -1) {
+            if (REGISTER_READ_REMOTE() < 0) {
+                LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_REMOTE", nd->client_fd);
+                CLEAR_CLIENT_AND_REMOTE();
+            }
+        } else {  // 对端已关闭
+            CLEAR_CLIENT_AND_REMOTE();
+        }
+        if (REGISTER_READ_CLIENT() < 0) {
+            LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_CLIENT", nd->client_fd);
+            CLEAR_CLIENT_AND_REMOTE();
+        }
     }
 }
 
