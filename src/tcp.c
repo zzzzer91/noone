@@ -441,28 +441,17 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->client_buf->idx = 0;
 
-    if (nd->remote_buf->len > 0) {
-        if (nd->remote_fd != -1) {
-            if (REGISTER_RW_REMOTE() < 0) {
-                LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_WRITE_REMOTE", nd->client_fd);
-                CLEAR_CLIENT_AND_REMOTE();
-            }
-        } else {  // 对端已关闭
+    if (nd->remote_fd != -1) {
+        if (REGISTER_READ_REMOTE() < 0) {
+            LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_REMOTE", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
         }
-    } else {
-        if (nd->remote_fd != -1) {
-            if (REGISTER_READ_REMOTE() < 0) {
-                LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_REMOTE", nd->client_fd);
-                CLEAR_CLIENT_AND_REMOTE();
-            }
-        } else {  // 对端已关闭
-            CLEAR_CLIENT_AND_REMOTE();
-        }
-        if (REGISTER_READ_CLIENT() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_CLIENT", nd->client_fd);
-            CLEAR_CLIENT_AND_REMOTE();
-        }
+    } else {  // 对端已关闭
+        CLEAR_CLIENT_AND_REMOTE();
+    }
+    if (REGISTER_READ_CLIENT() < 0) {
+        LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_CLIENT", nd->client_fd);
+        CLEAR_CLIENT_AND_REMOTE();
     }
 }
 
