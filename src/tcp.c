@@ -46,10 +46,6 @@
     ae_register_event(event_loop, nd->remote_fd, AE_OUT, \
             NULL, tcp_write_remote, tcp_handle_timeout, nd)
 
-#define REGISTER_RW_REMOTE() \
-    ae_register_event(event_loop, nd->remote_fd, AE_OUT|AE_IN, \
-            tcp_read_remote, tcp_write_remote, tcp_handle_timeout, nd)
-
 #define REGISTER_PAUSE_REMOTE() \
     ae_register_event(event_loop, nd->remote_fd, EPOLLERR, \
             NULL, NULL, tcp_handle_timeout, nd)
