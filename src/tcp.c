@@ -46,10 +46,6 @@
     ae_register_event(event_loop, nd->remote_fd, AE_OUT, \
             NULL, tcp_write_remote, tcp_handle_timeout, nd)
 
-#define REGISTER_RW_REMOTE() \
-    ae_register_event(event_loop, nd->remote_fd, AE_OUT|AE_IN, \
-            tcp_read_remote, tcp_write_remote, tcp_handle_timeout, nd)
-
 #define REGISTER_PAUSE_REMOTE() \
     ae_register_event(event_loop, nd->remote_fd, EPOLLERR, \
             NULL, NULL, tcp_handle_timeout, nd)
@@ -217,7 +213,6 @@ handle_stage_handshake(NetData *nd)
     // 注意：当设置非阻塞 socket 后，tcp 三次握手会异步进行，
     // 所以可能会出现三次握手还未完成，就进行 write，
     // 此时 write 会把 errno 置为 EAGAIN
-    LOGGER_INFO("fd: %d, connecting", nd->client_fd);
     if (connect(fd, (struct sockaddr *)&nd->remote_addr->ai_addr,
             nd->remote_addr->ai_addrlen) < 0) {
         if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
@@ -328,7 +323,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
     if (nd->remote_fd != -1) {  // 触发前，remote 可能已关闭
-        if (REGISTER_RW_REMOTE() < 0) {
+        if (REGISTER_WRITE_REMOTE() < 0) {
             LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTE", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
         }

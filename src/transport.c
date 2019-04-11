@@ -92,7 +92,10 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
         memcpy(&port, buf->data+buf->idx, 2);
         buf->idx += 2;
         buf->len -= 2;
+        char port_str[MAX_PORT_LEN+1];
+        snprintf(port_str, MAX_DOMAIN_LEN, "%d", ntohs(port));
 
+        LOGGER_INFO("connecting %s:%s", domain, port_str);
         addr_info = lru_cache_get(lc, domain);
         if (addr_info == NULL) {
             LOGGER_DEBUG("%s: DNS 查询！", domain);
@@ -100,8 +103,6 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
             struct addrinfo hints = {0};
             hints.ai_socktype = SOCK_STREAM;
             hints.ai_family = AF_INET; // ipv4
-            char port_str[MAX_PORT_LEN+1];
-            snprintf(port_str, MAX_DOMAIN_LEN, "%d", ntohs(port));
             int ret = getaddrinfo(domain, port_str, &hints, &addr_list);
             if (ret != 0) {
                 LOGGER_ERROR("%s", gai_strerror(ret));
