@@ -108,6 +108,7 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
                 LOGGER_ERROR("%s", gai_strerror(ret));
                 return NULL;
             }
+            LOGGER_DEBUG("%s: DNS 查询成功！", domain);
 
             // 创建 addr_info
             addr_info = malloc(sizeof(MyAddrInfo));
