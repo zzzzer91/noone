@@ -11,11 +11,13 @@ typedef struct Buffer {
     size_t capacity;
     size_t len;
     size_t idx;
-    char data[0];
+    char *data;
 } Buffer;
 
 Buffer *init_buffer(size_t capacity);
 
 void free_buffer(Buffer *buf);
+
+int resize_buffer(Buffer *buf, size_t new_capacity);
 
 #endif  /* _NOONE_BUFFER_H_ */

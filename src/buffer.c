@@ -10,8 +10,14 @@ Buffer *
 init_buffer(size_t capacity)
 {
     assert(capacity > 0);
-    Buffer *buf = malloc(sizeof(Buffer) + sizeof(char)*capacity);
+    Buffer *buf = malloc(sizeof(Buffer));
     if (buf == NULL) {
+        return NULL;
+    }
+
+    buf->data = malloc(sizeof(char)*capacity);
+    if (buf->data == NULL) {
+        free(buf);
         return NULL;
     }
 
@@ -28,4 +34,24 @@ free_buffer(Buffer *buf)
     assert(buf != NULL);
 
     free(buf);
+    free(buf->data);
+}
+
+int
+resize_buffer(Buffer *buf, size_t new_capacity)
+{
+    assert(buf != NULL && new_capacity > 0);
+
+    if (new_capacity <= buf->capacity) {
+        return 0;
+    }
+
+    buf->data = realloc(buf->data, sizeof(char)*(new_capacity));
+    if (buf->data == NULL) {
+        return -1;
+    }
+
+    buf->capacity = new_capacity;
+
+    return 0;
 }
