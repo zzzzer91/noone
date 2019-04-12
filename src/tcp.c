@@ -83,7 +83,7 @@
 #define RESIZE_BUF(buf, size) \
     do { \
         size_t need_cap = buf->len + size; \
-        size_t step = buf->capacity >> 1; \
+        size_t step = buf->capacity >> 1U; \
         size_t new_cap = buf->capacity + step; \
         while (need_cap > new_cap) { \
             new_cap += step;\
@@ -389,6 +389,11 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     ssize_t nwriten = write(fd, cbuf->data, cbuf->len);
     if (nwriten == 0) {
         LOGGER_DEBUG("fd: %d, tcp_write_remote, remote close!", nd->client_fd);
+        if (nd->remote_buf->len > 0) {
+            CLEAR_REMOTE();
+            REGISTER_CLIENT(AE_OUT);
+            return;
+        }
         CLEAR_CLIENT_AND_REMOTE();
     } else if (nwriten < 0) {
         SYS_ERROR("write");
@@ -444,6 +449,11 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     rbuf->len += ret;
 
     REGISTER_CLIENT(AE_OUT);
+    if (nd->client_buf->len > 0) {
+        REGISTER_REMOTE(AE_OUT);
+    } else {
+        REGISTER_REMOTE(AE_ERR);
+    }
 }
 
 void
@@ -480,6 +490,7 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     REGISTER_CLIENT(AE_IN);
+    REGISTER_REMOTE(AE_IN);
 }
 
 /*
