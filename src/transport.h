@@ -24,6 +24,15 @@
 #define ATYP_DOMAIN 0x03
 #define ATYP_IPV6 0x04
 
+#define STREAM_UP   0
+#define STREAM_DOWN 1
+
+// for each stream, it's waiting for reading, or writing, or both
+#define WAIT_STATUS_INIT 0
+#define WAIT_STATUS_READING  1
+#define WAIT_STATUS_WRITING  2
+#define WAIT_STATUS_READWRITING WAIT_STATUS_READING | WAIT_STATUS_WRITING
+
 typedef enum SsStageType {
     STAGE_INIT = 0,   /* 获取 iv 阶段 */
     STAGE_HEADER,     /* 解析 header 阶段，获取 remote 的 ip 和 port */
@@ -46,6 +55,10 @@ typedef struct NetData {
     int client_fd;
 
     int remote_fd;
+
+    int upstream_status;
+
+    int downstream_status;
 
     SsStageType ss_stage;
 

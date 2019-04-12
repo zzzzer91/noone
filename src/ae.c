@@ -40,34 +40,6 @@
                 event_loop->event_set_size, timeout); \
     })
 
-/* Process every pending time event, then every pending file event
- * (that may be registered by time event callbacks just processed).
- *
- * 处理所有已到达的时间事件，以及所有已就绪的文件事件。
- *
- * The function returns the number of events processed.
- * 函数的返回值为已处理事件的数量
- *
- * note the fe->mask & mask & ... code: maybe an already processed
- * event removed an element that fired and we still didn't
- * processed, so we check if the event is still valid.
- */
-#define AE_PROCESS_EVENTS(event_loop, timeout) \
-    do { \
-        int numevents = AE_EPOLL_POLL(event_loop, timeout); \
-        for (int i = 0; i < numevents; i++) { \
-            uint32_t mask = event_loop->ready_events[i].events; \
-            int fd = event_loop->ready_events[i].data.fd; \
-            AeEvent *fe = &event_loop->events[fd]; \
-            if (fe->mask & mask & AE_IN) { \
-                fe->rcallback(event_loop, fd, fe->data); \
-            } \
-            if (fe->mask & mask & AE_OUT) { \
-                fe->wcallback(event_loop, fd, fe->data); \
-            } \
-        } \
-    } while (0)
-
 /*
  * 从双向链表尾部向前循环，按时间排序，尾部是最旧的事件
  */
@@ -86,6 +58,39 @@
             p = p->list_prev; \
         } \
     } while (0)
+
+/* Process every pending time event, then every pending file event
+ * (that may be registered by time event callbacks just processed).
+ *
+ * 处理所有已到达的时间事件，以及所有已就绪的文件事件。
+ *
+ * The function returns the number of events processed.
+ * 函数的返回值为已处理事件的数量
+ *
+ * note the fe->mask & mask & ... code: maybe an already processed
+ * event removed an element that fired and we still didn't
+ * processed, so we check if the event is still valid.
+ */
+static int
+ae_process_events(AeEventLoop *event_loop, int timeout)
+{
+    int processed = 0;
+    int numevents = AE_EPOLL_POLL(event_loop, timeout);
+    for (int i = 0; i < numevents; i++) {
+        uint32_t mask = event_loop->ready_events[i].events;
+        int fd = event_loop->ready_events[i].data.fd;
+        AeEvent *fe = &event_loop->events[fd];
+        if (fe->mask & mask & AE_IN) {
+            fe->rcallback(event_loop, fd, fe->data);
+        }
+        if (fe->mask & mask & AE_OUT) {
+            fe->wcallback(event_loop, fd, fe->data);
+        }
+        processed++;
+    }
+
+    return processed;
+}
 
 /*
  * 创建事件处理器
@@ -182,7 +187,7 @@ ae_run_loop(AeEventLoop *event_loop)
 
     while (!event_loop->stop) {
         // 开始处理事件
-        AE_PROCESS_EVENTS(event_loop, AE_WAIT_SECONDS*1000);
+        ae_process_events(event_loop, AE_WAIT_SECONDS * 1000);
 
         // 检查超时事件
         AE_CHECK_TIMEOUT(event_loop);

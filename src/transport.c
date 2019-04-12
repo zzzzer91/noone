@@ -23,6 +23,8 @@ init_net_data()
     nd->client_fd = -1;
     nd->remote_fd = -1;
     nd->ss_stage = STAGE_INIT;
+    nd->upstream_status = WAIT_STATUS_READING;
+    nd->downstream_status = WAIT_STATUS_INIT;
     nd->remote_addr = NULL;
     memset(nd->remote_domain, 0, sizeof(nd->remote_domain));
     memset(nd->remote_port, 0, sizeof(nd->remote_port));

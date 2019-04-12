@@ -26,29 +26,27 @@
     decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
             (uint8_t *)(nd)->remote_buf->data)
 
-#define REGISTER_READ_CLIENT() \
-    ae_register_event(event_loop, nd->client_fd, AE_IN, \
-            tcp_read_client, NULL, tcp_handle_timeout, nd)
+#define REGISTER_CLIENT(events) \
+    do { \
+        if (nd->client_fd != -1) { \
+            if (ae_register_event(event_loop, nd->client_fd, events, \
+                        tcp_read_client, tcp_write_client, tcp_handle_timeout, nd) < 0) { \
+                LOGGER_ERROR("fd: %d, %s, REGISTER_CLIENT", nd->client_fd, __func__); \
+                CLEAR_CLIENT_AND_REMOTE(); \
+            } \
+        } \
+    } while (0)
 
-#define REGISTER_WRITE_CLIENT() \
-    ae_register_event(event_loop, nd->client_fd, AE_OUT, \
-            NULL, tcp_write_client, tcp_handle_timeout, nd)
-
-#define REGISTER_PAUSE_CLIENT() \
-    ae_register_event(event_loop, nd->client_fd, EPOLLERR, \
-            NULL, NULL, tcp_handle_timeout, nd)
-
-#define REGISTER_READ_REMOTE() \
-    ae_register_event(event_loop, nd->remote_fd, AE_IN, \
-            tcp_read_remote, NULL, tcp_handle_timeout, nd)
-
-#define REGISTER_WRITE_REMOTE() \
-    ae_register_event(event_loop, nd->remote_fd, AE_OUT, \
-            NULL, tcp_write_remote, tcp_handle_timeout, nd)
-
-#define REGISTER_PAUSE_REMOTE() \
-    ae_register_event(event_loop, nd->remote_fd, EPOLLERR, \
-            NULL, NULL, tcp_handle_timeout, nd)
+#define REGISTER_REMOTE(events) \
+    do { \
+        if (nd->remote_fd != -1) { \
+            if (ae_register_event(event_loop, nd->remote_fd, events, \
+                    tcp_read_remote, tcp_write_remote, tcp_handle_timeout, nd) < 0) { \
+                LOGGER_ERROR("fd: %d, %s, REGISTER_CLIENT", nd->client_fd, __func__); \
+                CLEAR_CLIENT_AND_REMOTE(); \
+            } \
+        } \
+    } while (0)
 
 #define UNREGISTER_CLIENT() \
     ae_unregister_event(event_loop, nd->client_fd)
@@ -81,6 +79,43 @@
         free_net_data(nd); \
         return; \
     } while (0)
+
+static void
+update_stream(NetData *nd, int stream, int status)
+{
+    if (stream == STREAM_DOWN) {
+        nd->downstream_status = status;
+    } else if (stream == STREAM_UP) {
+        nd->upstream_status = status;
+    }
+}
+
+static void
+register_event(AeEventLoop *event_loop, NetData *nd)
+{
+    int event;
+    if (nd->client_fd != -1) {
+        event = EPOLLERR;
+        if (nd->downstream_status & WAIT_STATUS_WRITING) {
+            event |= AE_OUT;
+        }
+        if (nd->upstream_status & WAIT_STATUS_READING) {
+            event |= AE_IN;
+        }
+        REGISTER_CLIENT(event);
+    }
+
+    if (nd->remote_fd != -1) {
+        event = EPOLLERR;
+        if (nd->downstream_status & WAIT_STATUS_READING) {
+            event |= AE_IN;
+        }
+        if (nd->upstream_status & WAIT_STATUS_WRITING) {
+            event |= AE_OUT;
+        }
+        REGISTER_REMOTE(event);
+    }
+}
 
 /*
  * 这个函数必须和非阻塞 socket 配合。
@@ -266,12 +301,7 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
     nd->client_fd = conn_fd;
     nd->user_info = (NooneUserInfo *)data;
 
-    if (REGISTER_READ_CLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_accept_conn, REGISTER_READ_CLIENT", conn_fd);
-        close(conn_fd);
-        free_net_data(nd);
-        return;
-    }
+    REGISTER_CLIENT(AE_IN);
 }
 
 void
@@ -318,19 +348,10 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     if (nd->remote_buf->len != 0) {  // 等待缓冲区数据写完再读
         // 不需要考虑重复注册问题
         // ae_register_event() 中有相应处理逻辑
-        if (REGISTER_PAUSE_CLIENT() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_PAUSE_CLIENT", nd->client_fd);
-            CLEAR_CLIENT_AND_REMOTE();
-        }
-        if (REGISTER_WRITE_REMOTE() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_WRITE_REMOTE", nd->client_fd);
-            CLEAR_CLIENT_AND_REMOTE();
-        }
+        REGISTER_CLIENT(AE_ERR); // 将事件挂起
+        REGISTER_REMOTE(AE_OUT);
     } else {
-        if (REGISTER_READ_REMOTE() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_read_client, REGISTER_READ_REMOTE", nd->client_fd);
-            CLEAR_CLIENT_AND_REMOTE();
-        }
+        REGISTER_REMOTE(AE_IN);
     }
 }
 
@@ -353,14 +374,8 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->remote_buf->idx = 0;  // 写完，则重置写位置
 
-    if (REGISTER_READ_REMOTE() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_write_remote, REGISTER_READ_REMOTE", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
-    }
-    if (REGISTER_READ_CLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_write_remote, REGISTER_READ_CLIENT", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
-    }
+    REGISTER_REMOTE(AE_IN);
+    REGISTER_CLIENT(AE_IN);
 }
 
 void
@@ -387,16 +402,8 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->client_buf->len = ret;
 
-    if (nd->remote_fd != -1) {
-        if (REGISTER_PAUSE_REMOTE() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_read_remote, REGISTER_PAUSE_REMOTE", nd->client_fd);
-            CLEAR_CLIENT_AND_REMOTE();
-        }
-    }
-    if (REGISTER_WRITE_CLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_read_remote, REGISTER_WRITE_CLIENT", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
-    }
+    REGISTER_REMOTE(AE_ERR);
+    REGISTER_CLIENT(AE_OUT);
 }
 
 void
@@ -428,18 +435,11 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->client_buf->idx = 0;
 
-    if (nd->remote_fd != -1) {
-        if (REGISTER_READ_REMOTE() < 0) {
-            LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_REMOTE", nd->client_fd);
-            CLEAR_CLIENT_AND_REMOTE();
-        }
-    } else {  // 对端已关闭
+    REGISTER_REMOTE(AE_IN);
+    if (nd->remote_fd == -1) {  // 对端已关闭
         CLEAR_CLIENT_AND_REMOTE();
     }
-    if (REGISTER_READ_CLIENT() < 0) {
-        LOGGER_ERROR("fd: %d, tcp_write_client, REGISTER_READ_CLIENT", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
-    }
+    REGISTER_CLIENT(AE_IN);
 }
 
 /*

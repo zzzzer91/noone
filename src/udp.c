@@ -49,6 +49,7 @@ handle_stage_header(NetData *nd)
 void
 udp_read(AeEventLoop *event_loop, int fd, void *data)
 {
+    LOGGER_ERROR("udp 暂不支持");
 //    NetData *nd = init_net_data();
 //    if (nd == NULL) {
 //        LOGGER_ERROR("udp_read, init_net_data");
