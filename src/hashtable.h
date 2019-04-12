@@ -7,10 +7,10 @@
 
 #include <stddef.h>
 
-#define MAX_HASH_KEY_LEN 64
+#define MAX_HASH_KEY_LEN 128
 
 typedef struct Entry {
-    char key[MAX_HASH_KEY_LEN+1];
+    char key[MAX_HASH_KEY_LEN];
     void *value;
     size_t hashcode;
     struct Entry *zipper_prev, *zipper_next;  // 采用拉链法

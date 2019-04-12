@@ -98,9 +98,12 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
         snprintf(port_str, MAX_DOMAIN_LEN, "%d", ntohs(port));
 
         LOGGER_INFO("connecting %s:%s", domain, port_str);
-        addr_info = lru_cache_get(lc, domain);
+        char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
+        snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN, "%s:%s", domain, port_str);
+
+        addr_info = lru_cache_get(lc, domain_and_port);
         if (addr_info == NULL) {
-            LOGGER_DEBUG("%s: DNS 查询！", domain);
+            LOGGER_DEBUG("%s: DNS 查询！", domain_and_port);
             struct addrinfo *addr_list;
             struct addrinfo hints = {0};
             hints.ai_socktype = SOCK_STREAM;
@@ -110,7 +113,7 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
                 LOGGER_ERROR("%s", gai_strerror(ret));
                 return NULL;
             }
-            LOGGER_DEBUG("%s: DNS 查询成功！", domain);
+            LOGGER_DEBUG("%s: DNS 查询成功！", domain_and_port);
 
             // 创建 addr_info
             addr_info = malloc(sizeof(MyAddrInfo));
@@ -128,9 +131,6 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
             if (oldvalue != NULL) {
                 free(oldvalue);
             }
-        } else {  // 因为可能请求 http 和 https，所以端口要更新
-            // IPv4 和 IPv6 地址结构体的 port 位置偏移量一致，所以只需要更新一个
-            addr_info->ai_addr.sin.sin_port = port;
         }
     } else if (atty == ATYP_IPV4) {
         addr_info = malloc(sizeof(MyAddrInfo));
