@@ -416,6 +416,11 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     ssize_t nread = read(fd, buf, sizeof(buf));
     if (nread == 0) {
         LOGGER_DEBUG("fd: %d, tcp_read_remote, remote close!", nd->client_fd);
+        if (nd->remote_buf->len > 0) {
+            CLEAR_REMOTE();
+            REGISTER_CLIENT(AE_OUT);
+            return;
+        }
         CLEAR_CLIENT_AND_REMOTE();
     }
     if (nread < 0) {
