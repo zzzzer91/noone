@@ -35,7 +35,7 @@ handle_stage_init(NetData *nd)
 static int
 handle_stage_header(NetData *nd)
 {
-    MyAddrInfo *remote_addr = parse_net_data_header(nd->remote_buf, nd->user_info->lru_cache);
+    MyAddrInfo *remote_addr = parse_net_data_header(nd->client_buf, nd->user_info->lru_cache);
     if (remote_addr == NULL) {
         return -1;
     }
@@ -76,7 +76,7 @@ udp_read(AeEventLoop *event_loop, int fd, void *data)
 //        CLEAR_CLIENT_AND_REMOTE(event_loop, nd);
 //        return;
 //    }
-//    nd->remote_buf->len = ret;
+//    nd->client_buf->len = ret;
 //
 //    if (nd->ss_stage == STAGE_HEADER) {
 //        if (handle_stage_header(nd) < 0) {
@@ -86,7 +86,7 @@ udp_read(AeEventLoop *event_loop, int fd, void *data)
 //        }
 //    }
 //
-//    if (nd->remote_buf->len == 0) {  // 解析完头部后，没有数据了
+//    if (nd->client_buf->len == 0) {  // 解析完头部后，没有数据了
 //        return;
 //    }
 

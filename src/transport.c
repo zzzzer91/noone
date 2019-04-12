@@ -29,8 +29,8 @@ init_net_data()
     memset(nd->remote_domain, 0, sizeof(nd->remote_domain));
     memset(nd->remote_port, 0, sizeof(nd->remote_port));
     nd->cipher_ctx = init_noone_cipher_ctx();
-    nd->remote_buf = init_buffer(CLIENT_BUF_CAPACITY);
-    nd->client_buf = init_buffer(REMOTE_BUF_CAPACITY);
+    nd->client_buf = init_buffer(CLIENT_BUF_CAPACITY);
+    nd->remote_buf = init_buffer(REMOTE_BUF_CAPACITY);
     nd->is_iv_send = 0;
 
     return nd;
@@ -42,8 +42,8 @@ free_net_data(NetData *nd)
     assert(nd != NULL);
 
     free_noone_cipher_ctx(nd->cipher_ctx);
-    free_buffer(nd->remote_buf);
     free_buffer(nd->client_buf);
+    free_buffer(nd->remote_buf);
 
     free(nd);
 }

@@ -68,9 +68,9 @@ typedef struct NetData {
 
     NooneCipherCtx *cipher_ctx;
 
-    Buffer *remote_buf;  // 要发给 remote 的数据
+    Buffer *client_buf;  // 存放从 client 读到的解密后数据
 
-    Buffer *client_buf;  // 要发给 client 的数据
+    Buffer *remote_buf;  // 存放从 remote 读到的加密后数据
 
 } NetData;
 
