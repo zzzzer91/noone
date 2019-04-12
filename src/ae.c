@@ -75,7 +75,7 @@ static int
 ae_process_events(AeEventLoop *event_loop, int timeout)
 {
     int processed = 0;
-    int numevents = AE_EPOLL_POLL(event_loop, timeout);
+    int numevents = AE_EPOLL_POLL(event_loop, timeout * 1000);
     for (int i = 0; i < numevents; i++) {
         uint32_t mask = event_loop->ready_events[i].events;
         int fd = event_loop->ready_events[i].data.fd;
@@ -185,12 +185,20 @@ ae_run_loop(AeEventLoop *event_loop)
 {
     event_loop->stop = 0;
 
+    int i = 0;
     while (!event_loop->stop) {
         // 开始处理事件
-        ae_process_events(event_loop, AE_WAIT_SECONDS * 1000);
+        int processed = ae_process_events(event_loop, AE_WAIT_SECONDS);
 
-        // 检查超时事件
-        AE_CHECK_TIMEOUT(event_loop);
+        if (processed == 0) {  // epoll_wait() 超时返回，直接回调超时函数
+            AE_CHECK_TIMEOUT(event_loop);
+        } else {
+            i += processed;
+            if (i == 2048) {  // 执行一定数量事件后再回调超时函数，提高性能
+                AE_CHECK_TIMEOUT(event_loop);
+                i= 0;
+            }
+        }
     }
 }
 
