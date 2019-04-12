@@ -438,7 +438,34 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     rbuf->len += ret;
 
-    REGISTER_CLIENT(AE_OUT);
+    if (nd->is_iv_send == 0) {
+        NooneCryptorInfo *ci = nd->user_info->cryptor_info;
+        if (write(nd->client_fd, nd->iv, ci->iv_len) < ci->iv_len) {
+            LOGGER_ERROR("fd: %d, write iv error!", nd->client_fd);
+            CLEAR_CLIENT_AND_REMOTE();
+        }
+        nd->is_iv_send = 1;
+    }
+
+    ssize_t nwriten = write(nd->client_fd, rbuf->data, rbuf->len);
+    if (nwriten == 0) {
+        LOGGER_DEBUG("fd: %d, tcp_write_client, ssclient close!", nd->client_fd);
+        CLEAR_CLIENT_AND_REMOTE();
+    } else if (nwriten < 0) {
+        SYS_ERROR("write");
+        if (errno == EINTR || errno == EAGAIN) {
+            REGISTER_CLIENT(AE_OUT);
+            return;
+        }
+        CLEAR_CLIENT_AND_REMOTE();
+    }
+
+    rbuf->len -= nwriten;
+    if (rbuf->len > 0) {
+        memcpy(rbuf->data, rbuf->data+nwriten, rbuf->len);
+        REGISTER_CLIENT(AE_OUT);
+        return;  // 没写完，不能改变状态，因为缓冲区可能被覆盖
+    }
 }
 
 void
