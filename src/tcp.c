@@ -324,6 +324,7 @@ void
 tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
+    LOGGER_DEBUG("fd: %d, tcp_read_client", nd->client_fd);
 
     if (nd->ss_stage == STAGE_INIT) {
         if (handle_stage_init(nd) < 0) {
@@ -384,6 +385,7 @@ void
 tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
+    LOGGER_DEBUG("fd: %d, tcp_write_remote", nd->client_fd);
 
     Buffer *cbuf = nd->client_buf;
     ssize_t nwriten = write(fd, cbuf->data, cbuf->len);
@@ -416,6 +418,7 @@ void
 tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
+    LOGGER_DEBUG("fd: %d, tcp_read_remote", nd->client_fd);
 
     char buf[REMOTE_BUF_CAPACITY];
     ssize_t nread = read(fd, buf, sizeof(buf));
@@ -460,6 +463,7 @@ void
 tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
+    LOGGER_DEBUG("fd: %d, tcp_write_client", nd->client_fd);
 
     if (nd->is_iv_send == 0) {
         NooneCryptorInfo *ci = nd->user_info->cryptor_info;
