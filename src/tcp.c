@@ -437,6 +437,10 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     cbuf->len += ret;
 
+    if (nd->remote_buf->len > 0) {
+        LOGGER_DEBUG("1111");
+        REGISTER_REMOTE(AE_IN|AE_OUT);
+    }
     REGISTER_CLIENT(AE_OUT);
 }
 
