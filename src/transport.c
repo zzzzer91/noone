@@ -95,11 +95,11 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
         buf->idx += 2;
         buf->len -= 2;
         char port_str[MAX_PORT_LEN+1];
-        snprintf(port_str, MAX_DOMAIN_LEN, "%d", ntohs(port));
+        snprintf(port_str, MAX_DOMAIN_LEN+1, "%d", ntohs(port));
 
         LOGGER_INFO("connecting %s:%s", domain, port_str);
         char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
-        snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN, "%s:%s", domain, port_str);
+        snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN+1, "%s:%s", domain, port_str);
 
         addr_info = lru_cache_get(lc, domain_and_port);
         if (addr_info == NULL) {
@@ -107,7 +107,6 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
             struct addrinfo *addr_list;
             struct addrinfo hints = {0};
             hints.ai_socktype = SOCK_STREAM;
-            hints.ai_family = AF_INET; // ipv4
             int ret = getaddrinfo(domain, port_str, &hints, &addr_list);
             if (ret != 0) {
                 LOGGER_ERROR("%s", gai_strerror(ret));
@@ -118,6 +117,7 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
             // 创建 addr_info
             addr_info = malloc(sizeof(MyAddrInfo));
             addr_info->ai_addrlen = addr_list->ai_addrlen;
+            addr_info->ai_family = addr_list->ai_family;
             memcpy(&addr_info->ai_addr, addr_list->ai_addr, addr_info->ai_addrlen);
             freeaddrinfo(addr_list);
 
@@ -134,6 +134,7 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
         }
     } else if (atty == ATYP_IPV4) {
         addr_info = malloc(sizeof(MyAddrInfo));
+        addr_info->ai_family = AF_INET;
         addr_info->ai_addr.sin.sin_family = AF_INET;
         addr_info->ai_addrlen = sizeof(addr_info->ai_addr.sin);
         // 已经是网络字节序
@@ -145,6 +146,7 @@ parse_net_data_header(Buffer *buf, LruCache *lc)
         buf->len -= 2;
     } else if (atty == ATYP_IPV6) {
         addr_info = malloc(sizeof(MyAddrInfo));
+        addr_info->ai_family = AF_INET6;
         addr_info->ai_addr.sin6.sin6_family = AF_INET6;
         addr_info->ai_addrlen = sizeof(addr_info->ai_addr.sin6);
         memcpy(&addr_info->ai_addr.sin6.sin6_addr, buf->data+buf->idx, 16);

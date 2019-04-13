@@ -250,7 +250,7 @@ handle_stage_header(NetData *nd)
 static int
 handle_stage_handshake(NetData *nd)
 {
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    int fd = socket(nd->remote_addr->ai_family, SOCK_STREAM, 0);
     if (fd < 0) {
         SYS_ERROR("socket");
         return -1;
@@ -368,12 +368,11 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         }
     }
 
-    // 不需要考虑重复注册问题
-    // ae_register_event() 中有相应处理逻辑
     if (cbuf->len > 0) {
-        REGISTER_REMOTE(AE_IN|AE_OUT);
-    } else {
-        REGISTER_REMOTE(AE_IN);
+        // 不需要考虑重复注册问题
+        // ae_register_event() 中有相应处理逻辑
+        REGISTER_REMOTE(AE_OUT);
+        REGISTER_CLIENT(AE_ERR);
     }
 }
 
@@ -387,11 +386,6 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     size_t nwriten = write_net_data(fd, cbuf->data, cbuf->len, &close_flag);
     if (close_flag == 1) {
         LOGGER_DEBUG("fd: %d, tcp_write_remote, remote close!", nd->client_fd);
-        if (nd->remote_buf->len > 0) {
-            CLEAR_REMOTE();
-            REGISTER_CLIENT(AE_OUT);
-            return;
-        }
         CLEAR_CLIENT_AND_REMOTE();
     }
 
@@ -403,6 +397,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     }
 
     REGISTER_REMOTE(AE_IN);
+    REGISTER_CLIENT(AE_IN);
 }
 
 void
@@ -415,12 +410,11 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     size_t nread = read_net_data(fd, buf, sizeof(buf), &close_flag);
     if (close_flag == 1) {
         LOGGER_DEBUG("fd: %d, tcp_read_remote, remote close!", nd->client_fd);
-        if (nd->remote_buf->len > 0) {
+        if (nread > 0) {
             CLEAR_REMOTE();
-            REGISTER_CLIENT(AE_OUT);
-            return;
+        } else {
+            CLEAR_CLIENT_AND_REMOTE();
         }
-        CLEAR_CLIENT_AND_REMOTE();
     }
 
     Buffer *rbuf = nd->remote_buf;
@@ -435,12 +429,8 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     rbuf->len += ret;
 
-    REGISTER_CLIENT(AE_IN|AE_OUT);
-    if (nd->client_buf->len > 0) {
-        REGISTER_REMOTE(AE_OUT);
-    } else {
-        REGISTER_REMOTE(AE_ERR);
-    }
+    REGISTER_CLIENT(AE_OUT);
+    REGISTER_REMOTE(AE_ERR);
 }
 
 void
@@ -473,11 +463,10 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     REGISTER_CLIENT(AE_IN);
-    if (nd->client_buf->len > 0) {
-        REGISTER_REMOTE(AE_IN|AE_OUT);
-    } else {
-        REGISTER_REMOTE(AE_IN);
+    if (nd->remote_fd == -1) {
+        CLEAR_CLIENT_AND_REMOTE();
     }
+    REGISTER_REMOTE(AE_IN);
 }
 
 /*
