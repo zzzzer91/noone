@@ -159,7 +159,7 @@ read_net_data(int fd, void *buf, size_t capacity, int *close_flag)
             break;
         } else if (nread < 0) {
             // 需先设置非阻塞 socket
-            if (errno == EAGAIN || errno == ETIMEDOUT || errno == EWOULDBLOCK) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == ETIMEDOUT) {
                 break;
             } else if (errno == EINTR) {
                 nread = 0;
@@ -193,7 +193,7 @@ write_net_data(int fd, void *buf, size_t n, int *close_flag)
             break;
         } else if (nwritten < 0) {
             // 需先设置非阻塞 socket，在三次握手未完成或发送缓冲区满出现
-            if (errno == EAGAIN || errno == EINPROGRESS || errno == EWOULDBLOCK) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 break;
             } else if (errno == EINTR) {
                 nwritten = 0;
@@ -326,7 +326,6 @@ void
 tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_read_client", nd->client_fd);
 
     if (nd->ss_stage == STAGE_INIT) {
         if (handle_stage_init(nd) < 0) {
@@ -381,7 +380,6 @@ void
 tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_write_remote", nd->client_fd);
 
     Buffer *cbuf = nd->client_buf;
     int close_flag = 0;
@@ -410,7 +408,6 @@ void
 tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_read_remote", nd->client_fd);
 
     int close_flag = 0;
     char buf[REMOTE_BUF_CAPACITY];
@@ -449,7 +446,6 @@ void
 tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_write_client", nd->client_fd);
 
     if (nd->is_iv_send == 0) {
         NooneCryptorInfo *ci = nd->user_info->cryptor_info;
