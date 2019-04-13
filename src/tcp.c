@@ -398,7 +398,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写
         LOGGER_DEBUG("fd: %d, tcp_write_remote not completed", nd->client_fd);
         memcpy(cbuf->data, cbuf->data+nwriten, cbuf->len);
-        return;  // 没写完
+        return;  // 没写完，不改变 AE_IN||AE_OUT 状态
     }
 
     REGISTER_REMOTE(AE_IN);
@@ -434,7 +434,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     rbuf->len += ret;
 
-    REGISTER_CLIENT(AE_OUT);
+    REGISTER_CLIENT(AE_IN|AE_OUT);
     if (nd->client_buf->len > 0) {
         REGISTER_REMOTE(AE_OUT);
     } else {
@@ -472,7 +472,11 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     REGISTER_CLIENT(AE_IN);
-    REGISTER_REMOTE(AE_IN);
+    if (nd->client_buf->len > 0) {
+        REGISTER_REMOTE(AE_IN|AE_OUT);
+    } else {
+        REGISTER_REMOTE(AE_IN);
+    }
 }
 
 /*
