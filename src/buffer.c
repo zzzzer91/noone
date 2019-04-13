@@ -10,6 +10,7 @@ Buffer *
 init_buffer(size_t capacity)
 {
     assert(capacity > 0);
+
     Buffer *buf = malloc(sizeof(Buffer));
     if (buf == NULL) {
         return NULL;

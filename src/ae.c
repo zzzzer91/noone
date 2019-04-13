@@ -219,7 +219,7 @@ ae_run_loop(AeEventLoop *event_loop)
     int count = 0;
     while (!event_loop->stop) {
         // 开始处理事件
-        int proc = AE_PROCESS_EVENTS(event_loop, AE_WAIT_SECONDS);
+        int proc = ae_process_events(event_loop, AE_WAIT_SECONDS);
 
         if (proc == 0) {  // epoll_wait() 超时返回，直接回调超时函数
             AE_CHECK_TIMEOUT(event_loop);
