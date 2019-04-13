@@ -164,6 +164,7 @@ read_net_data(int fd, void *buf, size_t capacity, int *close_flag)
             } else if (errno == EINTR) {
                 nread = 0;
             } else {
+                SYS_ERROR("read");
                 *close_flag = 1;
                 break;
             }

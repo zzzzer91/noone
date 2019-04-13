@@ -74,9 +74,6 @@ main(int argc, char *argv[])
         if (udp_server_fd < 0) {
             PANIC("udp_server_fd_init");
         }
-        if (set_nonblock(udp_server_fd) < 0) {
-            PANIC("set_nonblock");
-        }
         ret = ae_register_event(ae_ev_loop, udp_server_fd,
                 AE_IN, udp_read, NULL, NULL, ui);
         if (ret < 0) {
