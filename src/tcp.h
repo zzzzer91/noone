@@ -17,6 +17,4 @@ void tcp_read_remote(AeEventLoop *event_loop, int fd, void *data);
 
 void tcp_write_remote(AeEventLoop *event_loop, int fd, void *data);
 
-void tcp_handle_timeout(AeEventLoop *event_loop, int fd, void *data);
-
 #endif  /* _NOONE_TCP_H_ */

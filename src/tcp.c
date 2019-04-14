@@ -18,11 +18,14 @@
 #include <sys/socket.h>  /* accept() */
 #include <netinet/in.h>  /* struct sockaddr_in */
 
+#define CLIENT_BUF_CAPACITY 16 * 1024
+#define REMOTE_BUF_CAPACITY 32 * 1024
+
 #define REGISTER_CLIENT(events) \
     do { \
         if (nd->client_fd != -1) { \
             if (ae_register_event(event_loop, nd->client_fd, events, \
-                        tcp_read_client, tcp_write_client, tcp_handle_timeout, nd) < 0) { \
+                        tcp_read_client, tcp_write_client, handle_timeout, nd) < 0) { \
                 LOGGER_ERROR("fd: %d, %s, REGISTER_CLIENT", nd->client_fd, __func__); \
                 CLEAR_CLIENT_AND_REMOTE(); \
             } \
@@ -33,52 +36,12 @@
     do { \
         if (nd->remote_fd != -1) { \
             if (ae_register_event(event_loop, nd->remote_fd, events, \
-                    tcp_read_remote, tcp_write_remote, tcp_handle_timeout, nd) < 0) { \
+                    tcp_read_remote, tcp_write_remote, handle_timeout, nd) < 0) { \
                 LOGGER_ERROR("fd: %d, %s, REGISTER_CLIENT", nd->client_fd, __func__); \
                 CLEAR_CLIENT_AND_REMOTE(); \
             } \
         } \
     } while (0)
-
-#define UNREGISTER_CLIENT() \
-    ae_unregister_event(event_loop, nd->client_fd)
-
-#define UNREGISTER_REMOTE() \
-    ae_unregister_event(event_loop, nd->remote_fd)
-
-#define CLEAR_CLIENT() \
-    do { \
-        UNREGISTER_CLIENT(); \
-        close(nd->client_fd); \
-        nd->client_fd = -1; \
-    } while (0)
-
-#define CLEAR_REMOTE() \
-    do { \
-        UNREGISTER_REMOTE(); \
-        close(nd->remote_fd); \
-        nd->remote_fd = -1; \
-    } while (0)
-
-#define CLEAR_CLIENT_AND_REMOTE() \
-    do { \
-        if (nd->client_fd != -1) { \
-            CLEAR_CLIENT(); \
-        } \
-        if (nd->remote_fd != -1) { \
-            CLEAR_REMOTE();\
-        } \
-        free_net_data(nd); \
-        return; \
-    } while (0)
-
-#define ENCRYPT(nd, buf, buf_len) \
-    encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \
-            (uint8_t *)(nd)->remote_buf->data+(nd)->remote_buf->len)
-
-#define DECRYPT(nd, buf, buf_len) \
-    decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
-            (uint8_t *)(nd)->client_buf->data+(nd)->client_buf->len)
 
 #define RESIZE_BUF(buf, size) \
     do { \
@@ -95,6 +58,14 @@
         LOGGER_DEBUG("fd: %d, %s, resize_buffer, new_cap: %ld", \
                 nd->client_fd, __func__, new_cap); \
     } while (0)
+
+#define ENCRYPT(nd, buf, buf_len) \
+    encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \
+            (uint8_t *)(nd)->remote_buf->data+(nd)->remote_buf->len)
+
+#define DECRYPT(nd, buf, buf_len) \
+    decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
+            (uint8_t *)(nd)->client_buf->data+(nd)->client_buf->len)
 
 static void
 update_stream(NetData *nd, int stream, int status)
@@ -210,117 +181,42 @@ write_net_data(int fd, void *buf, size_t n, int *close_flag)
     return n - nleft;
 }
 
-static int
-handle_stage_init(NetData *nd)
-{
-    NooneCryptorInfo *ci = nd->user_info->cryptor_info;
-
-    uint8_t iv[MAX_IV_LEN];
-    if (read(nd->client_fd, iv, ci->iv_len) < ci->iv_len) {
-        return -1;
-    }
-
-    nd->cipher_ctx->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, iv);
-    if (nd->cipher_ctx->decrypt_ctx == NULL) {
-        return -1;
-    }
-
-    nd->cipher_ctx->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->iv);
-    if (nd->cipher_ctx->encrypt_ctx == NULL) {
-        return -1;
-    }
-
-    nd->ss_stage = STAGE_HEADER;
-
-    return 0;
-}
-
-static int
-handle_stage_header(NetData *nd)
-{
-    MyAddrInfo *remote_addr = parse_net_data_header(nd->client_buf, nd->user_info->lru_cache);
-    if (remote_addr == NULL) {
-        return -1;
-    }
-
-    nd->remote_addr = remote_addr;
-    nd->ss_stage = STAGE_HANDSHAKE;
-
-    return 0;
-}
-
-static int
-handle_stage_handshake(NetData *nd)
-{
-    int fd = socket(nd->remote_addr->ai_family, SOCK_STREAM, 0);
-    if (fd < 0) {
-        SYS_ERROR("socket");
-        return -1;
-    }
-    if (set_nonblock(fd) < 0) {
-        close(fd);
-        return -1;
-    }
-//    if (set_nondelay(fd) < 0) {
-//        close(fd);
-//        return -1;
-//    }
-
-    // 注意：当设置非阻塞 socket 后，tcp 三次握手会异步进行，
-    // 所以可能会出现三次握手还未完成，就进行 write，
-    // 此时 write 会把 errno 置为 EAGAIN
-    if (connect(fd, (struct sockaddr *)&nd->remote_addr->ai_addr,
-            nd->remote_addr->ai_addrlen) < 0) {
-        if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
-            close(fd);
-            free(nd->remote_addr);
-            nd->remote_addr = NULL;
-            // TODO
-            // lru_cache_remove(nd->user_info->lru_cache, nd->remote_domain);
-            LOGGER_ERROR("fd: %d, connect: %s", nd->client_fd, strerror(errno));
-            return -1;
-        }
-    }
-
-    nd->remote_fd = fd;
-
-    nd->ss_stage = STAGE_STREAM;
-
-    return 0;
-}
-
 void
 tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 {
-    struct sockaddr_in conn_addr;
-    socklen_t conn_addr_len = sizeof(conn_addr);
-    int conn_fd = accept(fd, (struct sockaddr *)&conn_addr, &conn_addr_len);
-    if (conn_fd < 0) {
-        SYS_ERROR("fd: %d, accept", conn_fd);
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+    int client_fd = accept(fd, (struct sockaddr *)&client_addr, &client_addr_len);
+    if (client_fd < 0) {
+        SYS_ERROR("fd: %d, accept", client_fd);
         return;
     }
-    LOGGER_DEBUG("fd: %d, tcp_accept_conn", conn_fd);
+    LOGGER_DEBUG("fd: %d, tcp_accept_conn", client_fd);
 
-    if (set_nonblock(conn_fd) < 0) {
-        SYS_ERROR("fd: %d, set_nonblock", conn_fd);
-        close(conn_fd);
+    if (set_nonblock(client_fd) < 0) {
+        SYS_ERROR("fd: %d, set_nonblock", client_fd);
+        close(client_fd);
         return;
     }
 
-//    if (set_nondelay(conn_fd) < 0) {
+//    if (set_nondelay(client_fd) < 0) {
 //        SYS_ERROR("set_nondelay: %s", strerror(errno));
-//        close(conn_fd);
+//        close(client_fd);
 //        return;
 //    }
 
     NetData *nd = init_net_data();
     if (nd == NULL) {
-        LOGGER_ERROR("fd: %d, init_net_data", conn_fd);
-        close(conn_fd);
+        LOGGER_ERROR("fd: %d, init_net_data", client_fd);
+        close(client_fd);
         return;
     }
-    nd->client_fd = conn_fd;
+    nd->client_fd = client_fd;
     nd->user_info = (NooneUserInfo *)data;
+    memcpy(&nd->client_addr->ai_addr, &client_addr, client_addr_len);
+    nd->client_addr->ai_addrlen = client_addr_len;
+    nd->client_buf = init_buffer(CLIENT_BUF_CAPACITY);
+    nd->remote_buf = init_buffer(REMOTE_BUF_CAPACITY);
 
     REGISTER_CLIENT(AE_IN);
 }
@@ -331,13 +227,6 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
     LOGGER_DEBUG("fd: %d, tcp_read_client", nd->client_fd);
 
-    if (nd->ss_stage == STAGE_INIT) {
-        if (handle_stage_init(nd) < 0) {
-            LOGGER_ERROR("fd: %d, handle_stage_init", nd->client_fd);
-            CLEAR_CLIENT_AND_REMOTE();
-        }
-    }
-
     int close_flag = 0;
     char buf[CLIENT_BUF_CAPACITY];
     size_t nread = read_net_data(fd, buf, sizeof(buf), &close_flag);
@@ -346,11 +235,22 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE();
     }
 
+    int iv_len = 0;
+    if (nd->ss_stage == STAGE_INIT) {
+        iv_len = nd->user_info->cryptor_info->iv_len;
+        memcpy(nd->iv, buf, iv_len);
+        nread -= iv_len;
+        if (handle_stage_init(nd) < 0) {
+            LOGGER_ERROR("fd: %d, handle_stage_init", nd->client_fd);
+            CLEAR_CLIENT_AND_REMOTE();
+        }
+    }
+
     Buffer *cbuf = nd->client_buf;
     if (nread + cbuf->len > cbuf->capacity) {
         RESIZE_BUF(cbuf, nread);
     }
-    size_t ret = DECRYPT(nd, buf, nread);
+    size_t ret = DECRYPT(nd, buf+iv_len, nread);
     if (ret == 0) {
         LOGGER_ERROR("fd: %d, DECRYPT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
@@ -358,13 +258,15 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     cbuf->len += ret;
 
     if (nd->ss_stage == STAGE_HEADER) {
-        if (handle_stage_header(nd) < 0) {
+        if (handle_stage_header(nd, SOCK_STREAM) < 0) {
             LOGGER_ERROR("fd: %d, handle_stage_header", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
         }
     }
 
     if (nd->ss_stage == STAGE_HANDSHAKE) {
+        LOGGER_INFO("fd: %d, connecting %s:%s",
+                nd->client_fd, nd->remote_domain, nd->remote_port);
         if (handle_stage_handshake(nd) < 0) {
             LOGGER_ERROR("fd: %d, handle_stage_handshake", fd);
             CLEAR_CLIENT_AND_REMOTE();
@@ -474,20 +376,4 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     } else {
         REGISTER_REMOTE(AE_IN);
     }
-}
-
-/*
- * 检查所有时间的最后激活时间，踢掉超时的时间
- * 更新时间的操作，在 ae_register_event() 中进行。
- */
-void
-tcp_handle_timeout(AeEventLoop *event_loop, int fd, void *data)
-{
-    NetData *nd = data;  // client 和 remote 共用 nd
-    if (fd == nd->client_fd) {
-        LOGGER_DEBUG("kill client fd: %d", fd);
-    } else {
-        LOGGER_DEBUG("kill remote fd: %d", fd);
-    }
-    CLEAR_CLIENT_AND_REMOTE();
 }

@@ -14,8 +14,6 @@
 #include "manager.h"
 #include <netdb.h>
 
-#define CLIENT_BUF_CAPACITY 16 * 1024
-#define REMOTE_BUF_CAPACITY 32 * 1024
 #define MAX_DOMAIN_LEN 63
 #define MAX_PORT_LEN 5
 
@@ -62,6 +60,8 @@ typedef struct NetData {
 
     SsStageType ss_stage;
 
+    MyAddrInfo *client_addr;
+
     MyAddrInfo *remote_addr;
 
     NooneUserInfo *user_info;  // 指向用户信息
@@ -74,10 +74,50 @@ typedef struct NetData {
 
 } NetData;
 
+#define UNREGISTER_CLIENT() \
+    ae_unregister_event(event_loop, nd->client_fd)
+
+#define UNREGISTER_REMOTE() \
+    ae_unregister_event(event_loop, nd->remote_fd)
+
+#define CLEAR_CLIENT() \
+    do { \
+        UNREGISTER_CLIENT(); \
+        close(nd->client_fd); \
+        nd->client_fd = -1; \
+    } while (0)
+
+#define CLEAR_REMOTE() \
+    do { \
+        UNREGISTER_REMOTE(); \
+        close(nd->remote_fd); \
+        nd->remote_fd = -1; \
+    } while (0)
+
+#define CLEAR_CLIENT_AND_REMOTE() \
+    do { \
+        if (nd->client_fd != -1) { \
+            CLEAR_CLIENT(); \
+        } \
+        if (nd->remote_fd != -1) { \
+            CLEAR_REMOTE();\
+        } \
+        free_net_data(nd); \
+        return; \
+    } while (0)
+
 NetData *init_net_data();
 
 void free_net_data(NetData *nd);
 
-MyAddrInfo *parse_net_data_header(Buffer *buf, LruCache *lc);
+void handle_timeout(AeEventLoop *event_loop, int fd, void *data);
+
+int create_remote_socket(NetData *nd);
+
+int handle_stage_init(NetData *nd);
+
+int handle_stage_header(NetData *nd, int socktype);
+
+int handle_stage_handshake(NetData *nd);
 
 #endif  /* _NOONE_TRANSPORT_H_ */
