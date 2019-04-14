@@ -280,6 +280,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     } else {
         REGISTER_REMOTE(AE_IN);
     }
+    REGISTER_CLIENT(AE_PAUSE);
 }
 
 void
@@ -304,6 +305,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     }
 
     REGISTER_REMOTE(AE_IN);
+    REGISTER_CLIENT(AE_IN);
 }
 
 void
@@ -339,7 +341,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     if (nd->client_buf->len > 0) {
         REGISTER_REMOTE(AE_OUT);
     } else {
-        REGISTER_REMOTE(AE_ERR);
+        REGISTER_REMOTE(AE_PAUSE);
     }
 }
 

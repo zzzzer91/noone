@@ -17,7 +17,7 @@
 #define AE_NONE 0         // 未设置
 #define AE_IN EPOLLIN     // 可读
 #define AE_OUT EPOLLOUT   // 可写
-#define AE_ERR EPOLLERR   // 错误，光注册这个可视为将事件挂起
+#define AE_PAUSE EPOLLERR   // 错误，光注册这个可视为将事件挂起
 
 typedef struct AeEventLoop AeEventLoop;
 
