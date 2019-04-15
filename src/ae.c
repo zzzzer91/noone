@@ -259,7 +259,7 @@ ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         }
 
         // 设置文件事件类型，以及事件的处理器
-        fe->mask = mask;
+        fe->mask = mask | EPOLLERR | EPOLLHUP;
     }
 
     // 回调

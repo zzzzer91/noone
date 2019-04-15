@@ -275,7 +275,9 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
-    REGISTER_REMOTE(AE_OUT);
+    update_stream(nd, STREAM_UP, WAIT_STATUS_READWRITING);
+    update_stream(nd, STREAM_DOWN, WAIT_STATUS_READING);
+    register_event(event_loop, nd);
 }
 
 void
@@ -302,7 +304,8 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
         return;  // 没写完，不改变 AE_IN||AE_OUT 状态
     }
 
-    REGISTER_REMOTE(AE_IN);
+    update_stream(nd, STREAM_UP, WAIT_STATUS_READING);
+    register_event(event_loop, nd);
 }
 
 void
@@ -334,8 +337,8 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     rbuf->len += ret;
 
-    REGISTER_CLIENT(AE_OUT);
-    REGISTER_REMOTE(AE_PAUSE);
+    update_stream(nd, STREAM_DOWN, WAIT_STATUS_WRITING);
+    register_event(event_loop, nd);
 }
 
 void
@@ -373,6 +376,6 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE();
     }
 
-    REGISTER_CLIENT(AE_IN);
-    REGISTER_REMOTE(AE_IN);
+    update_stream(nd, STREAM_DOWN, WAIT_STATUS_READING);
+    register_event(event_loop, nd);
 }
