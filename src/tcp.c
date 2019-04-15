@@ -67,43 +67,6 @@
     decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
             (uint8_t *)(nd)->client_buf->data+(nd)->client_buf->len)
 
-static void
-update_stream(NetData *nd, int stream, int status)
-{
-    if (stream == STREAM_DOWN) {
-        nd->downstream_status = status;
-    } else if (stream == STREAM_UP) {
-        nd->upstream_status = status;
-    }
-}
-
-static void
-register_event(AeEventLoop *event_loop, NetData *nd)
-{
-    int event;
-    if (nd->client_fd != -1) {
-        event = EPOLLERR;
-        if (nd->downstream_status & WAIT_STATUS_WRITING) {
-            event |= AE_OUT;
-        }
-        if (nd->upstream_status & WAIT_STATUS_READING) {
-            event |= AE_IN;
-        }
-        REGISTER_CLIENT(event);
-    }
-
-    if (nd->remote_fd != -1) {
-        event = EPOLLERR;
-        if (nd->downstream_status & WAIT_STATUS_READING) {
-            event |= AE_IN;
-        }
-        if (nd->upstream_status & WAIT_STATUS_WRITING) {
-            event |= AE_OUT;
-        }
-        REGISTER_REMOTE(event);
-    }
-}
-
 /*
  * 这个函数必须和非阻塞 socket 配合。
  *
@@ -275,9 +238,10 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
-    update_stream(nd, STREAM_UP, WAIT_STATUS_READWRITING);
-    update_stream(nd, STREAM_DOWN, WAIT_STATUS_READING);
-    register_event(event_loop, nd);
+    if (cbuf->len > 0) {
+        REGISTER_REMOTE(AE_OUT);
+        REGISTER_CLIENT(AE_ERR);
+    }
 }
 
 void
@@ -304,8 +268,8 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
         return;  // 没写完，不改变 AE_IN||AE_OUT 状态
     }
 
-    update_stream(nd, STREAM_UP, WAIT_STATUS_READING);
-    register_event(event_loop, nd);
+    REGISTER_REMOTE(AE_IN);
+    REGISTER_CLIENT(AE_IN);
 }
 
 void
@@ -337,8 +301,8 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     rbuf->len += ret;
 
-    update_stream(nd, STREAM_DOWN, WAIT_STATUS_WRITING);
-    register_event(event_loop, nd);
+    REGISTER_CLIENT(AE_OUT);
+    REGISTER_REMOTE(AE_ERR);
 }
 
 void
@@ -376,6 +340,6 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE();
     }
 
-    update_stream(nd, STREAM_DOWN, WAIT_STATUS_READING);
-    register_event(event_loop, nd);
+    REGISTER_CLIENT(AE_IN);
+    REGISTER_REMOTE(AE_IN);
 }
