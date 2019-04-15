@@ -40,17 +40,8 @@
                 event_loop->event_set_size, timeout); \
     })
 
-/* Process every pending time event, then every pending file event
- * (that may be registered by time event callbacks just processed).
- *
- * 处理所有已到达的时间事件，以及所有已就绪的文件事件。
- *
- * The function returns the number of events processed.
- * 函数的返回值为已处理事件的数量
- *
- * note the fe->mask & mask & ... code: maybe an already processed
- * event removed an element that fired and we still didn't
- * processed, so we check if the event is still valid.
+/*
+ * 使用宏提高性能？
  */
 #define AE_PROCESS_EVENTS(event_loop, timeout) \
     ({ \
@@ -225,7 +216,7 @@ ae_run_loop(AeEventLoop *event_loop)
             AE_CHECK_TIMEOUT(event_loop);
         } else {
             count += proc;
-            if (count == 2048) {  // 执行一定数量事件后再回调超时函数，提高性能
+            if (count == 1024) {  // 执行一定数量事件后再回调超时函数，提高性能
                 AE_CHECK_TIMEOUT(event_loop);
                 count = 0;
             }

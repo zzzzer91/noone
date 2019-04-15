@@ -276,11 +276,9 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
     if (cbuf->len > 0) {
-        REGISTER_REMOTE(AE_IN|AE_OUT);
-    } else {
-        REGISTER_REMOTE(AE_IN);
+        REGISTER_REMOTE(AE_OUT);
+        UNREGISTER_CLIENT();
     }
-    REGISTER_CLIENT(AE_PAUSE);
 }
 
 void
@@ -338,11 +336,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     rbuf->len += ret;
 
     REGISTER_CLIENT(AE_IN|AE_OUT);
-    if (nd->client_buf->len > 0) {
-        REGISTER_REMOTE(AE_OUT);
-    } else {
-        REGISTER_REMOTE(AE_PAUSE);
-    }
+    UNREGISTER_REMOTE();
 }
 
 void
@@ -379,10 +373,7 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
         LOGGER_DEBUG("fd: %d, tcp_write_client, clear!", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     }
+
     REGISTER_CLIENT(AE_IN);
-    if (nd->client_buf->len > 0) {
-        REGISTER_REMOTE(AE_IN|AE_OUT);
-    } else {
-        REGISTER_REMOTE(AE_IN);
-    }
+    REGISTER_REMOTE(AE_IN);
 }
