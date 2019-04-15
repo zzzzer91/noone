@@ -276,7 +276,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
     if (cbuf->len > 0) {
-        REGISTER_REMOTE(AE_OUT);
+        REGISTER_REMOTE(AE_IN|AE_OUT);
         UNREGISTER_CLIENT();
     }
 }

@@ -3,6 +3,7 @@
  */
 
 #include "ae.h"
+#include "log.h"
 #include "dlist.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -102,7 +103,11 @@ ae_process_events(AeEventLoop *event_loop, int timeout)
         uint32_t mask = event_loop->ready_events[i].events;
         int fd = event_loop->ready_events[i].data.fd;
         AeEvent *fe = &event_loop->events[fd];
-        if (fe->mask & mask & AE_IN) {
+        if (mask & EPOLLERR) {
+            LOGGER_DEBUG("fd: %d, EPOLLERR", fd);
+            fe->tcallback(event_loop, fd, fe->data);
+        }
+        if (fe->mask & mask & (AE_IN|EPOLLHUP)) {
             fe->rcallback(event_loop, fd, fe->data);
         }
         if (fe->mask & mask & AE_OUT) {
