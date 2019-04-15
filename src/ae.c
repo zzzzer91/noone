@@ -105,7 +105,7 @@ ae_process_events(AeEventLoop *event_loop, int timeout)
         AeEvent *fe = &event_loop->events[fd];
         if ((fe->mask | EPOLLERR ) & mask & EPOLLERR) {
             fe->tcallback(event_loop, fd, fe->data);
-            break;
+            continue;
         }
         if ((fe->mask| EPOLLHUP) & mask & (AE_IN|EPOLLHUP)) {
             fe->rcallback(event_loop, fd, fe->data);
