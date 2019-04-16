@@ -43,22 +43,6 @@
         } \
     } while (0)
 
-#define RESIZE_BUF(buf, size) \
-    do { \
-        size_t need_cap = buf->len + size; \
-        size_t step = buf->capacity >> 1U; \
-        size_t new_cap = buf->capacity + step; \
-        while (need_cap > new_cap) { \
-            new_cap += step;\
-        } \
-        if (resize_buffer(buf, new_cap) < 0) { \
-            LOGGER_ERROR("fd: %d, %s, resize_buffer", nd->client_fd, __func__); \
-            CLEAR_CLIENT_AND_REMOTE(); \
-        } \
-        LOGGER_DEBUG("fd: %d, %s, resize_buffer, new_cap: %ld", \
-                nd->client_fd, __func__, new_cap); \
-    } while (0)
-
 #define ENCRYPT(nd, buf, buf_len) \
     encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \
             (uint8_t *)(nd)->remote_buf->data)
@@ -208,6 +192,9 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
             CLEAR_CLIENT_AND_REMOTE();
         }
     }
+    if (nread == 0) {
+        return;
+    }
 
     Buffer *cbuf = nd->client_buf;
     size_t ret = DECRYPT(nd, buf+iv_len, nread);
@@ -223,6 +210,9 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
             CLEAR_CLIENT_AND_REMOTE();
         }
     }
+    if (cbuf->len == 0) {
+        return;
+    }
 
     if (nd->ss_stage == STAGE_HANDSHAKE) {
         LOGGER_INFO("fd: %d, connecting %s:%s",
@@ -233,14 +223,10 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         }
     }
 
-    nd->client_event_status ^= AE_IN;
-    nd->remote_event_status |= AE_OUT;
-    if (cbuf->len == 0) {
-        nd->client_event_status |= AE_IN;
-        nd->remote_event_status ^= AE_OUT;
-    }
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
+    nd->client_event_status ^= AE_IN;
+    nd->remote_event_status |= AE_OUT;
     REGISTER_CLIENT(nd->client_event_status);
     REGISTER_REMOTE(nd->remote_event_status);
 }

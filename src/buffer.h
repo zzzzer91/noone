@@ -20,4 +20,20 @@ void free_buffer(Buffer *buf);
 
 int resize_buffer(Buffer *buf, size_t new_capacity);
 
+#define RESIZE_BUF(buf, size) \
+    do { \
+        size_t need_cap = buf->len + size; \
+        size_t step = buf->capacity >> 1U; \
+        size_t new_cap = buf->capacity + step; \
+        while (need_cap > new_cap) { \
+            new_cap += step;\
+        } \
+        if (resize_buffer(buf, new_cap) < 0) { \
+            LOGGER_ERROR("fd: %d, %s, resize_buffer", nd->client_fd, __func__); \
+            CLEAR_CLIENT_AND_REMOTE(); \
+        } \
+        LOGGER_DEBUG("fd: %d, %s, resize_buffer, new_cap: %ld", \
+                nd->client_fd, __func__, new_cap); \
+    } while (0)
+
 #endif  /* _NOONE_BUFFER_H_ */

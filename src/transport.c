@@ -6,6 +6,7 @@
 #include "log.h"
 #include "buffer.h"
 #include "socket.h"
+#include "error.h"
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
@@ -162,7 +163,7 @@ handle_stage_header(NetData *nd, int socktype)
         snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
 
         char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
-        snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN+1,
+        snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
                 "%s:%s", nd->remote_domain, nd->remote_port);
 
         addr_info = lru_cache_get(lc, domain_and_port);
@@ -265,9 +266,11 @@ handle_stage_handshake(NetData *nd)
             nd->remote_fd = -1;
             free(remote_addr);
             nd->remote_addr = NULL;
-            // TODO
-            // lru_cache_remove(nd->user_info->lru_cache, nd->remote_domain);
-            LOGGER_ERROR("fd: %d, connect: %s", nd->client_fd, strerror(errno));
+            char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
+            snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
+                     "%s:%s", nd->remote_domain, nd->remote_port);
+            lru_cache_remove(nd->user_info->lru_cache, domain_and_port);
+            SYS_ERROR("connect");
             return -1;
         }
     }
