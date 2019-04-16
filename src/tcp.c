@@ -45,7 +45,7 @@
 
 #define ENCRYPT(nd, buf, buf_len) \
     encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \
-            (uint8_t *)(nd)->remote_buf->data)
+            (uint8_t *)(nd)->remote_buf->data+(nd)->remote_buf->len)
 
 #define DECRYPT(nd, buf, buf_len) \
     decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
@@ -283,10 +283,6 @@ void
 tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    if (nd->remote_buf->len > 0 ) {
-        LOGGER_DEBUG("fd: %d, tcp_read_remote buf not ready", nd->client_fd);
-        return;
-    }
 
     char buf[REMOTE_BUF_CAPACITY];
     size_t nread = read(fd, buf, sizeof(buf));
@@ -306,12 +302,15 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
                  nd->client_fd, nd->remote_domain, nd->remote_port, nread);
 
     Buffer *rbuf = nd->remote_buf;
+    if (nread + rbuf->len > rbuf->capacity) {
+        RESIZE_BUF(rbuf, nread);
+    }
     size_t ret = ENCRYPT(nd, buf, nread);
     if (ret == 0) {
         LOGGER_ERROR("fd: %d, tcp_read_remote, ENCRYPT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     }
-    rbuf->len = ret;
+    rbuf->len += ret;
 
     nd->client_event_status |= AE_OUT;
     REGISTER_CLIENT(nd->client_event_status);
@@ -353,10 +352,9 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     rbuf->len -= nwriten;
     if (rbuf->len > 0) {
         LOGGER_DEBUG("fd: %d, tcp_write_client not completed", nd->client_fd);
-        rbuf->idx += nwriten;
+        memcpy(rbuf->data, rbuf->data+nwriten, rbuf->len);
         return;  // 没写完，不能改变状态，因为缓冲区可能被覆盖
     }
-    rbuf->idx = 0;
 
     nd->client_event_status ^= AE_OUT;
     REGISTER_CLIENT(nd->client_event_status);
