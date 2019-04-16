@@ -181,7 +181,7 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
     nd->client_buf = init_buffer(CLIENT_BUF_CAPACITY);
     nd->remote_buf = init_buffer(REMOTE_BUF_CAPACITY);
 
-    REGISTER_CLIENT(AE_IN);
+    REGISTER_CLIENT(nd->client_event_status);
 }
 
 void
@@ -236,12 +236,16 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         }
     }
 
+    nd->client_event_status ^= AE_IN;
+    nd->remote_event_status |= AE_OUT;
+    if (cbuf->len == 0) {
+        nd->client_event_status |= AE_IN;
+        nd->remote_event_status ^= AE_OUT;
+    }
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
-    if (cbuf->len > 0) {
-        REGISTER_REMOTE(AE_OUT);
-        REGISTER_CLIENT(AE_ERR);
-    }
+    REGISTER_CLIENT(nd->client_event_status);
+    REGISTER_REMOTE(nd->remote_event_status);
 }
 
 void
@@ -268,8 +272,10 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
         return;  // 没写完，不改变 AE_IN||AE_OUT 状态
     }
 
-    REGISTER_REMOTE(AE_IN);
-    REGISTER_CLIENT(AE_IN);
+    nd->client_event_status |= AE_IN;
+    nd->remote_event_status ^= AE_OUT;
+    REGISTER_CLIENT(nd->client_event_status);
+    REGISTER_REMOTE(nd->remote_event_status);
 }
 
 void
@@ -301,8 +307,10 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     rbuf->len += ret;
 
-    REGISTER_CLIENT(AE_OUT);
-    REGISTER_REMOTE(AE_ERR);
+    nd->client_event_status |= AE_OUT;
+    nd->remote_event_status ^= AE_IN;
+    REGISTER_CLIENT(nd->client_event_status);
+    REGISTER_REMOTE(nd->remote_event_status);
 }
 
 void
@@ -321,6 +329,9 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     Buffer *rbuf = nd->remote_buf;
+    if (rbuf->len == 0) {
+        return;
+    }
     int close_flag = 0;
     size_t nwriten = write_net_data(fd, rbuf->data+rbuf->idx, rbuf->len, &close_flag);
     if (close_flag == 1) {
@@ -340,6 +351,8 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE();
     }
 
-    REGISTER_CLIENT(AE_IN);
-    REGISTER_REMOTE(AE_IN);
+    nd->client_event_status ^= AE_OUT;
+    nd->remote_event_status |= AE_IN;
+    REGISTER_CLIENT(nd->client_event_status);
+    REGISTER_REMOTE(nd->remote_event_status);
 }

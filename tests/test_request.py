@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Noone 压力测试。"""
 
 import time
