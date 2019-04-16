@@ -126,40 +126,40 @@ handle_stage_init(NetData *nd)
  *     ATYP == 0x03：1 个字节表示域名长度，紧随其后的是对应的域名
  *     ATYP == 0x04：16 个字节的 IPv6 地址
  *     DST.PORT 字段：目的服务器的端口
- *
- * TODO
- * 判断头部长度是否合法
  */
 int
 handle_stage_header(NetData *nd, int socktype)
 {
-    MyAddrInfo *addr_info = NULL;
     Buffer *buf = nd->client_buf;
+    if (buf->len < 2) {
+        return -1;
+    }
+    MyAddrInfo *addr_info = NULL;
     LruCache *lc = nd->user_info->lru_cache;
+    int header_len = 0;
 
-    int atty = buf->data[0];
-    buf->idx += 1;
-    buf->len -= 1;
+    int atty = buf->data[header_len];
+    header_len += 1;
     if (atty == ATYP_DOMAIN) {
-        size_t domain_len = buf->data[buf->idx];  // 域名长度
+        size_t domain_len = buf->data[header_len];  // 域名长度
         if (domain_len > MAX_DOMAIN_LEN || domain_len < 4) {
             LOGGER_ERROR("domain_len error!");
             return -1;
         }
-        buf->idx += 1;
-        buf->len -= 1;
+        header_len += 1;
+        if (buf->len < (domain_len + 4)) {
+            return -1;
+        }
 
         // 域名
-        memcpy(nd->remote_domain, buf->data+buf->idx, domain_len);
+        memcpy(nd->remote_domain, buf->data+header_len, domain_len);
         nd->remote_domain[domain_len] = 0;  // 加上 '\0'
-        buf->idx += domain_len;
-        buf->len -= domain_len;
+        header_len += domain_len;
 
         // 端口
         uint16_t port;
-        memcpy(&port, buf->data+buf->idx, 2);
-        buf->idx += 2;
-        buf->len -= 2;
+        memcpy(&port, buf->data+header_len, 2);
+        header_len += 2;
         snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
 
         char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
@@ -199,36 +199,38 @@ handle_stage_header(NetData *nd, int socktype)
             }
         }
     } else if (atty == ATYP_IPV4) {
+        if (buf->len < 7) {
+            return -1;
+        }
         addr_info = malloc(sizeof(MyAddrInfo));
         addr_info->ai_addrlen = sizeof(addr_info->ai_addr.sin);
         addr_info->ai_family = AF_INET;
         addr_info->ai_socktype = socktype;
         addr_info->ai_addr.sin.sin_family = AF_INET;
         // 已经是网络字节序
-        inet_ntop(AF_INET, buf->data+buf->idx, nd->remote_domain, sizeof(nd->remote_domain));
-        memcpy(&addr_info->ai_addr.sin.sin_addr, buf->data+buf->idx, 4);
-        buf->idx += 4;
-        buf->len -= 4;
+        inet_ntop(AF_INET, buf->data+header_len, nd->remote_domain, sizeof(nd->remote_domain));
+        memcpy(&addr_info->ai_addr.sin.sin_addr, buf->data+header_len, 4);
+        header_len += 4;
         uint16_t port;
-        memcpy(&port, buf->data+buf->idx, 2);
-        buf->idx += 2;
-        buf->len -= 2;
+        memcpy(&port, buf->data+header_len, 2);
+        header_len += 2;
         addr_info->ai_addr.sin.sin_port = port;
         snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
     } else if (atty == ATYP_IPV6) {
+        if (buf->len < 19) {
+            return -1;
+        }
         addr_info = malloc(sizeof(MyAddrInfo));
         addr_info->ai_addrlen = sizeof(addr_info->ai_addr.sin6);
         addr_info->ai_family = AF_INET6;
         addr_info->ai_socktype = socktype;
         addr_info->ai_addr.sin6.sin6_family = AF_INET6;
-        inet_ntop(AF_INET6, buf->data+buf->idx, nd->remote_domain, sizeof(nd->remote_domain));
-        memcpy(&addr_info->ai_addr.sin6.sin6_addr, buf->data+buf->idx, 16);
-        buf->idx += 16;
-        buf->len -= 16;
+        inet_ntop(AF_INET6, buf->data+header_len, nd->remote_domain, sizeof(nd->remote_domain));
+        memcpy(&addr_info->ai_addr.sin6.sin6_addr, buf->data+header_len, 16);
+        header_len += 16;
         uint16_t port;
-        memcpy(&port, buf->data+buf->idx, 2);
-        buf->idx += 2;
-        buf->len -= 2;
+        memcpy(&port, buf->data+header_len, 2);
+        header_len += 2;
         addr_info->ai_addr.sin6.sin6_port = port;
         snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
     } else {
@@ -237,10 +239,12 @@ handle_stage_header(NetData *nd, int socktype)
     }
     nd->remote_addr = addr_info;
 
+    buf->len -= header_len;
+
     if (buf->len > 0) {
-        memcpy(buf->data, buf->data+buf->idx, buf->len);
+        memcpy(buf->data, buf->data+header_len, buf->len);
     }
-    buf->idx = 0;
+
 
     nd->ss_stage = STAGE_HANDSHAKE;
 
