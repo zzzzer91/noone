@@ -34,8 +34,8 @@ free_buffer(Buffer *buf)
 {
     assert(buf != NULL);
 
-    free(buf);
     free(buf->data);
+    free(buf);
 }
 
 int
