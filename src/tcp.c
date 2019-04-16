@@ -249,13 +249,15 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     size_t nwriten = write(fd, cbuf->data+cbuf->idx, cbuf->len);
     if (nwriten == 0) {
         LOGGER_DEBUG("fd: %d, tcp_write_remote, remote close!", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_REMOTE();
+        return;
     } else if (nwriten < 0) {
         if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
             return;
         }
         SYS_ERROR("write");
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_REMOTE();
+        return;
     }
     LOGGER_DEBUG("fd: %d, tcp_write_remote, nwriten: %ld", nd->client_fd, nwriten);
 
@@ -282,13 +284,15 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     size_t nread = read(fd, buf, sizeof(buf));
     if (nread == 0) {
         LOGGER_DEBUG("fd: %d, tcp_read_remote, remote close!", nd->client_fd);
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_REMOTE();
+        return;
     } else if (nread < 0) {
         if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK || errno == ETIMEDOUT) {
             return;
         }
         SYS_ERROR("read");
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_REMOTE();
+        return;
     }
     LOGGER_DEBUG("fd: %d, tcp_read_remote, nread: %ld", nd->client_fd, nread);
 
