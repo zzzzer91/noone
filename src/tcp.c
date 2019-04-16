@@ -252,7 +252,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
         LOGGER_DEBUG("tcp_write_remote 空！");
         return;
     }
-    size_t nwriten = write(fd, cbuf->data+cbuf->idx, cbuf->len);
+    size_t nwriten = write(fd, cbuf->data, cbuf->len);
     if (nwriten == 0) {
         LOGGER_DEBUG("fd: %d, tcp_write_remote, remote close!", nd->client_fd);
         CLEAR_REMOTE();
@@ -335,7 +335,7 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
         LOGGER_DEBUG("tcp_write_client 空！");
         return;
     }
-    size_t nwriten = write(fd, rbuf->data+rbuf->idx, rbuf->len);
+    size_t nwriten = write(fd, rbuf->data, rbuf->len);
     if (nwriten == 0) {
         LOGGER_DEBUG("fd: %d, tcp_write_client, client close!", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
