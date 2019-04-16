@@ -172,7 +172,6 @@ void
 tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_read_client", nd->client_fd);
 
     int close_flag = 0;
     char buf[CLIENT_BUF_CAPACITY];
@@ -181,6 +180,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         LOGGER_DEBUG("fd: %d, tcp_read_client, client close!", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     }
+    LOGGER_DEBUG("fd: %d, tcp_read_client, nread: %ld", nd->client_fd, nread);
 
     int iv_len = 0;
     if (nd->ss_stage == STAGE_INIT) {
@@ -243,14 +243,13 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     int close_flag = 0;
     size_t nwriten = write_net_data(fd, cbuf->data+cbuf->idx, cbuf->len, &close_flag);
+    LOGGER_DEBUG("fd: %d, tcp_write_remote, nwriten: %ld", nd->client_fd, nwriten);
     if (close_flag == 1) {
         LOGGER_DEBUG("fd: %d, tcp_write_remote, remote close!", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     }
 
     cbuf->len -= nwriten;
-    LOGGER_DEBUG("fd: %d, tcp_write_remote, nwriten: %ld, cbuf->len: %ld",
-                 nd->client_fd, nwriten, cbuf->len);
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写
         LOGGER_DEBUG("fd: %d, tcp_write_remote not completed", nd->client_fd);
         cbuf->idx += nwriten;
@@ -272,8 +271,9 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     int close_flag = 0;
     char buf[REMOTE_BUF_CAPACITY];
     size_t nread = read_net_data(fd, buf, sizeof(buf), &close_flag);
+    LOGGER_DEBUG("fd: %d, tcp_read_remote, nread: %ld", nd->client_fd, nread);
     if (close_flag == 1) {
-        LOGGER_DEBUG("fd: %d, tcp_read_remote, remote close!, nread: %ld", nd->client_fd, nread);
+        LOGGER_DEBUG("fd: %d, tcp_read_remote, remote close!", nd->client_fd);
         if (nread > 0) {
             CLEAR_REMOTE();
         } else {
@@ -288,8 +288,6 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE();
     }
     rbuf->len = ret;
-    LOGGER_DEBUG("fd: %d, tcp_read_remote, nread: %ld, rbuf->len: %ld",
-                 nd->client_fd, nread, rbuf->len);
 
     nd->client_event_status |= AE_OUT;
     nd->remote_event_status ^= AE_IN;
@@ -301,7 +299,6 @@ void
 tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_write_client", nd->client_fd);
 
     if (nd->is_iv_send == 0) {
         NooneCryptorInfo *ci = nd->user_info->cryptor_info;
@@ -319,6 +316,7 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     }
     int close_flag = 0;
     size_t nwriten = write_net_data(fd, rbuf->data+rbuf->idx, rbuf->len, &close_flag);
+    LOGGER_DEBUG("fd: %d, tcp_write_client, nwriten: %ld", nd->client_fd, nwriten);
     if (close_flag == 1) {
         LOGGER_DEBUG("fd: %d, tcp_write_client, client close!", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
