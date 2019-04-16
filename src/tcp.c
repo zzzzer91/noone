@@ -172,10 +172,6 @@ void
 tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    if (nd->client_buf->len > 0 ) {
-        LOGGER_DEBUG("fd: %d, tcp_read_client buf not ready", nd->client_fd);
-        return;
-    }
 
     char buf[CLIENT_BUF_CAPACITY];
     size_t nread = read(fd, buf, sizeof(buf));
@@ -211,6 +207,9 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     Buffer *cbuf = nd->client_buf;
+    if (nread + cbuf->len > cbuf->capacity) {
+        RESIZE_BUF(cbuf, nread);
+    }
     size_t ret = DECRYPT(nd, buf+iv_len, nread);
     if (ret == 0) {
         LOGGER_ERROR("fd: %d, tcp_read_client, DECRYPT", nd->client_fd);
