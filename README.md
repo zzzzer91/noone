@@ -1,6 +1,6 @@
 # Noone
 
-Noone: 一个纯 C 实现 Shadowsocks 的服务端，基于 epoll，only for Linux 。
+Noone: 纯 C 实现的 Shadowsocks 服务端，基于 epoll，only for Linux 。
 
 ## Todo list
 

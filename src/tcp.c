@@ -61,11 +61,11 @@
 
 #define ENCRYPT(nd, buf, buf_len) \
     encrypt((nd)->cipher_ctx->encrypt_ctx, (uint8_t *)(buf), (buf_len), \
-            (uint8_t *)(nd)->remote_buf->data+(nd)->remote_buf->len)
+            (uint8_t *)(nd)->remote_buf->data)
 
 #define DECRYPT(nd, buf, buf_len) \
     decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
-            (uint8_t *)(nd)->client_buf->data+(nd)->client_buf->len)
+            (uint8_t *)(nd)->client_buf->data)
 
 /*
  * 这个函数必须和非阻塞 socket 配合。
@@ -210,15 +210,12 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     Buffer *cbuf = nd->client_buf;
-    if (nread + cbuf->len > cbuf->capacity) {
-        RESIZE_BUF(cbuf, nread);
-    }
     size_t ret = DECRYPT(nd, buf+iv_len, nread);
     if (ret == 0) {
         LOGGER_ERROR("fd: %d, DECRYPT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     }
-    cbuf->len += ret;
+    cbuf->len = ret;
 
     if (nd->ss_stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_STREAM) < 0) {
@@ -256,10 +253,11 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 
     Buffer *cbuf = nd->client_buf;
     if (cbuf->len == 0) {
+        LOGGER_DEBUG("tcp_write_remote 空！");
         return;
     }
     int close_flag = 0;
-    size_t nwriten = write_net_data(fd, cbuf->data, cbuf->len, &close_flag);
+    size_t nwriten = write_net_data(fd, cbuf->data+cbuf->idx, cbuf->len, &close_flag);
     if (close_flag == 1) {
         LOGGER_DEBUG("fd: %d, tcp_write_remote, remote close!", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
@@ -268,9 +266,10 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     cbuf->len -= nwriten;
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写
         LOGGER_DEBUG("fd: %d, tcp_write_remote not completed", nd->client_fd);
-        memcpy(cbuf->data, cbuf->data+nwriten, cbuf->len);
+        cbuf->idx += nwriten;
         return;  // 没写完，不改变 AE_IN||AE_OUT 状态
     }
+    cbuf->idx = 0;
 
     nd->client_event_status |= AE_IN;
     nd->remote_event_status ^= AE_OUT;
@@ -297,15 +296,12 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     }
 
     Buffer *rbuf = nd->remote_buf;
-    if (nread + rbuf->len > rbuf->capacity) {
-        RESIZE_BUF(rbuf, nread);
-    }
     size_t ret = ENCRYPT(nd, buf, nread);
     if (ret == 0) {
         LOGGER_ERROR("fd: %d, ENCRYPT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     }
-    rbuf->len += ret;
+    rbuf->len = ret;
 
     nd->client_event_status |= AE_OUT;
     nd->remote_event_status ^= AE_IN;
@@ -330,6 +326,7 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
 
     Buffer *rbuf = nd->remote_buf;
     if (rbuf->len == 0) {
+        LOGGER_DEBUG("tcp_write_client 空！");
         return;
     }
     int close_flag = 0;
@@ -342,9 +339,10 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     rbuf->len -= nwriten;
     if (rbuf->len > 0) {
         LOGGER_DEBUG("fd: %d, tcp_write_client not completed", nd->client_fd);
-        memcpy(rbuf->data, rbuf->data+nwriten, rbuf->len);
+        rbuf->idx += nwriten;
         return;  // 没写完，不能改变状态，因为缓冲区可能被覆盖
     }
+    rbuf->idx = 0;
 
     if (nd->remote_fd == -1) {
         LOGGER_DEBUG("fd: %d, tcp_write_client, clear!", nd->client_fd);
