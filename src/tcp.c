@@ -191,9 +191,9 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
             LOGGER_ERROR("fd: %d, handle_stage_init", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
         }
-    }
-    if (nread == 0) {
-        return;
+        if (nread == 0) {
+            return;
+        }
     }
 
     Buffer *cbuf = nd->client_buf;
@@ -209,9 +209,9 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
             LOGGER_ERROR("fd: %d, handle_stage_header", nd->client_fd);
             CLEAR_CLIENT_AND_REMOTE();
         }
-    }
-    if (cbuf->len == 0) {
-        return;
+        if (cbuf->len == 0) {
+            return;
+        }
     }
 
     if (nd->ss_stage == STAGE_HANDSHAKE) {
@@ -235,7 +235,6 @@ void
 tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_write_remote", nd->client_fd);
 
     Buffer *cbuf = nd->client_buf;
     if (cbuf->len == 0) {
@@ -250,6 +249,8 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     }
 
     cbuf->len -= nwriten;
+    LOGGER_DEBUG("fd: %d, tcp_write_remote, nwriten: %ld, cbuf->len: %ld",
+                 nd->client_fd, nwriten, cbuf->len);
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写
         LOGGER_DEBUG("fd: %d, tcp_write_remote not completed", nd->client_fd);
         cbuf->idx += nwriten;
@@ -267,7 +268,6 @@ void
 tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("fd: %d, tcp_read_remote", nd->client_fd);
 
     int close_flag = 0;
     char buf[REMOTE_BUF_CAPACITY];
@@ -288,6 +288,8 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE();
     }
     rbuf->len = ret;
+    LOGGER_DEBUG("fd: %d, tcp_read_remote, nread: %ld, rbuf->len: %ld",
+                 nd->client_fd, nread, rbuf->len);
 
     nd->client_event_status |= AE_OUT;
     nd->remote_event_status ^= AE_IN;
