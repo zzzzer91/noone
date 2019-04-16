@@ -175,7 +175,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     char buf[CLIENT_BUF_CAPACITY];
     size_t nread = read(fd, buf, sizeof(buf));
-    if (nread == 0) {  // ss_client 关闭
+    if (nread == 0) {  // client 关闭
         LOGGER_DEBUG("fd: %d, tcp_read_client, client close!", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     } else if (nread < 0) {
@@ -185,7 +185,12 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         }
         CLEAR_CLIENT_AND_REMOTE();
     }
-    LOGGER_DEBUG("fd: %d, tcp_read_client, nread: %ld", nd->client_fd, nread);
+    if (nd->ss_stage == STAGE_STREAM) {
+        LOGGER_DEBUG("fd: %d, %s:%s, tcp_read_client, nread: %ld",
+                nd->client_fd, nd->remote_domain, nd->remote_port, nread);
+    } else {
+        LOGGER_DEBUG("fd: %d, tcp_read_client, nread: %ld", nd->client_fd, nread);
+    }
 
     int iv_len = 0;
     if (nd->ss_stage == STAGE_INIT) {
@@ -259,7 +264,8 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_REMOTE();
         return;
     }
-    LOGGER_DEBUG("fd: %d, tcp_write_remote, nwriten: %ld", nd->client_fd, nwriten);
+    LOGGER_DEBUG("fd: %d, %s:%s, tcp_write_remote, nwriten: %ld",
+            nd->client_fd, nd->remote_domain, nd->remote_port, nwriten);
 
     cbuf->len -= nwriten;
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写
@@ -294,7 +300,8 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_REMOTE();
         return;
     }
-    LOGGER_DEBUG("fd: %d, tcp_read_remote, nread: %ld", nd->client_fd, nread);
+    LOGGER_DEBUG("fd: %d, %s:%s, tcp_read_remote, nread: %ld",
+            nd->client_fd, nd->remote_domain, nd->remote_port, nread);
 
     Buffer *rbuf = nd->remote_buf;
     size_t ret = ENCRYPT(nd, buf, nread);
@@ -340,7 +347,8 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
         }
         CLEAR_CLIENT_AND_REMOTE();
     }
-    LOGGER_DEBUG("fd: %d, tcp_write_client, nwriten: %ld", nd->client_fd, nwriten);
+    LOGGER_DEBUG("fd: %d, %s:%s, tcp_write_client, nwriten: %ld",
+            nd->client_fd, nd->remote_domain, nd->remote_port, nwriten);
 
     rbuf->len -= nwriten;
     if (rbuf->len > 0) {
