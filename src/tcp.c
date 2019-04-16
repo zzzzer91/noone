@@ -199,7 +199,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     Buffer *cbuf = nd->client_buf;
     size_t ret = DECRYPT(nd, buf+iv_len, nread);
     if (ret == 0) {
-        LOGGER_ERROR("fd: %d, DECRYPT", nd->client_fd);
+        LOGGER_ERROR("fd: %d, tcp_read_client, DECRYPT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     }
     cbuf->len = ret;
@@ -284,7 +284,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     Buffer *rbuf = nd->remote_buf;
     size_t ret = ENCRYPT(nd, buf, nread);
     if (ret == 0) {
-        LOGGER_ERROR("fd: %d, ENCRYPT", nd->client_fd);
+        LOGGER_ERROR("fd: %d, tcp_read_remote, ENCRYPT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     }
     rbuf->len = ret;
