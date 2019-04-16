@@ -65,10 +65,11 @@ handle_timeout(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;  // client 和 remote 共用 nd
     if (fd == nd->client_fd) {
         LOGGER_DEBUG("kill client fd: %d", fd);
+        CLEAR_CLIENT_AND_REMOTE();
     } else {
         LOGGER_DEBUG("kill remote fd: %d", fd);
+        CLEAR_REMOTE();
     }
-    CLEAR_CLIENT_AND_REMOTE();
 }
 
 int
