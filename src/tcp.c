@@ -172,6 +172,10 @@ void
 tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
+    if (nd->client_buf->len > 0 ) {
+        LOGGER_DEBUG("fd: %d, tcp_read_client buf not ready", nd->client_fd);
+        return;
+    }
 
     char buf[CLIENT_BUF_CAPACITY];
     size_t nread = read(fd, buf, sizeof(buf));
@@ -235,9 +239,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
-    nd->client_event_status ^= AE_IN;
     nd->remote_event_status |= AE_OUT;
-    REGISTER_CLIENT(nd->client_event_status);
     REGISTER_REMOTE(nd->remote_event_status);
 }
 
@@ -275,9 +277,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     }
     cbuf->idx = 0;
 
-    nd->client_event_status |= AE_IN;
     nd->remote_event_status ^= AE_OUT;
-    REGISTER_CLIENT(nd->client_event_status);
     REGISTER_REMOTE(nd->remote_event_status);
 }
 
@@ -285,6 +285,10 @@ void
 tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
+    if (nd->remote_buf->len > 0 ) {
+        LOGGER_DEBUG("fd: %d, tcp_read_remote buf not ready", nd->client_fd);
+        return;
+    }
 
     char buf[REMOTE_BUF_CAPACITY];
     size_t nread = read(fd, buf, sizeof(buf));
@@ -312,9 +316,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     rbuf->len = ret;
 
     nd->client_event_status |= AE_OUT;
-    nd->remote_event_status ^= AE_IN;
     REGISTER_CLIENT(nd->client_event_status);
-    REGISTER_REMOTE(nd->remote_event_status);
 }
 
 void
@@ -359,7 +361,5 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     rbuf->idx = 0;
 
     nd->client_event_status ^= AE_OUT;
-    nd->remote_event_status |= AE_IN;
     REGISTER_CLIENT(nd->client_event_status);
-    REGISTER_REMOTE(nd->remote_event_status);
 }
