@@ -49,7 +49,7 @@
 
 #define DECRYPT(nd, buf, buf_len) \
     decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
-            (uint8_t *)((nd)->client_buf->data+(nd)->client_buf->len))
+            (uint8_t *)(nd)->client_buf->data)
 
 /*
  * 这个函数必须和非阻塞 socket 配合。
@@ -207,15 +207,12 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     Buffer *cbuf = nd->client_buf;
-    if (nread + cbuf->len > cbuf->capacity) {
-        RESIZE_BUF(cbuf, nread);
-    }
     size_t ret = DECRYPT(nd, buf+iv_len, nread);
     if (ret == 0) {
         LOGGER_ERROR("fd: %d, tcp_read_client, DECRYPT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     }
-    cbuf->len += ret;
+    cbuf->len = ret;
 
     if (nd->ss_stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_STREAM) < 0) {
@@ -238,7 +235,9 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
+    nd->client_event_status ^= AE_IN;
     nd->remote_event_status |= AE_OUT;
+    REGISTER_CLIENT(nd->client_event_status);
     REGISTER_REMOTE(nd->remote_event_status);
 }
 
@@ -248,7 +247,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     Buffer *cbuf = nd->client_buf;
-    size_t nwriten = write(fd, cbuf->data, cbuf->len);
+    size_t nwriten = write(fd, cbuf->data+cbuf->idx, cbuf->len);
     if (nwriten == 0) {
         LOGGER_DEBUG("fd: %d, tcp_write_remote, remote close!", nd->client_fd);
         CLEAR_REMOTE();
@@ -267,11 +266,14 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     cbuf->len -= nwriten;
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写
         LOGGER_DEBUG("fd: %d, tcp_write_remote not completed", nd->client_fd);
-        memcpy(cbuf->data, cbuf->data+nwriten, cbuf->len);
+        cbuf->idx += nwriten;
         return;  // 没写完，不改变 AE_IN||AE_OUT 状态
     }
+    cbuf->idx = 0;
 
+    nd->client_event_status |= AE_IN;
     nd->remote_event_status ^= AE_OUT;
+    REGISTER_CLIENT(nd->client_event_status);
     REGISTER_REMOTE(nd->remote_event_status);
 }
 
@@ -312,8 +314,9 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     rbuf->len = ret + iv_len;
 
     nd->client_event_status |= AE_OUT;
+    nd->remote_event_status ^= AE_IN;
     REGISTER_CLIENT(nd->client_event_status);
-    UNREGISTER_REMOTE();
+    REGISTER_REMOTE(nd->remote_event_status);
 }
 
 void
@@ -345,6 +348,7 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     rbuf->idx = 0;
 
     nd->client_event_status ^= AE_OUT;
+    nd->remote_event_status |= AE_IN;
     REGISTER_CLIENT(nd->client_event_status);
     REGISTER_REMOTE(nd->remote_event_status);
 }
