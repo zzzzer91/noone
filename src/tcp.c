@@ -49,7 +49,7 @@
 
 #define DECRYPT(nd, buf, buf_len) \
     decrypt((nd)->cipher_ctx->decrypt_ctx, (uint8_t *)(buf), (buf_len), \
-            (uint8_t *)(nd)->client_buf->data)
+            (uint8_t *)(nd)->client_buf->data+(nd)->client_buf->len)
 
 /*
  * 这个函数必须和非阻塞 socket 配合。
@@ -215,7 +215,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         LOGGER_ERROR("fd: %d, tcp_read_client, DECRYPT", nd->client_fd);
         CLEAR_CLIENT_AND_REMOTE();
     }
-    cbuf->len = ret;
+    cbuf->len += ret;
 
     if (nd->ss_stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_STREAM) < 0) {
@@ -271,10 +271,9 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     cbuf->len -= nwriten;
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写
         LOGGER_DEBUG("fd: %d, tcp_write_remote not completed", nd->client_fd);
-        cbuf->idx += nwriten;
+        memcpy(cbuf->data, cbuf->data+nwriten, cbuf->len);
         return;  // 没写完，不改变 AE_IN||AE_OUT 状态
     }
-    cbuf->idx = 0;
 
     nd->remote_event_status ^= AE_OUT;
     REGISTER_REMOTE(nd->remote_event_status);
