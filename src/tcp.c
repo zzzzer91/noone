@@ -146,11 +146,11 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
         return;
     }
 
-    if (set_nondelay(client_fd) < 0) {
-        SYS_ERROR("set_nondelay: %s", strerror(errno));
-        close(client_fd);
-        return;
-    }
+//    if (set_nondelay(client_fd) < 0) {
+//        SYS_ERROR("set_nondelay: %s", strerror(errno));
+//        close(client_fd);
+//        return;
+//    }
 
     NetData *nd = init_net_data();
     if (nd == NULL) {
