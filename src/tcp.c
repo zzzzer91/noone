@@ -279,10 +279,6 @@ void
 tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    if (nd->remote_buf->len > 0 ) {
-        LOGGER_DEBUG("fd: %d, tcp_read_remote buf not ready", nd->client_fd);
-        return;
-    }
 
     char buf[REMOTE_BUF_CAPACITY];
     size_t nread = read(fd, buf, sizeof(buf));
@@ -317,6 +313,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 
     nd->client_event_status |= AE_OUT;
     REGISTER_CLIENT(nd->client_event_status);
+    UNREGISTER_REMOTE();
 }
 
 void
@@ -349,4 +346,5 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
 
     nd->client_event_status ^= AE_OUT;
     REGISTER_CLIENT(nd->client_event_status);
+    REGISTER_REMOTE(nd->remote_event_status);
 }
