@@ -50,7 +50,7 @@
     ({ \
         ssize_t ret = read(sockfd, buf, cap); \
         if (ret == 0) { \
-            LOGGER_DEBUG("fd: %d, %s, client close!", nd->client_fd, __func__); \
+            LOGGER_DEBUG("fd: %d, %s, close!", nd->client_fd, __func__); \
             CLEAR_CLIENT_AND_REMOTE(); \
         } else if (ret < 0) { \
             SYS_ERROR("read"); \
@@ -73,7 +73,7 @@
     ({ \
         ssize_t ret = write(fd, buf, n); \
         if (ret == 0) { \
-            LOGGER_DEBUG("fd: %d, %s, remote close!", nd->client_fd, __func__); \
+            LOGGER_DEBUG("fd: %d, %s, close!", nd->client_fd, __func__); \
             CLEAR_CLIENT_AND_REMOTE(); \
         } else if (ret < 0) { \
             SYS_ERROR("write"); \
@@ -102,8 +102,8 @@
 #define DECRYPT(buf, buf_len) \
     do { \
         size_t ret = decrypt(nd->cipher_ctx->decrypt_ctx, \
-                (uint8_t *)(buf+iv_len), (buf_len), \
-                (uint8_t *)(cbuf->data+cbuf->len)); \
+                (uint8_t *)((buf)+iv_len), (buf_len), \
+                (uint8_t *)cbuf->data); \
         if (ret == 0) { \
             TCP_ERROR("DECRYPT"); \
             CLEAR_CLIENT_AND_REMOTE(); \
