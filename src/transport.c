@@ -168,7 +168,7 @@ handle_stage_header(NetData *nd, int socktype)
 
         addr_info = lru_cache_get(lc, domain_and_port);
         if (addr_info == NULL) {
-            LOGGER_DEBUG("fd: %d, %s: DNS 查询！", nd->client_fd, domain_and_port);
+            LOGGER_DEBUG("fd: %d, %s: query DNS!", nd->client_fd, domain_and_port);
             struct addrinfo *addr_list;
             struct addrinfo hints = {0};
             hints.ai_socktype = socktype;
@@ -177,7 +177,7 @@ handle_stage_header(NetData *nd, int socktype)
                 LOGGER_ERROR("%s", gai_strerror(ret));
                 return -1;
             }
-            LOGGER_DEBUG("fd: %d, %s: DNS 查询成功！", nd->client_fd, domain_and_port);
+            LOGGER_DEBUG("fd: %d, %s: DNS success!", nd->client_fd, domain_and_port);
 
             // 创建 addr_info
             addr_info = malloc(sizeof(MyAddrInfo));

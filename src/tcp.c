@@ -186,10 +186,10 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE();
     }
     if (nd->ss_stage == STAGE_STREAM) {
-        LOGGER_DEBUG("fd: %d, %s:%s, tcp_read_client, nread: %ld",
+        LOGGER_DEBUG("fd: %d, %s:%s, tcp_read_client: %ld",
                      nd->client_fd, nd->remote_domain, nd->remote_port, nread);
     } else {
-        LOGGER_DEBUG("fd: %d, tcp_read_client, nread: %ld", nd->client_fd, nread);
+        LOGGER_DEBUG("fd: %d, tcp_read_client: %ld", nd->client_fd, nread);
     }
 
     int iv_len = 0;
@@ -258,7 +258,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
         }
         CLEAR_CLIENT_AND_REMOTE();
     }
-    LOGGER_DEBUG("fd: %d, %s:%s, tcp_write_remote, nwriten: %ld",
+    LOGGER_DEBUG("fd: %d, %s:%s, tcp_write_remote: %ld",
                  nd->client_fd, nd->remote_domain, nd->remote_port, nwriten);
 
     cbuf->len -= nwriten;
@@ -292,7 +292,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
         }
         CLEAR_CLIENT_AND_REMOTE();
     }
-    LOGGER_DEBUG("fd: %d, %s:%s, tcp_read_remote, nread: %ld",
+    LOGGER_DEBUG("fd: %d, %s:%s, tcp_read_remote: %ld",
                  nd->client_fd, nd->remote_domain, nd->remote_port, nread);
 
     Buffer *rbuf = nd->remote_buf;
@@ -332,7 +332,7 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
         }
         CLEAR_CLIENT_AND_REMOTE();
     }
-    LOGGER_DEBUG("fd: %d, %s:%s, tcp_write_client, nwriten: %ld",
+    LOGGER_DEBUG("fd: %d, %s:%s, tcp_write_client: %ld",
                  nd->client_fd, nd->remote_domain, nd->remote_port, nwriten);
 
     rbuf->len -= nwriten;
