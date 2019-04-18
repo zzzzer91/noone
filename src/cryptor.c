@@ -3,6 +3,7 @@
  */
 
 #include "cryptor.h"
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <openssl/evp.h>
@@ -180,4 +181,17 @@ decrypt(EVP_CIPHER_CTX *ctx, uint8_t *ciphertext,
     plaintext_len += outlen;
 
     return plaintext_len;
+}
+
+/*
+ * len 是 4 的 倍数
+ */
+void
+rand_bytes(char *buf, int len)
+{
+    srand((unsigned int)time(NULL));
+    for (int i = 0; i < len; i+=sizeof(int)) {
+        int tmp = rand();
+        memcpy(buf+i, &tmp, sizeof(int));
+    }
 }

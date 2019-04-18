@@ -42,28 +42,6 @@
     })
 
 /*
- * 使用宏提高性能？
- */
-#define AE_PROCESS_EVENTS(event_loop, timeout) \
-    ({ \
-        int processed = 0; \
-        int numevents = AE_EPOLL_POLL(event_loop, timeout); \
-        for (int i = 0; i < numevents; i++) { \
-            uint32_t mask = event_loop->ready_events[i].events; \
-            int fd = event_loop->ready_events[i].data.fd; \
-            AeEvent *fe = &event_loop->events[fd]; \
-            if (fe->mask & mask & AE_IN) { \
-                fe->rcallback(event_loop, fd, fe->data); \
-            } \
-            if (fe->mask & mask & AE_OUT) { \
-                fe->wcallback(event_loop, fd, fe->data); \
-            } \
-            processed++; \
-        } \
-        processed; \
-    })
-
-/*
  * 从双向链表尾部向前循环，按时间排序，尾部是最旧的事件
  */
 #define AE_CHECK_TIMEOUT(event_loop) \
@@ -222,7 +200,7 @@ ae_run_loop(AeEventLoop *event_loop)
             AE_CHECK_TIMEOUT(event_loop);
         } else {
             count += proc;
-            if (count == 1024) {  // 执行一定数量事件后再回调超时函数，提高性能
+            if (count == 2048) {  // 执行一定数量事件后再回调超时函数，提高性能
                 AE_CHECK_TIMEOUT(event_loop);
                 count = 0;
             }

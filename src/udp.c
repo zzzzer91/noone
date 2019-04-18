@@ -36,10 +36,11 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_CLIENT_AND_REMOTE();
     }
 
+    uint8_t iv[MAX_IV_LEN];
     int iv_len = nd->user_info->cryptor_info->iv_len;
-    memcpy(nd->iv, cipherbuf, iv_len);
+    memcpy(iv, cipherbuf, iv_len);
     nread -= iv_len;
-    if (handle_stage_init(nd) < 0) {
+    if (handle_stage_init(nd, iv) < 0) {
         SYS_ERROR("handle_stage_init");
         CLEAR_CLIENT_AND_REMOTE();
     }
@@ -122,7 +123,13 @@ udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     Buffer *rbuf = init_buffer(REMOTE_BUF_CAPACITY+128);
     nd->remote_buf = rbuf;
     int iv_len = nd->user_info->cryptor_info->iv_len;
-    memcpy(rbuf->data, nd->iv, iv_len);
+    rand_bytes(rbuf->data, iv_len);
+    NooneCryptorInfo *ci = nd->user_info->cryptor_info;
+    nd->cipher_ctx->encrypt_ctx = INIT_ENCRYPT_CTX(
+            ci->cipher_name, ci->key, (uint8_t *)rbuf->data);
+    if (nd->cipher_ctx->encrypt_ctx == NULL) {
+        SYS_ERROR("INIT_ENCRYPT_CTX");
+    }
     ENCRYPT(plainbuf+HEAD_PREFIX-header_len, nread, rbuf->data+iv_len);
     rbuf->len += iv_len;
 

@@ -78,7 +78,7 @@ main(int argc, char *argv[])
             PANIC("ae_register_event");
         }
         ui->udp_server_fd = udp_server_fd;
-        ae_remove_event_from_list(ae_ev_loop, udp_server_fd);  // 从超时队列移除
+        ae_remove_event_from_list(ae_ev_loop, udp_server_fd);
     }
     ae_ev_loop->data = noone_manager;
 

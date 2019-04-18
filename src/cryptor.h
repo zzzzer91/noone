@@ -60,4 +60,6 @@ size_t encrypt(EVP_CIPHER_CTX *ctx, uint8_t *plaintext,
 size_t decrypt(EVP_CIPHER_CTX *ctx, uint8_t *ciphertext,
         size_t ciphertext_len, uint8_t *plaintext);
 
+void rand_bytes(char *buf, int len);
+
 #endif  /* _NOONE_CRYPTO_H_ */

@@ -56,7 +56,7 @@ lru_cache_put(LruCache *lc, char *key, void *value, void **oldvalue)
             *oldvalue = hashtable_remove_oldest(lc->hash_table);
             lc->size--;
         }
-    } else { // key 已存在，是更新操作，不需要增加 size
+    } else { // key 已存在，是更新操作，也不需要增加 size
         lc->size--;
     }
 

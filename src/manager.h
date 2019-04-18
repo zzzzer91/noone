@@ -17,7 +17,7 @@ typedef struct NooneUserInfo {
 } NooneUserInfo;
 
 typedef struct NooneManager {
-    NooneUserInfo *users_info;
+    NooneUserInfo *users_info; // 用户数组
     int user_count;
 } NooneManager;
 
