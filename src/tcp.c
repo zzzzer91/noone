@@ -91,7 +91,7 @@
     do { \
         size_t ret = encrypt(nd->cipher_ctx->encrypt_ctx, \
                 (uint8_t *)(buf), (buf_len), \
-                (uint8_t *)rbuf->data+iv_len); \
+                (uint8_t *)(rbuf->data+iv_len)); \
         if (ret == 0) { \
             TCP_ERROR("ENCRYPT"); \
             CLEAR_CLIENT_AND_REMOTE(); \
@@ -110,83 +110,6 @@
         } \
         cbuf->len = ret; \
     } while (0)
-
-/*
- * 这个函数必须和非阻塞 socket 配合。
- *
- * 1、当对端套接字已关闭，read() 会返回 0。
- * 2、当（read() == -1 && errno == EAGAIN）时，
- *    代表非阻塞 socket 数据读完。
- * 3、当执行到 read() 时，可能就会碰到 read() 返回 0，此时不能直接 return 0，
- *    因为前面可能读了数据，将 close_flag 设为 1，代表对端关闭，并且返回读到的数据长度。
- *    write_net_data() 同理。
- */
-static size_t
-read_net_data(int fd, void *buf, size_t capacity, int *close_flag)
-{
-    *close_flag = 0;
-    size_t nleft = capacity;
-    ssize_t nread;
-    char *p = buf;
-    while (nleft > 0) {
-        // 若没设置非阻塞 socket，这里会一直阻塞直到读到 nleft 字节内容。
-        // 这是没法接受的。
-        nread = read(fd, p, nleft);
-        if (nread == 0) {
-            *close_flag = 1;
-            break;
-        } else if (nread < 0) {
-            // 需先设置非阻塞 socket
-            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == ETIMEDOUT) {
-                break;
-            } else if (errno == EINTR) {
-                nread = 0;
-            } else {
-                SYS_ERROR("read");
-                *close_flag = 1;
-                break;
-            }
-        }
-        nleft -= nread;
-        p += nread;
-    }
-    return capacity - nleft;
-}
-
-/*
- * 把缓冲区数据写给远端
- */
-static size_t
-write_net_data(int fd, void *buf, size_t n, int *close_flag)
-{
-    *close_flag = 0;
-    size_t nleft = n;
-    ssize_t nwritten;
-    char *p = buf;
-    while (nleft > 0) {
-        // 阻塞 socket 会一直等，
-        // 非阻塞 socket 会在未成功发送时将 errno 设为 EAGAIN
-        nwritten = write(fd, p, nleft);
-        if (nwritten == 0) {
-            *close_flag = 1;
-            break;
-        } else if (nwritten < 0) {
-            // 需先设置非阻塞 socket，在三次握手未完成或发送缓冲区满出现
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                break;
-            } else if (errno == EINTR) {
-                nwritten = 0;
-            } else {
-                SYS_ERROR("write");
-                *close_flag = 1;
-                break;
-            }
-        }
-        nleft -= nwritten;
-        p += nwritten;
-    }
-    return n - nleft;
-}
 
 void
 tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
