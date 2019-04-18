@@ -11,13 +11,10 @@
 #include "log.h"
 #include "transport.h"
 #include "lru.h"
+#include "config.h"
 #include "manager.h"
 #include <unistd.h>
 #include <signal.h>
-
-/* test */
-#define PASSWD (unsigned char *)"123123"
-#define SERVER "0.0.0.0"
 
 int
 main(int argc, char *argv[])
