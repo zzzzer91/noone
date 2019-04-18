@@ -65,7 +65,7 @@
             } \
             CLEAR_CLIENT_AND_REMOTE(); \
         } \
-        if (nd->ss_stage > STAGE_INIT) { \
+        if (nd->ss_stage != STAGE_INIT) { \
             LOGGER_DEBUG("fd: %d, %s:%s, %s: %ld", \
                      nd->client_fd, nd->remote_domain, nd->remote_port, __func__, ret); \
         } else { \

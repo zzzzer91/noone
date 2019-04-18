@@ -246,7 +246,6 @@ handle_stage_header(NetData *nd, int socktype)
         memcpy(buf->data, buf->data+header_len, buf->len);
     }
 
-
     nd->ss_stage = STAGE_HANDSHAKE;
 
     return 0;
