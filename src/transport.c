@@ -96,12 +96,16 @@ create_remote_socket(NetData *nd)
 }
 
 int
-handle_stage_init(NetData *nd, uint8_t *iv)
+handle_stage_init(NetData *nd)
 {
     NooneCryptorInfo *ci = nd->user_info->cryptor_info;
 
-    nd->cipher_ctx->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, iv);
+    nd->cipher_ctx->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->iv);
     if (nd->cipher_ctx->decrypt_ctx == NULL) {
+        return -1;
+    }
+    nd->cipher_ctx->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, nd->iv);
+    if (nd->cipher_ctx->encrypt_ctx == NULL) {
         return -1;
     }
 

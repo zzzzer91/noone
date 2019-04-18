@@ -156,11 +156,10 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     int iv_len = 0;
     if (nd->ss_stage == STAGE_INIT) {
-        uint8_t iv[MAX_IV_LEN];
         iv_len = nd->user_info->cryptor_info->iv_len;
-        memcpy(iv, temp_buf, iv_len);
+        memcpy(nd->iv, temp_buf, iv_len);
         nread -= iv_len;
-        if (handle_stage_init(nd, iv) < 0) {
+        if (handle_stage_init(nd) < 0) {
             TCP_ERROR("handle_stage_init");
             CLEAR_CLIENT_AND_REMOTE();
         }
@@ -232,13 +231,7 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     int iv_len = 0;
     if (nd->is_iv_send == 0) {
         iv_len = nd->user_info->cryptor_info->iv_len;
-        rand_bytes(rbuf->data, iv_len);
-        NooneCryptorInfo *ci = nd->user_info->cryptor_info;
-        nd->cipher_ctx->encrypt_ctx = INIT_ENCRYPT_CTX(
-                ci->cipher_name, ci->key, (uint8_t *)rbuf->data);
-        if (nd->cipher_ctx->encrypt_ctx == NULL) {
-            TCP_ERROR("INIT_ENCRYPT_CTX");
-        }
+        memcpy(rbuf->data, nd->iv, iv_len);
         nd->is_iv_send = 1;
     }
     ENCRYPT(temp_buf, nread, rbuf->data+iv_len);

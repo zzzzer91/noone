@@ -187,7 +187,7 @@ decrypt(EVP_CIPHER_CTX *ctx, uint8_t *ciphertext,
  * len 是 4 的 倍数
  */
 void
-rand_bytes(char *buf, int len)
+rand_bytes(uint8_t *buf, int len)
 {
     srand((unsigned int)time(NULL));
     for (int i = 0; i < len; i+=sizeof(int)) {

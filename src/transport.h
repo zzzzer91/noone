@@ -37,6 +37,8 @@ typedef struct NetData {
 
     char remote_port[MAX_PORT_LEN+1];
 
+    uint8_t iv[MAX_IV_LEN];
+
     int is_iv_send;
 
     int client_fd;
@@ -127,7 +129,7 @@ void handle_timeout(AeEventLoop *event_loop, int fd, void *data);
 
 int create_remote_socket(NetData *nd);
 
-int handle_stage_init(NetData *nd, uint8_t *iv);
+int handle_stage_init(NetData *nd);
 
 int handle_stage_header(NetData *nd, int socktype);
 
