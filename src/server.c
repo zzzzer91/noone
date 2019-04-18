@@ -61,26 +61,24 @@ main(int argc, char *argv[])
         if (tcp_server_fd < 0) {
             PANIC("tcp_server_fd_init");
         }
-        int ret = ae_register_event(ae_ev_loop, tcp_server_fd,
-                AE_IN, tcp_accept_conn, NULL, NULL, ui);
-        if (ret  < 0) {
+        if (ae_register_event(ae_ev_loop, tcp_server_fd,
+                AE_IN, tcp_accept_conn, NULL, NULL, ui)  < 0) {
             PANIC("ae_register_event");
         }
         ui->tcp_server_fd = tcp_server_fd;
         ae_remove_event_from_list(ae_ev_loop, tcp_server_fd);  // 从超时队列移除，并且以后也不会加入
 
         // udp 可以和 tcp 绑定同一端口
-//        udp_server_fd = udp_server_fd_init(SERVER, server_port_list[i]);
-//        if (udp_server_fd < 0) {
-//            PANIC("udp_server_fd_init");
-//        }
-//        ret = ae_register_event(ae_ev_loop, udp_server_fd,
-//                                AE_IN, udp_read_client, NULL, NULL, ui);
-//        if (ret < 0) {
-//            PANIC("ae_register_event");
-//        }
-//        ui->udp_server_fd = udp_server_fd;
-//        ae_remove_event_from_list(ae_ev_loop, udp_server_fd);  // 从超时队列移除
+        udp_server_fd = udp_server_fd_init(SERVER, server_port_list[i]);
+        if (udp_server_fd < 0) {
+            PANIC("udp_server_fd_init");
+        }
+        if (ae_register_event(ae_ev_loop, udp_server_fd,
+                AE_IN, udp_read_client, NULL, NULL, ui) < 0) {
+            PANIC("ae_register_event");
+        }
+        ui->udp_server_fd = udp_server_fd;
+        ae_remove_event_from_list(ae_ev_loop, udp_server_fd);  // 从超时队列移除
     }
     ae_ev_loop->data = noone_manager;
 

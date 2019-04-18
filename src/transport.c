@@ -83,9 +83,11 @@ create_remote_socket(NetData *nd)
         close(fd);
         return -1;
     }
-    if (set_nondelay(fd) < 0) {
-        close(fd);
-        return -1;
+    if (remote_addr->ai_socktype == SOCK_STREAM) {
+        if (set_nondelay(fd) < 0) {
+            close(fd);
+            return -1;
+        }
     }
 
     nd->remote_fd = fd;

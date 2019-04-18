@@ -97,6 +97,30 @@ typedef struct NetData {
         return; \
     } while (0)
 
+#define ENCRYPT(pbuf, pbuf_len, cbuf) \
+    do { \
+        size_t ret = encrypt(nd->cipher_ctx->encrypt_ctx, \
+                (uint8_t *)(pbuf), (pbuf_len), \
+                (uint8_t *)(cbuf)); \
+        if (ret == 0) { \
+            SYS_ERROR("ENCRYPT"); \
+            CLEAR_CLIENT_AND_REMOTE(); \
+        } \
+        nd->remote_buf->len = ret; \
+    } while (0)
+
+#define DECRYPT(cbuf, cbuf_len, pbuf) \
+    do { \
+        size_t ret = decrypt(nd->cipher_ctx->decrypt_ctx, \
+                (uint8_t *)(cbuf), (cbuf_len), \
+                (uint8_t *)(pbuf)); \
+        if (ret == 0) { \
+            SYS_ERROR("DECRYPT"); \
+            CLEAR_CLIENT_AND_REMOTE(); \
+        } \
+        nd->client_buf->len = ret; \
+    } while (0)
+
 NetData *init_net_data();
 
 void free_net_data(NetData *nd);

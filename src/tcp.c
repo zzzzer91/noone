@@ -50,7 +50,12 @@
     ({ \
         ssize_t ret = read(sockfd, buf, cap); \
         if (ret == 0) { \
-            LOGGER_DEBUG("fd: %d, %s, close!", nd->client_fd, __func__); \
+            if (nd->ss_stage > STAGE_INIT) { \
+                LOGGER_DEBUG("fd: %d, %s:%s, %s: close!", \
+                         nd->client_fd, nd->remote_domain, nd->remote_port, __func__); \
+            } else { \
+                LOGGER_DEBUG("fd: %d, %s: close!", nd->client_fd, __func__); \
+            } \
             CLEAR_CLIENT_AND_REMOTE(); \
         } else if (ret < 0) { \
             SYS_ERROR("read"); \
@@ -60,7 +65,7 @@
             } \
             CLEAR_CLIENT_AND_REMOTE(); \
         } \
-        if (nd->ss_stage == STAGE_STREAM) { \
+        if (nd->ss_stage > STAGE_INIT) { \
             LOGGER_DEBUG("fd: %d, %s:%s, %s: %ld", \
                      nd->client_fd, nd->remote_domain, nd->remote_port, __func__, ret); \
         } else { \
@@ -73,7 +78,8 @@
     ({ \
         ssize_t ret = write(fd, buf, n); \
         if (ret == 0) { \
-            LOGGER_DEBUG("fd: %d, %s, close!", nd->client_fd, __func__); \
+            LOGGER_DEBUG("fd: %d, %s:%s, %s: close!", nd->client_fd, \
+                    nd->remote_domain, nd->remote_port, __func__); \
             CLEAR_CLIENT_AND_REMOTE(); \
         } else if (ret < 0) { \
             SYS_ERROR("write"); \
@@ -86,30 +92,6 @@
                 nd->client_fd, nd->remote_domain, nd->remote_port, __func__, ret); \
         ret; \
     })
-
-#define ENCRYPT(buf, buf_len) \
-    do { \
-        size_t ret = encrypt(nd->cipher_ctx->encrypt_ctx, \
-                (uint8_t *)(buf), (buf_len), \
-                (uint8_t *)(rbuf->data+iv_len)); \
-        if (ret == 0) { \
-            TCP_ERROR("ENCRYPT"); \
-            CLEAR_CLIENT_AND_REMOTE(); \
-        } \
-        rbuf->len = ret + iv_len; \
-    } while (0)
-
-#define DECRYPT(buf, buf_len) \
-    do { \
-        size_t ret = decrypt(nd->cipher_ctx->decrypt_ctx, \
-                (uint8_t *)((buf)+iv_len), (buf_len), \
-                (uint8_t *)cbuf->data); \
-        if (ret == 0) { \
-            TCP_ERROR("DECRYPT"); \
-            CLEAR_CLIENT_AND_REMOTE(); \
-        } \
-        cbuf->len = ret; \
-    } while (0)
 
 void
 tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
@@ -186,7 +168,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     Buffer *cbuf = nd->client_buf;
-    DECRYPT(temp_buf, nread);
+    DECRYPT(temp_buf+iv_len, nread, cbuf->data);
 
     if (nd->ss_stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_STREAM) < 0) {
@@ -251,7 +233,8 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
         memcpy(rbuf->data, nd->iv, iv_len);
         nd->is_iv_send = 1;
     }
-    ENCRYPT(temp_buf, nread);
+    ENCRYPT(temp_buf, nread, rbuf->data+iv_len);
+    rbuf->len += iv_len;
 
     nd->client_event_status |= AE_OUT;
     nd->remote_event_status ^= AE_IN;
