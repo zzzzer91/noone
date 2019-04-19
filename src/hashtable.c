@@ -87,7 +87,6 @@ hashtable_put(HashTable *ht, char *key, void *value)
         p = p->zipper_next;
     }
 
-
     // 拉链中没有相同的 key，先判断满没满
     if (ht->size == ht->capacity) {  // hashtable 满
         return 0;
@@ -194,6 +193,8 @@ hashtable_remove_oldest(HashTable *ht)
 void
 hashtable_clear(HashTable *ht)
 {
+    assert(ht != NULL);
+
     int size = ht->size;
     Entry *p = ht->list_head;
     for (int i = 0; i < size; i++) {

@@ -182,8 +182,8 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     if (nd->ss_stage == STAGE_HANDSHAKE) {
-        LOGGER_INFO("fd: %d, connecting %s:%s",
-                    nd->client_fd, nd->remote_domain, nd->remote_port);
+        LOGGER_DEBUG("fd: %d, connecting %s:%s",
+                nd->client_fd, nd->remote_domain, nd->remote_port);
         if (handle_stage_handshake(nd) < 0) {
             TCP_ERROR("handle_stage_handshake");
             CLEAR_CLIENT_AND_REMOTE();

@@ -196,8 +196,10 @@ handle_stage_header(NetData *nd, int socktype)
                 return -1;
             }
             if (oldvalue != NULL) {
+                LOGGER_DEBUG("lru replace!");
                 free(oldvalue);
             }
+            LOGGER_DEBUG("lru size: %ld", lc->size);
         }
     } else if (atty == ATYP_IPV4) {
         if (buf->len < 7) {

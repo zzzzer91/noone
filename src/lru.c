@@ -17,8 +17,8 @@ lru_cache_init(size_t capacity)
         return NULL;
     }
 
-    // hashcode 表比例 16
-    lc->hash_table = hashtable_init(capacity * 16);
+    // hashcode 表比例 8
+    lc->hash_table = hashtable_init(capacity * 8);
     if (lc->hash_table == NULL) {
         free(lc);
         return NULL;
@@ -34,6 +34,7 @@ void
 lru_cache_destory(LruCache *lc)
 {
     assert(lc != NULL);
+
     lru_cache_clear(lc);
     hashtable_destory(lc->hash_table);
     free(lc);
@@ -94,6 +95,7 @@ void
 lru_cache_clear(LruCache *lc)
 {
     assert(lc != NULL);
+
     hashtable_clear(lc->hash_table);
     lc->size = 0;
 }

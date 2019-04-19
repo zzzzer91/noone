@@ -100,8 +100,7 @@ typedef struct NetData {
 #define ENCRYPT(pbuf, pbuf_len, cbuf) \
     do { \
         size_t ret = encrypt(nd->cipher_ctx->encrypt_ctx, \
-                (uint8_t *)(pbuf), (pbuf_len), \
-                (uint8_t *)(cbuf)); \
+                (uint8_t *)(pbuf), (pbuf_len), (uint8_t *)(cbuf)); \
         if (ret == 0) { \
             SYS_ERROR("ENCRYPT"); \
             CLEAR_CLIENT_AND_REMOTE(); \
@@ -112,8 +111,7 @@ typedef struct NetData {
 #define DECRYPT(cbuf, cbuf_len, pbuf) \
     do { \
         size_t ret = decrypt(nd->cipher_ctx->decrypt_ctx, \
-                (uint8_t *)(cbuf), (cbuf_len), \
-                (uint8_t *)(pbuf)); \
+                (uint8_t *)(cbuf), (cbuf_len), (uint8_t *)(pbuf)); \
         if (ret == 0) { \
             SYS_ERROR("DECRYPT"); \
             CLEAR_CLIENT_AND_REMOTE(); \

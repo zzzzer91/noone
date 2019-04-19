@@ -10,7 +10,7 @@
 void
 test_hash_key()
 {
-    size_t capacity = 1024*32;
+    size_t capacity = 1024*16;
     char *table = malloc(sizeof(char) * capacity);
     memset(table, 0, sizeof(char) * capacity);
 
@@ -91,6 +91,7 @@ test_table()
     EXPECT_EQ_POINTER(NULL, ht->list_head);
     EXPECT_EQ_POINTER(NULL, ht->list_tail);
 
+    // 测试清空 hash 表
     hashtable_put(ht, s1, (void *) 1L);
     hashtable_put(ht, s2, (void *) 2L);
     EXPECT_EQ_LONG(2L, ht->size);
@@ -105,6 +106,6 @@ test_table()
 void
 test_hashtable()
 {
-    // test_hash_key();
+    test_hash_key();
     test_table();
 }

@@ -7,7 +7,7 @@
 
 #include <stddef.h>
 
-#define MAX_HASH_KEY_LEN 128
+#define MAX_HASH_KEY_LEN 80
 
 typedef struct Entry {
     char key[MAX_HASH_KEY_LEN];
