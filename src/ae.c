@@ -17,9 +17,10 @@
  * 如果已经关联了某个/某些事件，那么这是一个 MOD 操作。
  */
 #define AE_EPOLL_ADD_EVENT(event_loop, fd, mask, op) \
-    ({\
+    ({ \
         struct epoll_event ee; \
         ee.events = mask; \
+        ee.data.ptr = NULL; \
         ee.data.fd = fd; \
         epoll_ctl(event_loop->epfd, op, fd, &ee); \
     })
@@ -77,20 +78,23 @@ ae_process_events(AeEventLoop *event_loop, int timeout)
 {
     int processed = 0;
     int numevents = AE_EPOLL_POLL(event_loop, timeout * 1000);
+    LOGGER_DEBUG("numevents: %d", numevents);
     for (int i = 0; i < numevents; i++) {
         uint32_t mask = event_loop->ready_events[i].events;
         int fd = event_loop->ready_events[i].data.fd;
         AeEvent *fe = &event_loop->events[fd];
-        if (fe->mask & mask & EPOLLERR) {
-            LOGGER_DEBUG("fd: %d, EPOLLERR", fd);
+        LOGGER_DEBUG("fd: %d, fe_mask, %d, mask: %d", fd, fe->mask, mask);
+        if (fe->mask & mask & AE_ERR) {
+            // EPOLLERR 不需要另外注册，自带
+            // 会监控 socket 的错误，即返回小于 -1 的网络错误情况
             fe->tcallback(event_loop, fd, fe->data);
-            continue;
-        }
-        if (fe->mask & mask & (AE_IN|EPOLLHUP)) {
-            fe->rcallback(event_loop, fd, fe->data);
-        }
-        if (fe->mask & mask & AE_OUT) {
-            fe->wcallback(event_loop, fd, fe->data);
+        } else {
+            if (fe->mask & mask & AE_IN) {
+                fe->rcallback(event_loop, fd, fe->data);
+            }
+            if (fe->mask & mask & AE_OUT) {
+                fe->wcallback(event_loop, fd, fe->data);
+            }
         }
         processed++;
     }

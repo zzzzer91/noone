@@ -28,8 +28,8 @@ init_net_data()
     nd->cipher_ctx = init_noone_cipher_ctx();
     nd->client_fd = -1;
     nd->remote_fd = -1;
-    nd->client_event_status = AE_IN | AE_ERR | EPOLLHUP;
-    nd->remote_event_status = AE_IN | AE_ERR | EPOLLHUP;
+    nd->client_event_status = AE_IN | AE_ERR;
+    nd->remote_event_status = AE_IN | AE_ERR;
     nd->client_addr = malloc(sizeof(MyAddrInfo));
     nd->remote_addr = NULL;
     nd->client_buf = NULL;  // 交给应用初始化，UDP 不初始化，否则耗内存

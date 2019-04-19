@@ -9,7 +9,7 @@
 #include <time.h>
 
 #define AE_MAX_EVENTS 4096
-#define AE_WAIT_SECONDS 120  // epoll_wait() 和 踢出事件的超时时间
+#define AE_WAIT_SECONDS 180  // epoll_wait() 和 踢出事件的超时时间
 
 /*
  * 文件事件状态

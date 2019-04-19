@@ -22,7 +22,7 @@
 #define REMOTE_BUF_CAPACITY 32 * 1024
 
 #define TCP_ERROR(s) \
-        LOGGER_ERROR("fd: %d, %s -> " s, nd->client_fd, __func__)
+    LOGGER_ERROR("fd: %d, %s -> " s, nd->client_fd, __func__)
 
 #define REGISTER_CLIENT() \
     do { \
