@@ -55,32 +55,6 @@ free_net_data(NetData *nd)
     free(nd);
 }
 
-/*
- * 检查所有时间的最后激活时间，踢掉超时的时间
- * 更新时间的操作，在 ae_register_event() 中进行。
- */
-void
-handle_timeout(AeEventLoop *event_loop, int fd, void *data)
-{
-    NetData *nd = data;  // client 和 remote 共用 nd
-    if (fd == nd->client_fd) {
-        if (nd->ss_stage != STAGE_INIT) {
-            LOGGER_DEBUG("fd: %d, %s:%d, kill self",
-                    nd->client_fd, nd->remote_domain, nd->remote_port);
-        } else {
-            LOGGER_DEBUG("fd: %d, kill self", fd);
-        }
-    } else {
-        if (nd->ss_stage != STAGE_INIT) {
-            LOGGER_DEBUG("fd: %d, %s:%d, kill remote fd: %d",
-                    nd->client_fd, nd->remote_domain, nd->remote_port, fd);
-        } else {
-            LOGGER_DEBUG("fd: %d, kill remote fd: %d", nd->client_fd, fd);
-        }
-    }
-    CLEAR_ALL();
-}
-
 int
 create_remote_socket(NetData *nd)
 {
@@ -321,4 +295,30 @@ handle_stage_handshake(NetData *nd)
     nd->ss_stage = STAGE_STREAM;
 
     return 0;
+}
+
+/*
+ * 检查所有时间的最后激活时间，踢掉超时的时间
+ * 更新时间的操作，在 ae_register_event() 中进行。
+ */
+void
+handle_timeout(AeEventLoop *event_loop, int fd, void *data)
+{
+    NetData *nd = data;  // client 和 remote 共用 nd
+    if (fd == nd->client_fd) {
+        if (nd->ss_stage != STAGE_INIT) {
+            LOGGER_DEBUG("fd: %d, %s:%d, kill self",
+                         nd->client_fd, nd->remote_domain, nd->remote_port);
+        } else {
+            LOGGER_DEBUG("fd: %d, kill self", fd);
+        }
+    } else {
+        if (nd->ss_stage != STAGE_INIT) {
+            LOGGER_DEBUG("fd: %d, %s:%d, kill remote fd: %d",
+                         nd->client_fd, nd->remote_domain, nd->remote_port, fd);
+        } else {
+            LOGGER_DEBUG("fd: %d, kill remote fd: %d", nd->client_fd, fd);
+        }
+    }
+    CLEAR_ALL();
 }

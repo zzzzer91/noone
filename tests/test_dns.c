@@ -6,6 +6,7 @@
 #include "helper.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 void
 test_dns()
@@ -25,5 +26,7 @@ test_dns()
         SYS_ERROR("recvfrom");
         return;
     }
-    dns_parse_response(buffer);
+    struct in_addr netip;
+    netip.s_addr = dns_parse_response(buffer);
+    // printf("%s\n", inet_ntoa(netip));
 }

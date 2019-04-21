@@ -13,6 +13,9 @@
 
 #define DNS_SERVER "8.8.8.8"
 
+#define DNS_HOST			0x01
+#define DNS_CNAME			0x05
+
 typedef struct dns_header {
     unsigned short id;
     unsigned short flags;
@@ -144,6 +147,50 @@ dns_send_request(int sockfd, const char *domain)
     return 0;
 }
 
+static int
+is_pointer(int in)
+{
+    return ((in & 0xC0) == 0xC0);
+}
+
+static void
+dns_parse_name(unsigned char *chunk, unsigned char *ptr, char *out, int *len)
+{
+
+    int flag = 0, n = 0, alen = 0;
+    char *pos = out + (*len);
+
+    while (1) {
+
+        flag = (int)ptr[0];
+        if (flag == 0) break;
+
+        if (is_pointer(flag)) {
+
+            n = (int)ptr[1];
+            ptr = chunk + n;
+            dns_parse_name(chunk, ptr, out, len);
+            break;
+
+        } else {
+
+            ptr ++;
+            memcpy(pos, ptr, flag);
+            pos += flag;
+            ptr += flag;
+
+            *len += flag;
+            if ((int)ptr[0] != 0) {
+                memcpy(pos, ".", 1);
+                pos += 1;
+                (*len) += 1;
+            }
+        }
+
+    }
+
+}
+
 /*
  * 返回一个 ipv4 地址
  */
@@ -166,12 +213,52 @@ dns_parse_response(char *buf)
             int flag = (int)ptr[0];
             ptr += (flag + 1);
 
-            if (flag == 0) break;
+            if (flag == 0) {
+                break;
+            }
         }
         ptr += 4;
     }
 
-    // TODO
+    char cname[128], aname[128];
+    int len, type, ttl, datalen;
+
+    for (i = 0;i < answers;i ++) {
+
+        bzero(aname, sizeof(aname));
+        len = 0;
+
+        dns_parse_name((unsigned char *)buf, ptr, aname, &len);
+        ptr += 2;
+
+        type = htons(*(unsigned short*)ptr);
+        ptr += 4;
+
+        ttl = htons(*(unsigned short*)ptr);
+        ptr += 4;
+
+        datalen = ntohs(*(unsigned short*)ptr);
+        ptr += 2;
+
+        if (type == DNS_CNAME) {
+
+            bzero(cname, sizeof(cname));
+            len = 0;
+            dns_parse_name((unsigned char *)buf, ptr, cname, &len);
+            ptr += datalen;
+
+        } else if (type == DNS_HOST) {
+
+            unsigned int netip;
+
+            if (datalen == 4) {
+                memcpy(&netip, ptr, datalen);
+                return netip;
+            }
+
+            ptr += datalen;
+        }
+    }
 
     return 0;
 }

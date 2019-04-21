@@ -138,8 +138,6 @@ NetData *init_net_data();
 
 void free_net_data(NetData *nd);
 
-void handle_timeout(AeEventLoop *event_loop, int fd, void *data);
-
 int create_remote_socket(NetData *nd);
 
 int handle_stage_init(NetData *nd);
@@ -149,5 +147,7 @@ int handle_stage_header(NetData *nd, int socktype);
 int handle_stage_dns(NetData *nd, int socktype);
 
 int handle_stage_handshake(NetData *nd);
+
+void handle_timeout(AeEventLoop *event_loop, int fd, void *data);
 
 #endif  /* _NOONE_TRANSPORT_H_ */
