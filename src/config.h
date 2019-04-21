@@ -6,7 +6,6 @@
 #define _NOONE_CONFIG_H_
 
 #define PASSWD (unsigned char *)"123123"
-#define SERVER "0.0.0.0"
 
 #define NOONE_DEBUG 1
 

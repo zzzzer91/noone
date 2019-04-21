@@ -9,6 +9,7 @@
 #include "test_ae.c"
 #include "test_hashtable.c"
 #include "test_lru.c"
+#include "test_dns.c"
 
 int
 main(void)
@@ -18,6 +19,7 @@ main(void)
     test_ae();
     test_hashtable();
     test_lru();
+    test_dns();
     // test_error();
 
     SUMMARY();

@@ -64,9 +64,19 @@ handle_timeout(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;  // client 和 remote 共用 nd
     if (fd == nd->client_fd) {
-        LOGGER_DEBUG("fd: %d, kill self", fd);
+        if (nd->ss_stage != STAGE_INIT) {
+            LOGGER_DEBUG("fd: %d, %s:%s, kill self",
+                    nd->client_fd, nd->remote_domain, nd->remote_port);
+        } else {
+            LOGGER_DEBUG("fd: %d, kill self", fd);
+        }
     } else {
-        LOGGER_DEBUG("fd: %d, kill remote fd: %d", nd->client_fd, fd);
+        if (nd->ss_stage != STAGE_INIT) {
+            LOGGER_DEBUG("fd: %d, %s:%s, kill remote fd: %d",
+                    nd->client_fd, nd->remote_domain, nd->remote_port, fd);
+        } else {
+            LOGGER_DEBUG("fd: %d, kill remote fd: %d", nd->client_fd, fd);
+        }
     }
     CLEAR_CLIENT_AND_REMOTE();
 }

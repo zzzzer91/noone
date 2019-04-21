@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PASSWD (unsigned char *)"abc123"
+#define TEST_PASSWD (unsigned char *)"abc123"
 
 static size_t
 bytes_to_hex(unsigned char *data, size_t len, char *buf)
@@ -29,7 +29,7 @@ test_bytes_to_key()
     size_t iv_len = 16;
     unsigned char key[MAX_KEY_LEN];
     unsigned char iv[MAX_IV_LEN];
-    bytes_to_key(PASSWD, key, key_len, iv, iv_len);
+    bytes_to_key(TEST_PASSWD, key, key_len, iv, iv_len);
 
     char *key_hex = malloc(MAX_KEY_LEN*2+1);
     size_t key_hex_len = bytes_to_hex(key, key_len, key_hex);
@@ -46,7 +46,7 @@ test_bytes_to_key()
 static void
 test_aes128ctr_encrypt_and_decrypt()
 {
-    NooneCryptorInfo *ci = init_noone_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
+    NooneCryptorInfo *ci = init_noone_cryptor_info("aes-128-ctr", TEST_PASSWD, 32, 16);
 
     NooneCipherCtx *c_ctx = init_noone_cipher_ctx();
     // 加密

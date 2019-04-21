@@ -6,6 +6,7 @@
 #define _NOONE_HELPER_H_
 
 #include "log.h"
+#include "error.h"
 #include <stdio.h>
 
 int main_ret;    /* 测试结果，0 成功，1 失败 */

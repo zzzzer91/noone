@@ -19,9 +19,9 @@ typedef struct MyAddrInfo {
     } ai_addr;
 } MyAddrInfo;
 
-int tcp_server_fd_init(const char *addr, uint16_t port);
+int tcp_ipv4_server_fd_init(uint16_t port);
 
-int udp_server_fd_init(const char *addr, uint16_t port);
+int udp_ipv4_server_fd_init(uint16_t port);
 
 int set_nonblock(int sockfd);
 

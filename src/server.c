@@ -2,16 +2,17 @@
  * Created by zzzzer on 2/11/19.
  */
 
+#include "config.h"
+#include "log.h"
+#include "error.h"
 #include "ae.h"
 #include "socket.h"
+#include "transport.h"
 #include "tcp.h"
 #include "udp.h"
+#include "dns.h"
 #include "cryptor.h"
-#include "error.h"
-#include "log.h"
-#include "transport.h"
 #include "lru.h"
-#include "config.h"
 #include "manager.h"
 #include <unistd.h>
 #include <signal.h>
@@ -36,6 +37,7 @@ main(int argc, char *argv[])
     if (noone_manager == NULL) {
         PANIC("init_users_info");
     }
+
     for (int i = 0; i < noone_manager->user_count; i++) {
         NooneUserInfo *ui = &noone_manager->users_info[i];
 
@@ -54,9 +56,9 @@ main(int argc, char *argv[])
         ui->lru_cache = lc;
 
         // tcp
-        tcp_server_fd = tcp_server_fd_init(SERVER, server_port_list[i]);
+        tcp_server_fd = tcp_ipv4_server_fd_init(server_port_list[i]);
         if (tcp_server_fd < 0) {
-            PANIC("tcp_server_fd_init");
+            PANIC("tcp_ipv4_server_fd_init");
         }
         if (ae_register_event(ae_ev_loop, tcp_server_fd,
                 AE_IN, tcp_accept_conn, NULL, NULL, ui)  < 0) {
@@ -66,9 +68,9 @@ main(int argc, char *argv[])
         ae_remove_event_from_list(ae_ev_loop, tcp_server_fd);  // 从超时队列移除，并且以后也不会加入
 
         // udp 可以和 tcp 绑定同一端口
-        udp_server_fd = udp_server_fd_init(SERVER, server_port_list[i]);
+        udp_server_fd = udp_ipv4_server_fd_init(server_port_list[i]);
         if (udp_server_fd < 0) {
-            PANIC("udp_server_fd_init");
+            PANIC("udp_ipv4_server_fd_init");
         }
         if (ae_register_event(ae_ev_loop, udp_server_fd,
                 AE_IN, udp_read_client, NULL, NULL, ui) < 0) {

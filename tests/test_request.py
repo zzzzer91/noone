@@ -32,6 +32,8 @@ def get(url):
 def main():
     url = 'http://www.ruanyifeng.com/blog/'
     url = 'https://gamersky.com/'
+    url = 'https://www.google.com'
+    url = 'https://www.twitch.tv'
 
     # while True:
         # get(url)

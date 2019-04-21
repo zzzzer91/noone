@@ -85,6 +85,7 @@ ae_process_events(AeEventLoop *event_loop, int timeout)
         AeEvent *fe = &event_loop->events[fd];
         LOGGER_DEBUG("fd: %d, fe_mask, %d, mask: %d", fd, fe->mask, mask);
         if (fe->mask & mask & AE_ERR) {
+            LOGGER_DEBUG("fd: %d, EPOLLERR", fd);
             // EPOLLERR 不需要另外注册，自带
             // 会监控 socket 的错误，即返回小于 -1 的网络错误情况
             fe->tcallback(event_loop, fd, fe->data);
