@@ -35,7 +35,7 @@ typedef struct NetData {
 
     char remote_domain[MAX_DOMAIN_LEN+1];
 
-    char remote_port[MAX_PORT_LEN+1];
+    uint16_t remote_port;
 
     uint8_t iv[MAX_IV_LEN];
 
@@ -44,6 +44,8 @@ typedef struct NetData {
     int client_fd;
 
     int remote_fd;
+
+    int dns_fd;
 
     int client_event_status;
 
@@ -71,6 +73,9 @@ typedef struct NetData {
 #define UNREGISTER_REMOTE() \
     ae_unregister_event(event_loop, nd->remote_fd)
 
+#define UNREGISTER_DNS() \
+    ae_unregister_event(event_loop, nd->dns_fd)
+
 #define CLEAR_CLIENT() \
     do { \
         UNREGISTER_CLIENT(); \
@@ -85,13 +90,23 @@ typedef struct NetData {
         nd->remote_fd = -1; \
     } while (0)
 
-#define CLEAR_CLIENT_AND_REMOTE() \
+#define CLEAR_DNS() \
+    do { \
+        UNREGISTER_DNS(); \
+        close(nd->dns_fd); \
+        nd->dns_fd = -1; \
+    } while (0)
+
+#define CLEAR_ALL() \
     do { \
         if (nd->client_fd != -1) { \
             CLEAR_CLIENT(); \
         } \
         if (nd->remote_fd != -1) { \
             CLEAR_REMOTE();\
+        } \
+        if (nd->dns_fd != -1) { \
+            CLEAR_DNS(); \
         } \
         free_net_data(nd); \
         return; \
@@ -103,7 +118,7 @@ typedef struct NetData {
                 (uint8_t *)(pbuf), (pbuf_len), (uint8_t *)(cbuf)); \
         if (ret == 0) { \
             SYS_ERROR("ENCRYPT"); \
-            CLEAR_CLIENT_AND_REMOTE(); \
+            CLEAR_ALL(); \
         } \
         nd->remote_buf->len = ret; \
     } while (0)
@@ -114,7 +129,7 @@ typedef struct NetData {
                 (uint8_t *)(cbuf), (cbuf_len), (uint8_t *)(pbuf)); \
         if (ret == 0) { \
             SYS_ERROR("DECRYPT"); \
-            CLEAR_CLIENT_AND_REMOTE(); \
+            CLEAR_ALL(); \
         } \
         nd->client_buf->len = ret; \
     } while (0)
@@ -130,6 +145,8 @@ int create_remote_socket(NetData *nd);
 int handle_stage_init(NetData *nd);
 
 int handle_stage_header(NetData *nd, int socktype);
+
+int handle_stage_dns(NetData *nd, int socktype);
 
 int handle_stage_handshake(NetData *nd);
 

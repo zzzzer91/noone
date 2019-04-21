@@ -24,10 +24,10 @@ init_net_data()
     nd->ss_stage = STAGE_INIT;
     nd->is_iv_send = 0;
     memset(nd->remote_domain, 0, sizeof(nd->remote_domain));
-    memset(nd->remote_port, 0, sizeof(nd->remote_port));
     nd->cipher_ctx = init_noone_cipher_ctx();
     nd->client_fd = -1;
     nd->remote_fd = -1;
+    nd->dns_fd = -1;
     nd->client_event_status = AE_IN | AE_ERR;
     nd->remote_event_status = AE_IN | AE_ERR;
     nd->client_addr = malloc(sizeof(MyAddrInfo));
@@ -65,20 +65,20 @@ handle_timeout(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;  // client 和 remote 共用 nd
     if (fd == nd->client_fd) {
         if (nd->ss_stage != STAGE_INIT) {
-            LOGGER_DEBUG("fd: %d, %s:%s, kill self",
+            LOGGER_DEBUG("fd: %d, %s:%d, kill self",
                     nd->client_fd, nd->remote_domain, nd->remote_port);
         } else {
             LOGGER_DEBUG("fd: %d, kill self", fd);
         }
     } else {
         if (nd->ss_stage != STAGE_INIT) {
-            LOGGER_DEBUG("fd: %d, %s:%s, kill remote fd: %d",
+            LOGGER_DEBUG("fd: %d, %s:%d, kill remote fd: %d",
                     nd->client_fd, nd->remote_domain, nd->remote_port, fd);
         } else {
             LOGGER_DEBUG("fd: %d, kill remote fd: %d", nd->client_fd, fd);
         }
     }
-    CLEAR_CLIENT_AND_REMOTE();
+    CLEAR_ALL();
 }
 
 int
@@ -145,8 +145,7 @@ handle_stage_header(NetData *nd, int socktype)
     if (buf->len < 2) {
         return -1;
     }
-    MyAddrInfo *addr_info = NULL;
-    LruCache *lc = nd->user_info->lru_cache;
+
     int header_len = 0;
 
     int atty = buf->data[header_len];
@@ -158,6 +157,7 @@ handle_stage_header(NetData *nd, int socktype)
             return -1;
         }
         header_len += 1;
+
         if (buf->len < (domain_len + 4)) {
             return -1;
         }
@@ -171,92 +171,119 @@ handle_stage_header(NetData *nd, int socktype)
         uint16_t port;
         memcpy(&port, buf->data+header_len, 2);
         header_len += 2;
-        snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
+        nd->remote_port = ntohs(port);
 
-        char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
-        snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
-                "%s:%s", nd->remote_domain, nd->remote_port);
-
-        addr_info = lru_cache_get(lc, domain_and_port);
-        if (addr_info == NULL) {
-            LOGGER_DEBUG("fd: %d, %s: query DNS!", nd->client_fd, domain_and_port);
-            struct addrinfo *addr_list;
-            struct addrinfo hints = {0};
-            hints.ai_socktype = socktype;
-            int ret = getaddrinfo(nd->remote_domain, nd->remote_port, &hints, &addr_list);
-            if (ret != 0) {
-                LOGGER_ERROR("%s", gai_strerror(ret));
-                return -1;
-            }
-            LOGGER_DEBUG("fd: %d, %s: DNS success!", nd->client_fd, domain_and_port);
-
-            // 创建 addr_info
-            addr_info = malloc(sizeof(MyAddrInfo));
-            addr_info->ai_addrlen = addr_list->ai_addrlen;
-            addr_info->ai_family = addr_list->ai_family;
-            addr_info->ai_socktype = addr_list->ai_socktype;
-            memcpy(&addr_info->ai_addr, addr_list->ai_addr, addr_info->ai_addrlen);
-            freeaddrinfo(addr_list);
-
-            // 加入 lru
-            void *oldvalue;
-            ret = lru_cache_put(lc, domain_and_port, addr_info, &oldvalue);
-            if (ret < 0) {
-                free(addr_info);
-                return -1;
-            }
-            if (oldvalue != NULL) {
-                LOGGER_DEBUG("lru replace!");
-                free(oldvalue);
-            }
-            LOGGER_DEBUG("lru size: %ld", lc->size);
-        }
+        nd->ss_stage = STAGE_DNS;
     } else if (atty == ATYP_IPV4) {
         if (buf->len < 7) {
             return -1;
         }
-        addr_info = malloc(sizeof(MyAddrInfo));
+
+        MyAddrInfo *addr_info = malloc(sizeof(MyAddrInfo));
         addr_info->ai_addrlen = sizeof(addr_info->ai_addr.sin);
         addr_info->ai_family = AF_INET;
         addr_info->ai_socktype = socktype;
         addr_info->ai_addr.sin.sin_family = AF_INET;
+
         // 已经是网络字节序
         inet_ntop(AF_INET, buf->data+header_len, nd->remote_domain, sizeof(nd->remote_domain));
         memcpy(&addr_info->ai_addr.sin.sin_addr, buf->data+header_len, 4);
         header_len += 4;
+
         uint16_t port;
         memcpy(&port, buf->data+header_len, 2);
         header_len += 2;
         addr_info->ai_addr.sin.sin_port = port;
-        snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
+        nd->remote_port = ntohs(port);
+
+        nd->remote_addr = addr_info;
+
+        nd->ss_stage = STAGE_HANDSHAKE;
     } else if (atty == ATYP_IPV6) {
         if (buf->len < 19) {
             return -1;
         }
-        addr_info = malloc(sizeof(MyAddrInfo));
+
+        MyAddrInfo *addr_info = malloc(sizeof(MyAddrInfo));
         addr_info->ai_addrlen = sizeof(addr_info->ai_addr.sin6);
         addr_info->ai_family = AF_INET6;
         addr_info->ai_socktype = socktype;
         addr_info->ai_addr.sin6.sin6_family = AF_INET6;
+
         inet_ntop(AF_INET6, buf->data+header_len, nd->remote_domain, sizeof(nd->remote_domain));
         memcpy(&addr_info->ai_addr.sin6.sin6_addr, buf->data+header_len, 16);
         header_len += 16;
+
         uint16_t port;
         memcpy(&port, buf->data+header_len, 2);
         header_len += 2;
         addr_info->ai_addr.sin6.sin6_port = port;
-        snprintf(nd->remote_port, MAX_DOMAIN_LEN, "%d", ntohs(port));
+        nd->remote_port = ntohs(port);
+
+        nd->remote_addr = addr_info;
+
+        nd->ss_stage = STAGE_HANDSHAKE;
     } else {
         LOGGER_ERROR("ATYP error！Maybe wrong password or decryption method.");
         return -1;
     }
-    nd->remote_addr = addr_info;
 
     buf->len -= header_len;
 
     if (buf->len > 0) {
         memcpy(buf->data, buf->data+header_len, buf->len);
     }
+
+    return 0;
+}
+
+int
+handle_stage_dns(NetData *nd, int socktype)
+{
+    MyAddrInfo *addr_info = NULL;
+    LruCache *lc = nd->user_info->lru_cache;
+
+    char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
+    snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
+             "%s:%d", nd->remote_domain, nd->remote_port);
+
+    addr_info = lru_cache_get(lc, domain_and_port);
+    if (addr_info == NULL) {
+        LOGGER_DEBUG("fd: %d, %s:  DNS query!", nd->client_fd, domain_and_port);
+        struct addrinfo *addr_list;
+        struct addrinfo hints = {0};
+        hints.ai_socktype = socktype;
+        char port_str[MAX_PORT_LEN+1];
+        snprintf(port_str, MAX_PORT_LEN, "%d", nd->remote_port);
+        int ret = getaddrinfo(nd->remote_domain, port_str, &hints, &addr_list);
+        if (ret != 0) {
+            LOGGER_ERROR("%s", gai_strerror(ret));
+            return -1;
+        }
+        LOGGER_DEBUG("fd: %d, %s: DNS success!", nd->client_fd, domain_and_port);
+
+        // 创建 addr_info
+        addr_info = malloc(sizeof(MyAddrInfo));
+        addr_info->ai_addrlen = addr_list->ai_addrlen;
+        addr_info->ai_family = addr_list->ai_family;
+        addr_info->ai_socktype = addr_list->ai_socktype;
+        memcpy(&addr_info->ai_addr, addr_list->ai_addr, addr_info->ai_addrlen);
+        freeaddrinfo(addr_list);
+
+        // 加入 lru
+        void *oldvalue;
+        ret = lru_cache_put(lc, domain_and_port, addr_info, &oldvalue);
+        if (ret < 0) {
+            free(addr_info);
+            return -1;
+        }
+        if (oldvalue != NULL) {
+            LOGGER_DEBUG("lru replace!");
+            free(oldvalue);
+        }
+        LOGGER_DEBUG("lru size: %ld", lc->size);
+    }
+    nd->remote_addr = addr_info;
 
     nd->ss_stage = STAGE_HANDSHAKE;
 
@@ -284,7 +311,7 @@ handle_stage_handshake(NetData *nd)
             nd->remote_addr = NULL;
             char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
             snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
-                     "%s:%s", nd->remote_domain, nd->remote_port);
+                     "%s:%d", nd->remote_domain, nd->remote_port);
             lru_cache_remove(nd->user_info->lru_cache, domain_and_port);
             SYS_ERROR("connect");
             return -1;

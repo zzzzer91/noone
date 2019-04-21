@@ -7,6 +7,6 @@
 
 int dns_send_request(int sockfd, const char *domain);
 
-int dns_parse_response(int sockfd);
+unsigned int dns_parse_response(char *buf);
 
 #endif  /* _NOONE_DNS_H_ */

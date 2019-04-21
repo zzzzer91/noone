@@ -1,5 +1,7 @@
 /*
  * Created by zzzzer on 4/18/19.
+ *
+ * 只支持 ipv4
  */
 
 #include "dns.h"
@@ -106,6 +108,7 @@ build_request(DnsHeader *header, DnsQuestion *question, char *request)
 
     memcpy(request+offset, question->qname, question->length);
     offset += question->length;
+    free(question->qname);
 
     memcpy(request+offset, &question->qtype, sizeof(question->qtype));
     offset += sizeof(question->qtype);
@@ -141,18 +144,34 @@ dns_send_request(int sockfd, const char *domain)
     return 0;
 }
 
-int
-dns_parse_response(int sockfd)
+/*
+ * 返回一个 ipv4 地址
+ */
+unsigned int
+dns_parse_response(char *buf)
 {
-    char buffer[1024] = {0};
-    struct sockaddr_in addr;
-    socklen_t addr_len = sizeof(addr);
+    int i = 0;
+    unsigned char *ptr = (unsigned char *)buf;
 
-    int n = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addr_len);
-    if (n < 0) {
-        SYS_ERROR("recvfrom");
-        return -1;
+    ptr += 4;
+    int querys = ntohs(*(unsigned short*)ptr);
+
+    ptr += 2;
+    int answers = ntohs(*(unsigned short*)ptr);
+
+    // 跳过 query 区域
+    ptr += 6;
+    for (i = 0;i < querys;i ++) {
+        while (1) {
+            int flag = (int)ptr[0];
+            ptr += (flag + 1);
+
+            if (flag == 0) break;
+        }
+        ptr += 4;
     }
+
+    // TODO
 
     return 0;
 }

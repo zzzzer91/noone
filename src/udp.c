@@ -33,7 +33,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
             (struct sockaddr *)&caddr->ai_addr, &caddr->ai_addrlen);
     if (nread < 0) {
         SYS_ERROR("recvfrom");
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_ALL();
     }
 
     int iv_len = nd->user_info->cryptor_info->iv_len;
@@ -41,7 +41,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     nread -= iv_len;
     if (handle_stage_init(nd) < 0) {
         SYS_ERROR("handle_stage_init");
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_ALL();
     }
 
     Buffer *cbuf = init_buffer(CLIENT_BUF_CAPACITY+128);
@@ -51,25 +51,25 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     if (nd->ss_stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_DGRAM) < 0) {
             SYS_ERROR("handle_stage_header");
-            CLEAR_CLIENT_AND_REMOTE();
+            CLEAR_ALL();
         }
     }
 
     if (cbuf->len == 0) {  // 解析完头部后，没有数据了
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_ALL();
         return;
     }
 
     if (create_remote_socket(nd) < 0) {
         SYS_ERROR("create_remote_socket");
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_ALL();
     }
 
     MyAddrInfo *raddr = nd->remote_addr;
     if (sendto(nd->remote_fd, cbuf->data, cbuf->len, 0,
             (struct sockaddr *)&raddr->ai_addr, raddr->ai_addrlen) < cbuf->len) {
         SYS_ERROR("sendto");
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_ALL();
     }
 
     free_buffer(cbuf);
@@ -78,7 +78,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     if (ae_register_event(event_loop, nd->remote_fd, AE_IN,
             udp_read_remote, NULL, handle_timeout, nd) < 0) {
         SYS_ERROR("ae_register_event");
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_ALL();
     }
 }
 
@@ -96,7 +96,7 @@ udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
             (struct sockaddr *)&remote_addr.ai_addr, &remote_addr.ai_addrlen);
     if (nread < 0) {
         SYS_ERROR("recvfrom");
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_ALL();
     }
 
     char temp_buf[HEAD_PREFIX];
@@ -131,8 +131,8 @@ udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     if (sendto(sockfd, rbuf->data, rbuf->len, 0,
                (struct sockaddr *)&caddr->ai_addr, caddr->ai_addrlen) < rbuf->len) {
         SYS_ERROR("sendto");
-        CLEAR_CLIENT_AND_REMOTE();
+        CLEAR_ALL();
     }
 
-    CLEAR_CLIENT_AND_REMOTE();
+    CLEAR_ALL();
 }
