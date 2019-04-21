@@ -7,6 +7,7 @@
 #include "buffer.h"
 #include "socket.h"
 #include "error.h"
+#include "dns.h"
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
@@ -212,53 +213,35 @@ handle_stage_header(NetData *nd, int socktype)
 }
 
 int
-handle_stage_dns(NetData *nd, int socktype)
+handle_stage_dns(NetData *nd)
 {
-    MyAddrInfo *addr_info = NULL;
     LruCache *lc = nd->user_info->lru_cache;
 
     char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
     snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
              "%s:%d", nd->remote_domain, nd->remote_port);
 
-    addr_info = lru_cache_get(lc, domain_and_port);
+    MyAddrInfo *addr_info = lru_cache_get(lc, domain_and_port);
     if (addr_info == NULL) {
         LOGGER_DEBUG("fd: %d, %s:  DNS query!", nd->client_fd, domain_and_port);
-        struct addrinfo *addr_list;
-        struct addrinfo hints = {0};
-        hints.ai_socktype = socktype;
-        char port_str[MAX_PORT_LEN+1];
-        snprintf(port_str, MAX_PORT_LEN, "%d", nd->remote_port);
-        int ret = getaddrinfo(nd->remote_domain, port_str, &hints, &addr_list);
-        if (ret != 0) {
-            LOGGER_ERROR("%s", gai_strerror(ret));
+        int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (sockfd < 0) {
+            SYS_ERROR("socket");
             return -1;
         }
-        LOGGER_DEBUG("fd: %d, %s: DNS success!", nd->client_fd, domain_and_port);
-
-        // 创建 addr_info
-        addr_info = malloc(sizeof(MyAddrInfo));
-        addr_info->ai_addrlen = addr_list->ai_addrlen;
-        addr_info->ai_family = addr_list->ai_family;
-        addr_info->ai_socktype = addr_list->ai_socktype;
-        memcpy(&addr_info->ai_addr, addr_list->ai_addr, addr_info->ai_addrlen);
-        freeaddrinfo(addr_list);
-
-        // 加入 lru
-        void *oldvalue;
-        ret = lru_cache_put(lc, domain_and_port, addr_info, &oldvalue);
-        if (ret < 0) {
-            free(addr_info);
+        if (set_nonblock(sockfd) < 0) {
+            close(sockfd);
             return -1;
         }
-        if (oldvalue != NULL) {
-            LOGGER_DEBUG("lru replace!");
-            free(oldvalue);
+        nd->dns_fd = sockfd;
+
+        if (dns_send_request(nd->dns_fd, nd->remote_domain) < 0) {
+            close(sockfd);
+            return -1;
         }
-        LOGGER_DEBUG("lru size: %ld", lc->size);
+        return 0;
     }
     nd->remote_addr = addr_info;
-
     nd->ss_stage = STAGE_HANDSHAKE;
 
     return 0;
@@ -302,7 +285,7 @@ handle_stage_handshake(NetData *nd)
  * 更新时间的操作，在 ae_register_event() 中进行。
  */
 void
-handle_timeout(AeEventLoop *event_loop, int fd, void *data)
+handle_stream_timeout(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;  // client 和 remote 共用 nd
     if (fd == nd->client_fd) {

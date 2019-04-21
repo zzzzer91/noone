@@ -10,6 +10,7 @@
 #include "cryptor.h"
 #include "log.h"
 #include "lru.h"
+#include "dns.h"
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
@@ -38,7 +39,7 @@
     do { \
         if (nd->client_fd != -1) { \
             if (ae_register_event(event_loop, nd->client_fd, nd->client_event_status, \
-                        tcp_read_client, tcp_write_client, handle_timeout, nd) < 0) { \
+                        tcp_read_client, tcp_write_client, handle_stream_timeout, nd) < 0) { \
                 TCP_ERROR("REGISTER_CLIENT"); \
                 CLEAR_ALL(); \
             } \
@@ -49,7 +50,7 @@
     do { \
         if (nd->remote_fd != -1) { \
             if (ae_register_event(event_loop, nd->remote_fd, nd->remote_event_status, \
-                    tcp_read_remote, tcp_write_remote, handle_timeout, nd) < 0) { \
+                    tcp_read_remote, tcp_write_remote, handle_stream_timeout, nd) < 0) { \
                 TCP_ERROR("REGISTER_REMOTE"); \
                 CLEAR_ALL(); \
             } \
@@ -91,6 +92,69 @@
         ret; \
     })
 
+static void
+handle_dns(AeEventLoop *event_loop, int fd, void *data)
+{
+    NetData *nd = data;
+    TCP_DEBUG("DNS success!");
+
+    char buffer[1024] = {0};
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof(addr);
+    int n = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addr_len);
+    if (n < 0) {
+        SYS_ERROR("recvfrom");
+        return;
+    }
+
+    unsigned int netip = dns_parse_response(buffer);
+
+    CLEAR_DNS();
+
+    // 只支持 ipv4
+    MyAddrInfo *addr_info = malloc(sizeof(MyAddrInfo));
+    addr_info->ai_addrlen = sizeof(struct sockaddr_in);
+    addr_info->ai_family = AF_INET;
+    addr_info->ai_socktype = SOCK_STREAM;
+    addr_info->ai_addr.sin.sin_addr.s_addr = netip;
+    addr_info->ai_addr.sin.sin_family = AF_INET;
+    addr_info->ai_addr.sin.sin_port = htons(nd->remote_port);
+    nd->remote_addr = addr_info;
+
+    char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
+    snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
+             "%s:%d", nd->remote_domain, nd->remote_port);
+    // 加入 lru
+    void *oldvalue;
+    LruCache *lc = nd->user_info->lru_cache;
+    if (lru_cache_put(lc, domain_and_port, addr_info, &oldvalue) < 0) {
+        free(addr_info);
+        return;
+    }
+    if (oldvalue != NULL) {
+        // LOGGER_DEBUG("lru replace!");
+        free(oldvalue);
+    }
+    // LOGGER_DEBUG("lru size: %ld", lc->size);
+
+    LOGGER_DEBUG("fd: %d, connecting %s:%d",
+                 nd->client_fd, nd->remote_domain, nd->remote_port);
+    if (handle_stage_handshake(nd) < 0) {
+        TCP_ERROR("handle_stage_handshake");
+        CLEAR_ALL();
+    }
+
+    // 解析完头部后没有数据了
+    if (nd->client_buf->len == 0) {
+        nd->client_event_status |= AE_IN;
+        REGISTER_CLIENT();
+        return;
+    }
+
+    nd->remote_event_status |= AE_OUT;
+    REGISTER_REMOTE();
+}
+
 void
 tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 {
@@ -121,6 +185,7 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
         close(client_fd);
         return;
     }
+
     nd->client_fd = client_fd;
     nd->user_info = (NooneUserInfo *)data;
     memcpy(&nd->client_addr->ai_addr, &client_addr, client_addr_len);
@@ -177,9 +242,19 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     if (nd->ss_stage == STAGE_DNS) {
-        if (handle_stage_dns(nd, SOCK_STREAM) < 0) {
+        if (handle_stage_dns(nd) < 0) {
             TCP_ERROR("handle_stage_dns");
             CLEAR_ALL();
+        }
+        if (nd->ss_stage == STAGE_DNS) {  // 异步查询 dns
+            if (ae_register_event(event_loop, nd->dns_fd, AE_IN,
+                    handle_dns, NULL, handle_stream_timeout, nd) < 0) {
+                TCP_ERROR("handle_stage_dns");
+                CLEAR_ALL();
+            }
+            nd->client_event_status ^= AE_IN;
+            REGISTER_CLIENT();
+            return;
         }
     }
 

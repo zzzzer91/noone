@@ -7,6 +7,7 @@
 #include "log.h"
 #include "error.h"
 #include "socket.h"
+#include "dns.h"
 #include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -15,6 +16,71 @@
 #define CLIENT_BUF_CAPACITY 8 * 1024
 #define REMOTE_BUF_CAPACITY 8 * 1024
 
+static void
+handle_dns(AeEventLoop *event_loop, int fd, void *data)
+{
+    NetData *nd = data;
+    LOGGER_DEBUG("DNS success!");
+
+    char buffer[1024] = {0};
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof(addr);
+    int n = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addr_len);
+    if (n < 0) {
+        SYS_ERROR("recvfrom");
+        return;
+    }
+
+    unsigned int netip = dns_parse_response(buffer);
+
+    CLEAR_DNS();
+
+    // 只支持 ipv4
+    MyAddrInfo *addr_info = malloc(sizeof(MyAddrInfo));
+    addr_info->ai_addrlen = sizeof(struct sockaddr_in);
+    addr_info->ai_family = AF_INET;
+    addr_info->ai_socktype = SOCK_STREAM;
+    addr_info->ai_addr.sin.sin_addr.s_addr = netip;
+    addr_info->ai_addr.sin.sin_family = AF_INET;
+    addr_info->ai_addr.sin.sin_port = htons(nd->remote_port);
+    nd->remote_addr = addr_info;
+
+    char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
+    snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
+             "%s:%d", nd->remote_domain, nd->remote_port);
+    // 加入 lru
+    void *oldvalue;
+    LruCache *lc = nd->user_info->lru_cache;
+    if (lru_cache_put(lc, domain_and_port, addr_info, &oldvalue) < 0) {
+        free(addr_info);
+        return;
+    }
+    if (oldvalue != NULL) {
+        free(oldvalue);
+    }
+
+    if (create_remote_socket(nd) < 0) {
+        SYS_ERROR("create_remote_socket");
+        CLEAR_ALL();
+    }
+
+    MyAddrInfo *raddr = nd->remote_addr;
+    Buffer *cbuf = nd->client_buf;
+    if (sendto(nd->remote_fd, cbuf->data, cbuf->len, 0,
+               (struct sockaddr *)&raddr->ai_addr, raddr->ai_addrlen) < cbuf->len) {
+        SYS_ERROR("sendto");
+        CLEAR_ALL();
+    }
+
+    free_buffer(cbuf);
+    nd->client_buf = NULL;
+
+    if (ae_register_event(event_loop, nd->remote_fd, AE_IN,
+                          udp_read_remote, NULL, handle_stream_timeout, nd) < 0) {
+        SYS_ERROR("ae_register_event");
+        CLEAR_ALL();
+    }
+}
 void
 udp_read_client(AeEventLoop *event_loop, int fd, void *data)
 {
@@ -53,11 +119,24 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
             SYS_ERROR("handle_stage_header");
             CLEAR_ALL();
         }
+        if (cbuf->len == 0) {  // 解析完头部后，没有数据了
+            CLEAR_ALL();
+        }
     }
 
-    if (cbuf->len == 0) {  // 解析完头部后，没有数据了
-        CLEAR_ALL();
-        return;
+    if (nd->ss_stage == STAGE_DNS) {
+        if (handle_stage_dns(nd) < 0) {
+            SYS_ERROR("handle_stage_dns");
+            CLEAR_ALL();
+        }
+        if (nd->ss_stage == STAGE_DNS) {  // 异步查询 dns
+            if (ae_register_event(event_loop, nd->dns_fd, AE_IN,
+                    handle_dns, NULL, handle_stream_timeout, nd) < 0) {
+                SYS_ERROR("handle_stage_dns");
+                CLEAR_ALL();
+            }
+            return;
+        }
     }
 
     if (create_remote_socket(nd) < 0) {
@@ -72,11 +151,11 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_ALL();
     }
 
-    free_buffer(cbuf);
+    free_buffer(nd->client_buf);
     nd->client_buf = NULL;
 
     if (ae_register_event(event_loop, nd->remote_fd, AE_IN,
-            udp_read_remote, NULL, handle_timeout, nd) < 0) {
+                          udp_read_remote, NULL, handle_stream_timeout, nd) < 0) {
         SYS_ERROR("ae_register_event");
         CLEAR_ALL();
     }

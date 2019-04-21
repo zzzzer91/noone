@@ -144,10 +144,10 @@ int handle_stage_init(NetData *nd);
 
 int handle_stage_header(NetData *nd, int socktype);
 
-int handle_stage_dns(NetData *nd, int socktype);
+int handle_stage_dns(NetData *nd);
 
 int handle_stage_handshake(NetData *nd);
 
-void handle_timeout(AeEventLoop *event_loop, int fd, void *data);
+void handle_stream_timeout(AeEventLoop *event_loop, int fd, void *data);
 
 #endif  /* _NOONE_TRANSPORT_H_ */

@@ -11,7 +11,9 @@
 #include <assert.h>
 #include <arpa/inet.h>
 
-#define DNS_SERVER "8.8.8.8"
+#define DNS_SERVER1 "8.8.8.8"
+#define DNS_SERVER2 "8.8.4.4"
+#define DNS_SERVER3 "114.114.114.114"
 
 #define DNS_HOST			0x01
 #define DNS_CNAME			0x05
@@ -137,12 +139,26 @@ dns_send_request(int sockfd, const char *domain)
     struct sockaddr_in dest;
     dest.sin_family = AF_INET;
     dest.sin_port = htons(53);
-    dest.sin_addr.s_addr = inet_addr(DNS_SERVER);
+
+    // 主服务器，备用服务器各发一遍，增加稳定性
+    dest.sin_addr.s_addr = inet_addr(DNS_SERVER1);
     int slen = sendto(sockfd, request, req_len, 0, (struct sockaddr*)&dest, sizeof(dest));
     if (slen < 0) {
         SYS_ERROR("sendto");
         return -1;
     }
+    dest.sin_addr.s_addr = inet_addr(DNS_SERVER2);
+    slen = sendto(sockfd, request, req_len, 0, (struct sockaddr*)&dest, sizeof(dest));
+    if (slen < 0) {
+        SYS_ERROR("sendto");
+        return -1;
+    }
+//    dest.sin_addr.s_addr = inet_addr(DNS_SERVER3);
+//    slen = sendto(sockfd, request, req_len, 0, (struct sockaddr*)&dest, sizeof(dest));
+//    if (slen < 0) {
+//        SYS_ERROR("sendto");
+//        return -1;
+//    }
 
     return 0;
 }
