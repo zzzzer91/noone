@@ -200,6 +200,7 @@ hashtable_clear(HashTable *ht)
     for (int i = 0; i < size; i++) {
         ht->zipper_entry[p->hashcode].entry_count--;
         ht->list_head = p->list_next;
+        free(p->value); // value 必须是 malloc分配
         free(p);
         p = ht->list_head;
     }

@@ -76,7 +76,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     nd->client_buf = NULL;
 
     if (ae_register_event(event_loop, nd->remote_fd, AE_IN,
-                          udp_read_remote, NULL, handle_stream_timeout, nd) < 0) {
+            udp_read_remote, NULL, handle_stream_timeout, nd) < 0) {
         SYS_ERROR("ae_register_event");
         CLEAR_ALL();
     }

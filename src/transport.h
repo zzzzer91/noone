@@ -28,7 +28,6 @@ typedef enum SsStageType {
     STAGE_DNS,        /* 查询 DNS，可能不进行这一步 */
     STAGE_HANDSHAKE,  /* TCP 和 remote 握手阶段 */
     STAGE_STREAM,     /* TCP 传输阶段 */
-    STAGE_UDP
 } SsStageType;
 
 typedef struct NetData {

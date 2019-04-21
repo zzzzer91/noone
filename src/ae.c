@@ -82,7 +82,7 @@ ae_process_events(AeEventLoop *event_loop, int timeout)
         uint32_t mask = event_loop->ready_events[i].events;
         int fd = event_loop->ready_events[i].data.fd;
         AeEvent *fe = &event_loop->events[fd];
-        // LOGGER_DEBUG("fd: %d, fe_mask, %d, mask: %d", fd, fe->mask, mask);
+        LOGGER_DEBUG("fd: %d, fe_mask, %d, mask: %d", fd, fe->mask, mask);
         if (fe->mask & mask & AE_ERR) {
             LOGGER_DEBUG("fd: %d, EPOLLERR", fd);
             // EPOLLERR 不需要另外注册，自带
