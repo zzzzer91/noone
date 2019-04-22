@@ -43,7 +43,7 @@ main(int argc, char *argv[])
 
         ui->user_idx = i;
 
-        NooneCryptorInfo *ci = init_noone_cryptor_info("aes-128-ctr", PASSWD, 32, 16);
+        NooneCryptorInfo *ci = init_noone_cryptor_info("aes-128-ctr", NOONE_PASSWD, 32, 16);
         if (ci == NULL) {
             PANIC("init_noone_cryptor_info");
         }

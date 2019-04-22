@@ -46,7 +46,7 @@ tcp_ipv4_server_fd_init(uint16_t port)
         return -1;
     }
 
-    if (listen(server_fd, MAX_LISTEN) < 0) {
+    if (listen(server_fd, 2048) < 0) {
         SYS_ERROR("listen");
         close(server_fd);
         return -1;

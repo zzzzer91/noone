@@ -92,6 +92,21 @@
         ret; \
     })
 
+#define RESIZE_BUF(buf, size) \
+    do { \
+        size_t need_cap = buf->len + size; \
+        size_t step = buf->capacity >> 1U; \
+        size_t new_cap = buf->capacity + step; \
+        while (need_cap > new_cap) { \
+            new_cap += step;\
+        } \
+        if (resize_buffer(buf, new_cap) < 0) { \
+            TCP_ERROR("RESIZE_BUF"); \
+            CLEAR_ALL(); \
+        } \
+        TCP_DEBUG("RESIZE_BUF: %ld", new_cap); \
+    } while (0)
+
 static void
 handle_dns(AeEventLoop *event_loop, int fd, void *data)
 {
@@ -144,15 +159,12 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_ALL();
     }
 
-    // 解析完头部后没有数据了
-    if (nd->client_buf->len == 0) {
-        nd->client_event_status |= AE_IN;
-        REGISTER_CLIENT();
-        return;
+    nd->client_event_status |= AE_IN;
+    REGISTER_CLIENT();
+    if (nd->client_buf->len > 0) {
+        nd->remote_event_status |= AE_OUT;
+        REGISTER_REMOTE();
     }
-
-    nd->remote_event_status |= AE_OUT;
-    REGISTER_REMOTE();
 }
 
 void
@@ -187,7 +199,7 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
     }
 
     nd->client_fd = client_fd;
-    nd->user_info = (NooneUserInfo *)data;
+    nd->user_info = data;
     memcpy(&nd->client_addr->ai_addr, &client_addr, client_addr_len);
     nd->client_addr->ai_addrlen = client_addr_len;
     // 多出来的给 iv 分配，和防止加密后长度变化导致溢出
@@ -232,7 +244,10 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     Buffer *cbuf = nd->client_buf;
-    DECRYPT(temp_buf+iv_len, nread, cbuf->data);
+    if (nread + cbuf->len > cbuf->capacity) {
+        RESIZE_BUF(cbuf, nread);
+    }
+    DECRYPT(temp_buf+iv_len, nread, cbuf->data+cbuf->len);
 
     if (nd->ss_stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_STREAM) < 0) {
@@ -274,9 +289,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     // 不需要考虑重复注册问题
     // ae_register_event() 中有相应处理逻辑
-    nd->client_event_status ^= AE_IN;
     nd->remote_event_status |= AE_OUT;
-    REGISTER_CLIENT();
     REGISTER_REMOTE();
 }
 
@@ -290,14 +303,11 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     cbuf->len -= nwriten;
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写
         TCP_DEBUG("not completed!");
-        cbuf->idx += nwriten;
+        memcpy(cbuf->data, cbuf->data+nwriten, cbuf->len);
         return;  // 没写完，不改变 AE_IN||AE_OUT 状态
     }
-    cbuf->idx = 0;
 
-    nd->client_event_status |= AE_IN;
     nd->remote_event_status ^= AE_OUT;
-    REGISTER_CLIENT();
     REGISTER_REMOTE();
 }
 

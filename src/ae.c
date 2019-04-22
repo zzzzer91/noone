@@ -78,15 +78,16 @@ ae_process_events(AeEventLoop *event_loop, int timeout)
 {
     int processed = 0;
     int numevents = AE_EPOLL_POLL(event_loop, timeout * 1000);
+    // LOGGER_DEBUG("numevents: %d", numevents);
     for (int i = 0; i < numevents; i++) {
         uint32_t mask = event_loop->ready_events[i].events;
         int fd = event_loop->ready_events[i].data.fd;
         AeEvent *fe = &event_loop->events[fd];
-        LOGGER_DEBUG("fd: %d, fe_mask, %d, mask: %d", fd, fe->mask, mask);
+        // LOGGER_DEBUG("fd: %d, fe_mask, %d, mask: %d", fd, fe->mask, mask);
         if (fe->mask & mask & AE_ERR) {
             LOGGER_DEBUG("fd: %d, EPOLLERR", fd);
             // EPOLLERR 不需要另外注册，自带
-            // 会监控 socket 的错误，即返回小于 -1 的网络错误情况
+            // 会监控 socket 的错误，如 Connection reset by peer
             fe->tcallback(event_loop, fd, fe->data);
         } else {
             if (fe->mask & mask & AE_IN) {
@@ -121,22 +122,16 @@ ae_create_event_loop(int event_set_size)
     }
 
     // 初始化文件事件结构
-    event_loop->events = malloc(sizeof(AeEvent)*event_set_size);
+    // Events with mask == AE_NONE are not set.
+    event_loop->events = calloc(event_set_size, sizeof(AeEvent));
     if (event_loop->events == NULL) {
         close(event_loop->epfd);
         free(event_loop);
         return NULL;
     }
-    /* Events with mask == AE_NONE are not set. So let's initialize the
-     * vector with it. */
-    for (int i = 0; i < event_set_size; i++) {
-        event_loop->events[i].mask = AE_NONE;
-        event_loop->events[i].list_prev = NULL;
-        event_loop->events[i].list_next = NULL;
-    }
 
     // 初始化事件槽空间，放置 epoll_wait() 已就绪事件
-    event_loop->ready_events = malloc(sizeof(struct epoll_event)*event_set_size);
+    event_loop->ready_events = malloc(event_set_size*sizeof(struct epoll_event));
     if (event_loop->ready_events == NULL) {
         close(event_loop->epfd);
         free(event_loop->events);
@@ -146,12 +141,11 @@ ae_create_event_loop(int event_set_size)
 
     // 设置数组大小
     event_loop->event_set_size = event_set_size;
-
     event_loop->stop = 0;
     event_loop->maxfd = -1;
-
     event_loop->list_head = NULL;
     event_loop->list_tail = NULL;
+    event_loop->data = NULL;
 
     // 返回事件循环
     return event_loop;

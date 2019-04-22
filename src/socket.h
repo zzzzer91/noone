@@ -7,8 +7,6 @@
 
 #include <netinet/in.h>  /* struct sockaddr_in */
 
-#define MAX_LISTEN	2048
-
 typedef struct MyAddrInfo {
     socklen_t ai_addrlen;
     int ai_family;

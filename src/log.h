@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <time.h>
 
+
+#if NOONE_LOGGER_DISPLAY_TIME
 #define LOGGER_PRINT(log_level, fmt, args...) \
     do { \
         time_t t = time(NULL); \
@@ -17,12 +19,10 @@
         strftime(nowtime, 32, "%Y-%m-%d %H:%M:%S", lt); \
         fprintf(stderr, "[%s] " "["log_level"] " fmt "\n", nowtime, ##args); \
     } while(0)
-
-/*
+#else
 #define LOGGER_PRINT(log_level, fmt, args...) \
-        fprintf(stderr, "["log_level"] " fmt "\n", ##args); \
-
- */
+        fprintf(stderr, "["log_level"] " fmt "\n", ##args)
+#endif
 
 #if NOONE_DEBUG
 #define LOGGER_DEBUG(fmt, args...) LOGGER_PRINT("DEBUG", fmt, ##args)

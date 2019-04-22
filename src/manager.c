@@ -15,7 +15,7 @@ init_manager(int user_count)
         return NULL;
     }
 
-    m->users_info = malloc(sizeof(NooneUserInfo)*user_count);
+    m->users_info = malloc(user_count*sizeof(NooneUserInfo));
     if (m->users_info == NULL) {
         free(m);
         return NULL;

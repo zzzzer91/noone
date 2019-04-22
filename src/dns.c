@@ -6,7 +6,6 @@
 
 #include "dns.h"
 #include "error.h"
-#include "socket.h"
 #include <sys/socket.h>
 #include <assert.h>
 #include <arpa/inet.h>
