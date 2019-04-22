@@ -33,7 +33,14 @@
     } while (0)
 
 #define TCP_ERROR(s) \
-    LOGGER_ERROR("fd: %d, %s -> " s, nd->client_fd, __func__)
+    do { \
+        if (errno != 0) { \
+            LOGGER_ERROR("fd: %d, %s -> " s ": %s", nd->client_fd, __func__, strerror(errno)); \
+            errno = 0; \
+        } else {\
+            LOGGER_ERROR("fd: %d, %s -> " s, nd->client_fd, __func__); \
+        } \
+    } while (0)
 
 #define REGISTER_CLIENT() \
     do { \
@@ -64,7 +71,7 @@
             TCP_DEBUG("close!"); \
             CLEAR_ALL(); \
         } else if (ret < 0) { \
-            SYS_ERROR("read"); \
+            TCP_ERROR("READ"); \
             if (errno == EINTR || errno == EAGAIN \
                     || errno == ETIMEDOUT || errno == EWOULDBLOCK) { \
                 return; \
@@ -82,7 +89,7 @@
             TCP_DEBUG("close!"); \
             CLEAR_ALL(); \
         } else if (ret < 0) { \
-            SYS_ERROR("write"); \
+            TCP_ERROR("WRITE"); \
             if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) { \
                 return; \
             } \
@@ -118,7 +125,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     socklen_t addr_len = sizeof(addr);
     int n = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addr_len);
     if (n < 0) {
-        SYS_ERROR("recvfrom");
+        TCP_ERROR("recvfrom");
         return;
     }
 
