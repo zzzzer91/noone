@@ -66,6 +66,24 @@ typedef struct NetData {
 
 } NetData;
 
+NetData *init_net_data();
+
+void free_net_data(NetData *nd);
+
+int create_remote_socket(NetData *nd);
+
+int handle_stage_init(NetData *nd);
+
+int handle_stage_header(NetData *nd, int socktype);
+
+int handle_stage_dns(NetData *nd);
+
+int handle_stage_handshake(NetData *nd);
+
+void handle_transport_timeout(AeEventLoop *event_loop, int fd, void *data);
+
+int add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info);
+
 #define UNREGISTER_CLIENT() \
     ae_unregister_event(event_loop, nd->client_fd)
 
@@ -133,20 +151,13 @@ typedef struct NetData {
         nd->client_buf->len = ret; \
     } while (0)
 
-NetData *init_net_data();
-
-void free_net_data(NetData *nd);
-
-int create_remote_socket(NetData *nd);
-
-int handle_stage_init(NetData *nd);
-
-int handle_stage_header(NetData *nd, int socktype);
-
-int handle_stage_dns(NetData *nd);
-
-int handle_stage_handshake(NetData *nd);
-
-void handle_stream_timeout(AeEventLoop *event_loop, int fd, void *data);
+#define REGISTER_DNS_EVENT(callback) \
+    do { \
+        if (ae_register_event(event_loop, nd->dns_fd, AE_IN, \
+                handle_dns, NULL, handle_transport_timeout, nd) < 0) { \
+            LOGGER_ERROR("handle_stage_dns"); \
+            CLEAR_ALL(); \
+        } \
+    } while (0)
 
 #endif  /* _NOONE_TRANSPORT_H_ */

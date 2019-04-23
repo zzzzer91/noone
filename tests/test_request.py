@@ -31,7 +31,7 @@ def get(url):
 
 def main():
     url = 'http://www.ruanyifeng.com/blog/'
-    url = 'https://www.baidu.com'
+    url = 'https://www.twitch.tv'
 
     # while True:
         # get(url)

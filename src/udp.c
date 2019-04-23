@@ -16,16 +16,43 @@
 #define CLIENT_BUF_CAPACITY 8 * 1024
 #define REMOTE_BUF_CAPACITY 8 * 1024
 
+#define RECVFROM(sockfd, buf, buf_cap, addr) \
+    ({ \
+        ssize_t ret = recvfrom(sockfd, buf, buf_cap, 0, \
+                (struct sockaddr *)&addr->ai_addr, &addr->ai_addrlen); \
+        if (ret < 0) { \
+            SYS_ERROR("recvfrom"); \
+            CLEAR_ALL(); \
+        } \
+        ret; \
+    })
+
+#define SENDTO(sockfd, buf, buf_len, addr) \
+    do { \
+        if (sendto(sockfd, buf, buf_len, 0, \
+                (struct sockaddr *)&addr->ai_addr, addr->ai_addrlen) < buf_len) {\
+            SYS_ERROR("sendto");\
+            CLEAR_ALL();\
+        }\
+    } while (0)
+
+#define REGISTER_REMOTE_EVENT() \
+    do { \
+        if (ae_register_event(event_loop, nd->remote_fd, AE_IN, \
+            udp_read_remote, NULL, handle_transport_timeout, nd) < 0) { \
+            SYS_ERROR("REGISTER_REMOTE_EVENT"); \
+            CLEAR_ALL(); \
+        } \
+    } while (0)
+
 static void
 handle_dns(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
     LOGGER_DEBUG("DNS success!");
 
-    char buffer[1024] = {0};
-    struct sockaddr_in addr;
-    socklen_t addr_len = sizeof(addr);
-    int n = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addr_len);
+    char buffer[1024];
+    int n = read(fd, buffer, sizeof(buffer));
     if (n < 0) {
         SYS_ERROR("recvfrom");
         return;
@@ -45,19 +72,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     addr_info->ai_addr.sin.sin_port = htons(nd->remote_port);
     nd->remote_addr = addr_info;
 
-    char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
-    snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
-             "%s:%d", nd->remote_domain, nd->remote_port);
-    // 加入 lru
-    void *oldvalue;
-    LruCache *lc = nd->user_info->lru_cache;
-    if (lru_cache_put(lc, domain_and_port, addr_info, &oldvalue) < 0) {
-        free(addr_info);
-        return;
-    }
-    if (oldvalue != NULL) {
-        free(oldvalue);
-    }
+    add_dns_to_lru_cache(nd, addr_info);
 
     if (create_remote_socket(nd) < 0) {
         SYS_ERROR("create_remote_socket");
@@ -66,21 +81,39 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
 
     MyAddrInfo *raddr = nd->remote_addr;
     Buffer *cbuf = nd->client_buf;
-    if (sendto(nd->remote_fd, cbuf->data, cbuf->len, 0,
-               (struct sockaddr *)&raddr->ai_addr, raddr->ai_addrlen) < cbuf->len) {
-        SYS_ERROR("sendto");
-        CLEAR_ALL();
-    }
+    SENDTO(nd->remote_fd, cbuf->data+cbuf->idx, cbuf->len, raddr);
 
     free_buffer(cbuf);
     nd->client_buf = NULL;
 
-    if (ae_register_event(event_loop, nd->remote_fd, AE_IN,
-            udp_read_remote, NULL, handle_stream_timeout, nd) < 0) {
-        SYS_ERROR("ae_register_event");
-        CLEAR_ALL();
-    }
+    REGISTER_REMOTE_EVENT();
 }
+
+static int
+build_send_header(char *buf, MyAddrInfo *remote_addr)
+{
+    char temp_buf[HEAD_PREFIX];
+    int header_len = 1;  // 1 留给 atty
+    char atty;
+    if (remote_addr->ai_addrlen != 16) {  // 是 ipv6
+        atty = 0x03;
+        memcpy(temp_buf+header_len, &remote_addr->ai_addr.sin6.sin6_addr, 16);
+        header_len += 16;
+        memcpy(temp_buf+header_len, &remote_addr->ai_addr.sin6.sin6_port, 2);
+        header_len += 2;
+    } else {  // 是 ipv4
+        atty = 0x01;
+        memcpy(temp_buf+header_len, &remote_addr->ai_addr.sin.sin_addr, 4);
+        header_len += 4;
+        memcpy(temp_buf+header_len, &remote_addr->ai_addr.sin.sin_port, 2);
+        header_len += 2;
+    }
+    temp_buf[0] = atty;
+    memcpy(buf+HEAD_PREFIX-header_len, temp_buf, header_len);
+
+    return header_len;
+}
+
 void
 udp_read_client(AeEventLoop *event_loop, int fd, void *data)
 {
@@ -95,12 +128,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     MyAddrInfo *caddr = nd->client_addr;
     char cipherbuf[CLIENT_BUF_CAPACITY];
     caddr->ai_addrlen = sizeof(caddr->ai_addr);
-    size_t nread = recvfrom(fd, cipherbuf, sizeof(cipherbuf), 0,
-            (struct sockaddr *)&caddr->ai_addr, &caddr->ai_addrlen);
-    if (nread < 0) {
-        SYS_ERROR("recvfrom");
-        CLEAR_ALL();
-    }
+    ssize_t nread = RECVFROM(fd, cipherbuf, sizeof(cipherbuf), caddr);
 
     int iv_len = nd->user_info->cryptor_info->iv_len;
     memcpy(nd->iv, cipherbuf, iv_len);
@@ -130,11 +158,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
             CLEAR_ALL();
         }
         if (nd->ss_stage == STAGE_DNS) {  // 异步查询 dns
-            if (ae_register_event(event_loop, nd->dns_fd, AE_IN,
-                    handle_dns, NULL, handle_stream_timeout, nd) < 0) {
-                SYS_ERROR("handle_stage_dns");
-                CLEAR_ALL();
-            }
+            REGISTER_DNS_EVENT(handle_dns);
             return;
         }
     }
@@ -145,20 +169,12 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     MyAddrInfo *raddr = nd->remote_addr;
-    if (sendto(nd->remote_fd, cbuf->data, cbuf->len, 0,
-            (struct sockaddr *)&raddr->ai_addr, raddr->ai_addrlen) < cbuf->len) {
-        SYS_ERROR("sendto");
-        CLEAR_ALL();
-    }
+    SENDTO(nd->remote_fd, cbuf->data+cbuf->idx, cbuf->len, raddr);
 
     free_buffer(nd->client_buf);
     nd->client_buf = NULL;
 
-    if (ae_register_event(event_loop, nd->remote_fd, AE_IN,
-                          udp_read_remote, NULL, handle_stream_timeout, nd) < 0) {
-        SYS_ERROR("ae_register_event");
-        CLEAR_ALL();
-    }
+    REGISTER_REMOTE_EVENT();
 }
 
 void
@@ -178,24 +194,7 @@ udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_ALL();
     }
 
-    char temp_buf[HEAD_PREFIX];
-    int header_len = 1;  // 1 留给 atty
-    char atty;
-    if (remote_addr.ai_addrlen != 16) {  // 是 ipv6
-        atty = 0x03;
-        memcpy(temp_buf+header_len, &remote_addr.ai_addr.sin6.sin6_addr, 16);
-        header_len += 16;
-        memcpy(temp_buf+header_len, &remote_addr.ai_addr.sin6.sin6_port, 2);
-        header_len += 2;
-    } else {  // 是 ipv4
-        atty = 0x01;
-        memcpy(temp_buf+header_len, &remote_addr.ai_addr.sin.sin_addr, 4);
-        header_len += 4;
-        memcpy(temp_buf+header_len, &remote_addr.ai_addr.sin.sin_port, 2);
-        header_len += 2;
-    }
-    temp_buf[0] = atty;
-    memcpy(plainbuf+HEAD_PREFIX-header_len, temp_buf, header_len);
+    int header_len = build_send_header(plainbuf, &remote_addr);
     nread += header_len;
 
     Buffer *rbuf = init_buffer(REMOTE_BUF_CAPACITY+128);
@@ -207,11 +206,7 @@ udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 
     int sockfd = nd->user_info->udp_server_fd;
     MyAddrInfo *caddr = nd->client_addr;
-    if (sendto(sockfd, rbuf->data, rbuf->len, 0,
-               (struct sockaddr *)&caddr->ai_addr, caddr->ai_addrlen) < rbuf->len) {
-        SYS_ERROR("sendto");
-        CLEAR_ALL();
-    }
+    SENDTO(sockfd, rbuf->data, rbuf->len, caddr);
 
     CLEAR_ALL();
 }

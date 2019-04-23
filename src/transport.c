@@ -206,7 +206,7 @@ handle_stage_header(NetData *nd, int socktype)
     buf->len -= header_len;
 
     if (buf->len > 0) {
-        memcpy(buf->data, buf->data+header_len, buf->len);
+        buf->idx += header_len;
     }
 
     return 0;
@@ -285,7 +285,7 @@ handle_stage_handshake(NetData *nd)
  * 更新时间的操作，在 ae_register_event() 中进行。
  */
 void
-handle_stream_timeout(AeEventLoop *event_loop, int fd, void *data)
+handle_transport_timeout(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;  // client 和 remote 共用 nd
     if (fd == nd->client_fd) {
@@ -304,4 +304,22 @@ handle_stream_timeout(AeEventLoop *event_loop, int fd, void *data)
         }
     }
     CLEAR_ALL();
+}
+
+int
+add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info)
+{
+    char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
+    snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
+            "%s:%d", nd->remote_domain, nd->remote_port);
+    void *oldvalue;
+    LruCache *lc = nd->user_info->lru_cache;
+    if (lru_cache_put(lc, domain_and_port, addr_info, &oldvalue) < 0) {
+        return -1;
+    }
+    if (oldvalue != NULL) {
+        free(oldvalue);
+    }
+
+    return 0;
 }

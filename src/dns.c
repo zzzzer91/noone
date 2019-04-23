@@ -132,7 +132,7 @@ dns_send_request(int sockfd, const char *domain)
     struct dns_question question;
     build_question(&question, domain);
 
-    char request[1024] = {0};
+    char request[1024];
     int req_len = build_request(&header, &question, request);
 
     struct sockaddr_in dest;
