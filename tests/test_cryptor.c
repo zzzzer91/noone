@@ -53,7 +53,7 @@ test_aes128ctr_encrypt_and_decrypt()
     c_ctx->encrypt_ctx = INIT_ENCRYPT_CTX(ci->cipher_name, ci->key, ci->iv);
     char plaintext[256];
     char ciphertext[256];
-    strcpy(plaintext, "你好");
+    strcpy(plaintext, "abc123");
     size_t plaintext_len = strlen(plaintext);
     size_t ciphertext_len = encrypt(c_ctx->encrypt_ctx,
             (uint8_t *)plaintext, plaintext_len, (uint8_t *)ciphertext);
@@ -64,7 +64,7 @@ test_aes128ctr_encrypt_and_decrypt()
     size_t plaintext_len_result = decrypt(c_ctx->decrypt_ctx,
             (uint8_t *)ciphertext, ciphertext_len, (uint8_t *)plaintext_result);
     EXPECT_EQ_LONG(plaintext_len, plaintext_len_result);
-    EXPECT_EQ_STRING("你好", plaintext_result, plaintext_len_result);
+    EXPECT_EQ_STRING("abc123", plaintext_result, plaintext_len_result);
 
     // 测试多次加密，一次解密
     ciphertext_len = encrypt(c_ctx->encrypt_ctx,
@@ -76,7 +76,7 @@ test_aes128ctr_encrypt_and_decrypt()
     plaintext_len_result = decrypt(c_ctx->decrypt_ctx,
             (uint8_t *)ciphertext, ciphertext_len, (uint8_t *)plaintext_result);
     EXPECT_EQ_LONG(plaintext_len*2, plaintext_len_result);
-    EXPECT_EQ_STRING("你好你好", plaintext_result, plaintext_len_result);
+    EXPECT_EQ_STRING("abc123abc123", plaintext_result, plaintext_len_result);
 
     free_noone_cipher_ctx(c_ctx);
     free_noone_cryptor_info(ci);
