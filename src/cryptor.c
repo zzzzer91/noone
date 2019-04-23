@@ -152,6 +152,11 @@ encrypt(EVP_CIPHER_CTX *ctx, uint8_t *plaintext,
     }
     ciphertext_len = (size_t)outlen;
 
+    if (!EVP_EncryptFinal_ex(ctx, ciphertext+outlen, &outlen)) {
+        return 0;
+    }
+    ciphertext_len += outlen;
+
     return ciphertext_len;
 }
 
@@ -169,6 +174,11 @@ decrypt(EVP_CIPHER_CTX *ctx, uint8_t *ciphertext,
         return 0;
     }
     plaintext_len = (size_t)outlen;
+
+    if (!EVP_DecryptFinal_ex(ctx, plaintext+outlen, &outlen)) {
+        return 0;
+    }
+    plaintext_len += outlen;
 
     return plaintext_len;
 }
