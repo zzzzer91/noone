@@ -20,4 +20,16 @@ void free_buffer(Buffer *buf);
 
 int resize_buffer(Buffer *buf, size_t new_capacity);
 
+// 若超出容量上限，则每次循环增加原来容量的一半，直到满足
+#define RESIZE_BUF(buf, size) \
+    do { \
+        size_t need_cap = buf->len + size; \
+        size_t step = buf->capacity >> 1U; \
+        size_t new_cap = buf->capacity + step; \
+        while (need_cap > new_cap) { \
+            new_cap += step;\
+        } \
+        resize_buffer(buf, new_cap); \
+    } while (0)
+
 #endif  /* _NOONE_BUFFER_H_ */

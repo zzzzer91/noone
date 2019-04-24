@@ -24,7 +24,7 @@
 
 #define TCP_DEBUG(s, args...) \
     do { \
-        if (nd->ss_stage > STAGE_INIT) { \
+        if (nd->stage > STAGE_INIT) { \
             LOGGER_DEBUG("fd: %d, %s:%d, %s: " s, \
                     nd->client_fd, nd->remote_domain, nd->remote_port, __func__, ##args); \
         } else { \
@@ -99,21 +99,6 @@
         } \
     } while (0)
 
-#define RESIZE_BUF(buf, size) \
-    do { \
-        size_t need_cap = buf->len + size; \
-        size_t step = buf->capacity >> 1U; \
-        size_t new_cap = buf->capacity + step; \
-        while (need_cap > new_cap) { \
-            new_cap += step;\
-        } \
-        if (resize_buffer(buf, new_cap) < 0) { \
-            TCP_ERROR("RESIZE_BUF"); \
-            CLEAR_ALL(); \
-        } \
-        TCP_DEBUG("RESIZE_BUF: %ld", new_cap); \
-    } while (0)
-
 static void
 handle_dns(AeEventLoop *event_loop, int fd, void *data)
 {
@@ -122,7 +107,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
 
     char buffer[1024];
     // udp 不关心 remote 地址，用 read，否则用 recvfrom
-    int n = read(fd, buffer, sizeof(buffer));
+    ssize_t n = read(fd, buffer, sizeof(buffer));
     if (n < 0) {
         TCP_ERROR("recvfrom");
         return;
@@ -148,7 +133,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_ALL();
     }
 
-    LOGGER_DEBUG("fd: %d, connecting %s:%d",
+    LOGGER_INFO("fd: %d, connecting %s:%d",
                  nd->client_fd, nd->remote_domain, nd->remote_port);
     if (handle_stage_handshake(nd) < 0) {
         TCP_ERROR("handle_stage_handshake");
@@ -198,8 +183,8 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
 
     nd->client_fd = client_fd;
     nd->user_info = data;
-    memcpy(&nd->client_addr->ai_addr, &client_addr, client_addr_len);
-    nd->client_addr->ai_addrlen = client_addr_len;
+    memcpy(&nd->client_addr.ai_addr, &client_addr, client_addr_len);
+    nd->client_addr.ai_addrlen = client_addr_len;
     // 多出来的给 iv 分配，和防止加密后长度变化导致溢出
     nd->client_buf = init_buffer(CLIENT_BUF_CAPACITY+128);
     if (nd->client_buf == NULL) {
@@ -228,7 +213,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     ssize_t nread = READ(fd, temp_buf, sizeof(temp_buf));
 
     int iv_len = 0;
-    if (nd->ss_stage == STAGE_INIT) {
+    if (nd->stage == STAGE_INIT) {
         iv_len = nd->user_info->cryptor_info->iv_len;
         memcpy(nd->iv, temp_buf, iv_len);
         nread -= iv_len;
@@ -244,19 +229,19 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     Buffer *cbuf = nd->client_buf;
     DECRYPT(temp_buf+iv_len, nread, cbuf->data);
 
-    if (nd->ss_stage == STAGE_HEADER) {
+    if (nd->stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_STREAM) < 0) {
             TCP_ERROR("handle_stage_header");
             CLEAR_ALL();
         }
     }
 
-    if (nd->ss_stage == STAGE_DNS) {
+    if (nd->stage == STAGE_DNS) {
         if (handle_stage_dns(nd) < 0) {
             TCP_ERROR("handle_stage_dns");
             CLEAR_ALL();
         }
-        if (nd->ss_stage == STAGE_DNS) {  // 异步查询 dns
+        if (nd->stage == STAGE_DNS) {  // 异步查询 dns
             REGISTER_DNS_EVENT(handle_dns);
             // 挂起 client 事件
             nd->client_event_status ^= AE_IN;
@@ -265,7 +250,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         }
     }
 
-    if (nd->ss_stage == STAGE_HANDSHAKE) {
+    if (nd->stage == STAGE_HANDSHAKE) {
         LOGGER_DEBUG("fd: %d, connecting %s:%d",
                 nd->client_fd, nd->remote_domain, nd->remote_port);
         if (handle_stage_handshake(nd) < 0) {
@@ -293,6 +278,9 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     Buffer *cbuf = nd->client_buf;
+    // 这里缓冲区要加上索引
+    // 1.是可能解析完头部，索引有偏移
+    // 2.是可能上一次没写完
     ssize_t nwriten = WRITE(fd, cbuf->data+cbuf->idx, cbuf->len);
     cbuf->len -= nwriten;
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写

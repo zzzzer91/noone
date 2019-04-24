@@ -22,13 +22,14 @@
 #define ATYP_DOMAIN 0x03
 #define ATYP_IPV6 0x04
 
-typedef enum SsStageType {
+typedef enum TransportStage {
     STAGE_INIT = 0,   /* 获取 iv 阶段 */
     STAGE_HEADER,     /* 解析 header 阶段，获取 remote 的 ip 和 port */
     STAGE_DNS,        /* 查询 DNS，可能不进行这一步 */
     STAGE_HANDSHAKE,  /* TCP 和 remote 握手阶段 */
-    STAGE_STREAM,     /* TCP 传输阶段 */
-} SsStageType;
+    STAGE_STREAM,     /* 传输阶段 */
+    STAGE_DESTROYED,  /* 该连接所有资源已销毁，就剩释放 NetData 对象内存 */
+} TransportStage;
 
 typedef struct NetData {
 
@@ -50,9 +51,9 @@ typedef struct NetData {
 
     int remote_event_status;
 
-    SsStageType ss_stage;
+    TransportStage stage;
 
-    MyAddrInfo *client_addr;
+    MyAddrInfo client_addr;  // 不是指针
 
     MyAddrInfo *remote_addr;
 
@@ -125,6 +126,7 @@ int add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info);
         if (nd->dns_fd != -1) { \
             CLEAR_DNS(); \
         } \
+        nd->stage = STAGE_DESTROYED; \
         free_net_data(nd); \
         return; \
     } while (0)

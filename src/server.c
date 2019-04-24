@@ -20,7 +20,7 @@
 int
 main(int argc, char *argv[])
 {
-    LOGGER_DEBUG("Noone started!");
+    LOGGER_INFO("Noone started!");
 
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
         PANIC("signal");

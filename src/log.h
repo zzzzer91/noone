@@ -13,7 +13,7 @@
 #define NOONE_DEBUG 1
 
 // log 信息是否显示时间，log多时貌似挺费性能的
-#define NOONE_LOGGER_DISPLAY_TIME 0
+#define NOONE_LOGGER_DISPLAY_TIME 1
 
 #if NOONE_LOGGER_DISPLAY_TIME
 #define LOGGER_PRINT(log_level, fmt, args...) \

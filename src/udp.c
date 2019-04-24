@@ -16,10 +16,10 @@
 #define CLIENT_BUF_CAPACITY 8 * 1024
 #define REMOTE_BUF_CAPACITY 8 * 1024
 
-#define RECVFROM(sockfd, buf, buf_cap, addr) \
+#define RECVFROM(sockfd, buf, buf_cap, addr_p) \
     ({ \
         ssize_t ret = recvfrom(sockfd, buf, buf_cap, 0, \
-                (struct sockaddr *)&addr->ai_addr, &addr->ai_addrlen); \
+                (struct sockaddr *)&addr_p->ai_addr, &addr_p->ai_addrlen); \
         if (ret < 0) { \
             SYS_ERROR("recvfrom"); \
             CLEAR_ALL(); \
@@ -27,10 +27,10 @@
         ret; \
     })
 
-#define SENDTO(sockfd, buf, buf_len, addr) \
+#define SENDTO(sockfd, buf, buf_len, addr_p) \
     do { \
         if (sendto(sockfd, buf, buf_len, 0, \
-                (struct sockaddr *)&addr->ai_addr, addr->ai_addrlen) < buf_len) {\
+                (struct sockaddr *)&addr_p->ai_addr, addr_p->ai_addrlen) < buf_len) {\
             SYS_ERROR("sendto");\
             CLEAR_ALL();\
         }\
@@ -52,7 +52,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     LOGGER_DEBUG("DNS success!");
 
     char buffer[1024];
-    int n = read(fd, buffer, sizeof(buffer));
+    ssize_t n = read(fd, buffer, sizeof(buffer));
     if (n < 0) {
         SYS_ERROR("recvfrom");
         return;
@@ -125,7 +125,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
     nd->user_info = (NooneUserInfo *)data;
 
-    MyAddrInfo *caddr = nd->client_addr;
+    MyAddrInfo *caddr = &nd->client_addr;
     char cipherbuf[CLIENT_BUF_CAPACITY];
     caddr->ai_addrlen = sizeof(caddr->ai_addr);
     ssize_t nread = RECVFROM(fd, cipherbuf, sizeof(cipherbuf), caddr);
@@ -142,7 +142,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     nd->client_buf = cbuf;
     DECRYPT(cipherbuf+iv_len, nread, cbuf->data);
 
-    if (nd->ss_stage == STAGE_HEADER) {
+    if (nd->stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_DGRAM) < 0) {
             SYS_ERROR("handle_stage_header");
             CLEAR_ALL();
@@ -152,12 +152,12 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
         }
     }
 
-    if (nd->ss_stage == STAGE_DNS) {
+    if (nd->stage == STAGE_DNS) {
         if (handle_stage_dns(nd) < 0) {
             SYS_ERROR("handle_stage_dns");
             CLEAR_ALL();
         }
-        if (nd->ss_stage == STAGE_DNS) {  // 异步查询 dns
+        if (nd->stage == STAGE_DNS) {  // 异步查询 dns
             REGISTER_DNS_EVENT(handle_dns);
             return;
         }
@@ -185,16 +185,13 @@ udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     NetData *nd = data;
 
     char plainbuf[REMOTE_BUF_CAPACITY+HEAD_PREFIX]; // 前面放头部信息
-    MyAddrInfo remote_addr;
-    remote_addr.ai_addrlen = sizeof(remote_addr);
-    size_t nread = recvfrom(fd, plainbuf+HEAD_PREFIX, sizeof(plainbuf), 0,
-            (struct sockaddr *)&remote_addr.ai_addr, &remote_addr.ai_addrlen);
+    ssize_t nread = read(fd, plainbuf+HEAD_PREFIX, sizeof(plainbuf));
     if (nread < 0) {
         SYS_ERROR("recvfrom");
-        CLEAR_ALL();
+        return;
     }
 
-    int header_len = build_send_header(plainbuf, &remote_addr);
+    int header_len = build_send_header(plainbuf, nd->remote_addr);
     nread += header_len;
 
     Buffer *rbuf = init_buffer(REMOTE_BUF_CAPACITY+128);
@@ -205,7 +202,7 @@ udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     rbuf->len += iv_len;
 
     int sockfd = nd->user_info->udp_server_fd;
-    MyAddrInfo *caddr = nd->client_addr;
+    MyAddrInfo *caddr = &nd->client_addr;
     SENDTO(sockfd, rbuf->data, rbuf->len, caddr);
 
     CLEAR_ALL();

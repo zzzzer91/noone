@@ -22,16 +22,14 @@ init_net_data()
         return NULL;
     }
 
-    nd->ss_stage = STAGE_INIT;
+    nd->stage = STAGE_INIT;
     nd->is_iv_send = 0;
-    memset(nd->remote_domain, 0, sizeof(nd->remote_domain));
     nd->cipher_ctx = init_noone_cipher_ctx();
     nd->client_fd = -1;
     nd->remote_fd = -1;
     nd->dns_fd = -1;
     nd->client_event_status = AE_IN | AE_ERR;
     nd->remote_event_status = AE_IN | AE_ERR;
-    nd->client_addr = malloc(sizeof(MyAddrInfo));
     nd->remote_addr = NULL;
     nd->client_buf = NULL;  // 交给应用初始化，UDP 不初始化，否则耗内存
     nd->remote_buf = NULL;
@@ -44,7 +42,6 @@ free_net_data(NetData *nd)
 {
     assert(nd != NULL);
 
-    free(nd->client_addr);
     free_noone_cipher_ctx(nd->cipher_ctx);
     if (nd->client_buf != NULL) {
         free_buffer(nd->client_buf);
@@ -52,6 +49,8 @@ free_net_data(NetData *nd)
     if (nd->remote_buf != NULL) {
         free_buffer(nd->remote_buf);
     }
+
+    // 不清理 remote_addr，因为会被加入 lru 缓存，交给缓存清理
 
     free(nd);
 }
@@ -94,7 +93,7 @@ handle_stage_init(NetData *nd)
         return -1;
     }
 
-    nd->ss_stage = STAGE_HEADER;
+    nd->stage = STAGE_HEADER;
 
     return 0;
 }
@@ -148,7 +147,7 @@ handle_stage_header(NetData *nd, int socktype)
         header_len += 2;
         nd->remote_port = ntohs(port);
 
-        nd->ss_stage = STAGE_DNS;
+        nd->stage = STAGE_DNS;
     } else if (atty == ATYP_IPV4) {
         if (buf->len < 7) {
             return -1;
@@ -173,7 +172,7 @@ handle_stage_header(NetData *nd, int socktype)
 
         nd->remote_addr = addr_info;
 
-        nd->ss_stage = STAGE_HANDSHAKE;
+        nd->stage = STAGE_HANDSHAKE;
     } else if (atty == ATYP_IPV6) {
         if (buf->len < 19) {
             return -1;
@@ -197,7 +196,7 @@ handle_stage_header(NetData *nd, int socktype)
 
         nd->remote_addr = addr_info;
 
-        nd->ss_stage = STAGE_HANDSHAKE;
+        nd->stage = STAGE_HANDSHAKE;
     } else {
         LOGGER_ERROR("ATYP error！Maybe wrong password or decryption method.");
         return -1;
@@ -242,7 +241,7 @@ handle_stage_dns(NetData *nd)
         return 0;
     }
     nd->remote_addr = addr_info;
-    nd->ss_stage = STAGE_HANDSHAKE;
+    nd->stage = STAGE_HANDSHAKE;
 
     return 0;
 }
@@ -275,7 +274,7 @@ handle_stage_handshake(NetData *nd)
         }
     }
 
-    nd->ss_stage = STAGE_STREAM;
+    nd->stage = STAGE_STREAM;
 
     return 0;
 }
@@ -289,14 +288,14 @@ handle_transport_timeout(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;  // client 和 remote 共用 nd
     if (fd == nd->client_fd) {
-        if (nd->ss_stage != STAGE_INIT) {
+        if (nd->stage != STAGE_INIT) {
             LOGGER_DEBUG("fd: %d, %s:%d, kill self",
                          nd->client_fd, nd->remote_domain, nd->remote_port);
         } else {
             LOGGER_DEBUG("fd: %d, kill self", fd);
         }
     } else {
-        if (nd->ss_stage != STAGE_INIT) {
+        if (nd->stage != STAGE_INIT) {
             LOGGER_DEBUG("fd: %d, %s:%d, kill remote fd: %d",
                          nd->client_fd, nd->remote_domain, nd->remote_port, fd);
         } else {
