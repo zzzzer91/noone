@@ -55,7 +55,7 @@ typedef struct NetData {
 
     MyAddrInfo client_addr;  // 不是指针
 
-    MyAddrInfo *remote_addr;
+    MyAddrInfo *remote_addr;  // 不主动释放，交给 lru 缓存释放
 
     NooneUserInfo *user_info;  // 指向用户信息
 
@@ -156,7 +156,7 @@ int add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info);
 #define REGISTER_DNS_EVENT(callback) \
     do { \
         if (ae_register_event(event_loop, nd->dns_fd, AE_IN, \
-                handle_dns, NULL, handle_transport_timeout, nd) < 0) { \
+                callback, NULL, handle_transport_timeout, nd) < 0) { \
             LOGGER_ERROR("handle_stage_dns"); \
             CLEAR_ALL(); \
         } \
