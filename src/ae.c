@@ -320,5 +320,6 @@ void
 ae_add_event_to_list(AeEventLoop *event_loop, int fd)
 {
     AeEvent *fe = &event_loop->events[fd];
+    DLIST_DEL(event_loop->list_head, event_loop->list_tail, fe);
     DLIST_ADD_HEAD(event_loop->list_head, event_loop->list_tail, fe);
 }

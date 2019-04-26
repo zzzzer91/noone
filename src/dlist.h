@@ -22,18 +22,20 @@
 
 #define DLIST_DEL(head, tail, item) \
     do { \
-        if (item->list_prev != NULL) { \
-            item->list_prev->list_next = item->list_next; \
-        } else { \
-            head = item->list_next; \
+        if (item->list_prev != NULL || item->list_next != NULL) { \
+            if (item->list_prev != NULL) { \
+                item->list_prev->list_next = item->list_next; \
+            } else { \
+                head = item->list_next; \
+            } \
+            if (item->list_next != NULL) { \
+                item->list_next->list_prev = item->list_prev; \
+            } else { \
+                tail = item->list_prev; \
+            } \
+            item->list_prev = NULL; \
+            item->list_next = NULL; \
         } \
-        if (item->list_next != NULL) { \
-            item->list_next->list_prev = item->list_prev; \
-        } else { \
-            tail = item->list_prev; \
-        } \
-        item->list_prev = NULL; \
-        item->list_next = NULL; \
     } while (0)
 
 #endif  /* _NOONE_DLIST_H_ */
