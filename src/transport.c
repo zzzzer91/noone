@@ -272,6 +272,7 @@ handle_stage_handshake(NetData *nd)
             SYS_ERROR("connect");
             return -1;
         }
+        errno = 0;
     }
 
     nd->stage = STAGE_STREAM;

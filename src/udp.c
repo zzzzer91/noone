@@ -4,8 +4,6 @@
 
 #include "udp.h"
 #include "transport.h"
-#include "log.h"
-#include "error.h"
 #include "socket.h"
 #include "dns.h"
 #include <unistd.h>
@@ -16,12 +14,15 @@
 #define CLIENT_BUF_CAPACITY 8 * 1024
 #define REMOTE_BUF_CAPACITY 8 * 1024
 
+#define UDP_REGISTER_REMOTE_EVENT() \
+    REGISTER_REMOTE_EVENT(udp_read_remote, NULL)
+
 #define RECVFROM(sockfd, buf, buf_cap, addr_p) \
     ({ \
         ssize_t ret = recvfrom(sockfd, buf, buf_cap, 0, \
                 (struct sockaddr *)&addr_p->ai_addr, &addr_p->ai_addrlen); \
         if (ret < 0) { \
-            SYS_ERROR("recvfrom"); \
+            TRANSPORT_ERROR("recvfrom"); \
             CLEAR_ALL(); \
         } \
         ret; \
@@ -31,30 +32,22 @@
     do { \
         if (sendto(sockfd, buf, buf_len, 0, \
                 (struct sockaddr *)&addr_p->ai_addr, addr_p->ai_addrlen) < buf_len) {\
-            SYS_ERROR("sendto");\
+            TRANSPORT_ERROR("sendto");\
             CLEAR_ALL();\
         }\
-    } while (0)
-
-#define REGISTER_REMOTE_EVENT() \
-    do { \
-        if (ae_register_event(event_loop, nd->remote_fd, AE_IN, \
-            udp_read_remote, NULL, handle_transport_timeout, nd) < 0) { \
-            SYS_ERROR("REGISTER_REMOTE_EVENT"); \
-            CLEAR_ALL(); \
-        } \
     } while (0)
 
 static void
 handle_dns(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    LOGGER_DEBUG("DNS success!");
+
+    TRANSPORT_DEBUG("DNS success!");
 
     char buffer[1024];
     ssize_t n = read(fd, buffer, sizeof(buffer));
     if (n < 0) {
-        SYS_ERROR("recvfrom");
+        TRANSPORT_ERROR("recvfrom");
         return;
     }
 
@@ -75,7 +68,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     add_dns_to_lru_cache(nd, addr_info);
 
     if (create_remote_socket(nd) < 0) {
-        SYS_ERROR("create_remote_socket");
+        TRANSPORT_ERROR("create_remote_socket");
         CLEAR_ALL();
     }
 
@@ -86,7 +79,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     free_buffer(cbuf);
     nd->client_buf = NULL;
 
-    REGISTER_REMOTE_EVENT();
+    UDP_REGISTER_REMOTE_EVENT();
 }
 
 static int
@@ -117,13 +110,14 @@ build_send_header(char *buf, MyAddrInfo *remote_addr)
 void
 udp_read_client(AeEventLoop *event_loop, int fd, void *data)
 {
-    LOGGER_DEBUG("udp_read_client");
     NetData *nd = init_net_data();
     if (nd == NULL) {
-        SYS_ERROR("init_net_data");
+        TRANSPORT_ERROR("init_net_data");
         return;
     }
     nd->user_info = (NooneUserInfo *)data;
+
+    TRANSPORT_DEBUG("udp_read_client");
 
     MyAddrInfo *caddr = &nd->client_addr;
     char cipherbuf[CLIENT_BUF_CAPACITY];
@@ -134,7 +128,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     memcpy(nd->iv, cipherbuf, iv_len);
     nread -= iv_len;
     if (handle_stage_init(nd) < 0) {
-        SYS_ERROR("handle_stage_init");
+        TRANSPORT_ERROR("handle_stage_init");
         CLEAR_ALL();
     }
 
@@ -144,7 +138,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_DGRAM) < 0) {
-            SYS_ERROR("handle_stage_header");
+            TRANSPORT_ERROR("handle_stage_header");
             CLEAR_ALL();
         }
         if (cbuf->len == 0) {  // 解析完头部后，没有数据了
@@ -154,7 +148,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->stage == STAGE_DNS) {
         if (handle_stage_dns(nd) < 0) {
-            SYS_ERROR("handle_stage_dns");
+            TRANSPORT_ERROR("handle_stage_dns");
             CLEAR_ALL();
         }
         if (nd->stage == STAGE_DNS) {  // 异步查询 dns
@@ -164,7 +158,7 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     if (create_remote_socket(nd) < 0) {
-        SYS_ERROR("create_remote_socket");
+        TRANSPORT_ERROR("create_remote_socket");
         CLEAR_ALL();
     }
 
@@ -174,20 +168,20 @@ udp_read_client(AeEventLoop *event_loop, int fd, void *data)
     free_buffer(nd->client_buf);
     nd->client_buf = NULL;
 
-    REGISTER_REMOTE_EVENT();
+    UDP_REGISTER_REMOTE_EVENT();
 }
 
 void
 udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 {
-    LOGGER_DEBUG("udp_read_remote");
-
     NetData *nd = data;
+
+    TRANSPORT_DEBUG("udp_read_remote");
 
     char plainbuf[REMOTE_BUF_CAPACITY+HEAD_PREFIX]; // 前面放头部信息
     ssize_t nread = read(fd, plainbuf+HEAD_PREFIX, sizeof(plainbuf));
     if (nread < 0) {
-        SYS_ERROR("recvfrom");
+        TRANSPORT_ERROR("recvfrom");
         return;
     }
 

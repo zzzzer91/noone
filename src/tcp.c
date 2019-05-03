@@ -3,12 +3,9 @@
  */
 
 #include "tcp.h"
-#include "error.h"
 #include "transport.h"
 #include "socket.h"
 #include "ae.h"
-#include "cryptor.h"
-#include "log.h"
 #include "lru.h"
 #include "dns.h"
 #include <string.h>
@@ -22,41 +19,28 @@
 #define CLIENT_BUF_CAPACITY 16 * 1024
 #define REMOTE_BUF_CAPACITY 32 * 1024
 
-#define TCP_DEBUG(s, args...) \
-    do { \
-        if (nd->stage > STAGE_INIT) { \
-            LOGGER_DEBUG("fd: %d, %s:%d, %s: " s, \
-                    nd->client_fd, nd->remote_domain, nd->remote_port, __func__, ##args); \
-        } else { \
-            LOGGER_DEBUG("fd: %d, %s: " s, nd->client_fd, __func__, ##args); \
-        } \
-    } while (0)
+#define TCP_REGISTER_CLIENT_EVENT() \
+    REGISTER_CLIENT_EVENT(tcp_read_client, tcp_write_client)
 
-#define TCP_ERROR(s) \
-    do { \
-        if (errno != 0) { \
-            LOGGER_ERROR("fd: %d, %s -> " s ": %s", nd->client_fd, __func__, strerror(errno)); \
-            errno = 0; \
-        } else {\
-            LOGGER_ERROR("fd: %d, %s -> " s, nd->client_fd, __func__); \
-        } \
-    } while (0)
+#define TCP_REGISTER_REMOTE_EVENT() \
+    REGISTER_REMOTE_EVENT(tcp_read_remote, tcp_write_remote)
 
 #define READ(sockfd, buf, cap) \
     ({ \
         ssize_t ret = read(sockfd, buf, cap); \
         if (ret == 0) { \
-            TCP_DEBUG("close!"); \
+            TRANSPORT_DEBUG("close!"); \
             CLEAR_ALL(); \
         } else if (ret < 0) { \
-            TCP_ERROR("READ"); \
+            TRANSPORT_ERROR("READ"); \
             if (errno == EINTR || errno == EAGAIN \
                     || errno == ETIMEDOUT || errno == EWOULDBLOCK) { \
+                errno = 0; \
                 return; \
             } \
             CLEAR_ALL(); \
         } \
-        TCP_DEBUG("%ld", ret); \
+        TRANSPORT_DEBUG("%ld", ret); \
         ret; \
     })
 
@@ -64,52 +48,31 @@
     ({ \
         ssize_t ret = write(fd, buf, n); \
         if (ret == 0) { \
-            TCP_DEBUG("close!"); \
+            TRANSPORT_DEBUG("close!"); \
             CLEAR_ALL(); \
         } else if (ret < 0) { \
-            TCP_ERROR("WRITE"); \
+            TRANSPORT_ERROR("WRITE"); \
             if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) { \
+                errno = 0; \
                 return; \
             } \
             CLEAR_ALL(); \
         } \
-        TCP_DEBUG("%ld", ret); \
+        TRANSPORT_DEBUG("%ld", ret); \
         ret; \
     })
-
-#define REGISTER_CLIENT_EVENT() \
-    do { \
-        if (nd->client_fd != -1) { \
-            if (ae_register_event(event_loop, nd->client_fd, nd->client_event_status, \
-                        tcp_read_client, tcp_write_client, handle_transport_timeout, nd) < 0) { \
-                TCP_ERROR("REGISTER_CLIENT_EVENT"); \
-                CLEAR_ALL(); \
-            } \
-        } \
-    } while (0)
-
-#define REGISTER_REMOTE_EVENT() \
-    do { \
-        if (nd->remote_fd != -1) { \
-            if (ae_register_event(event_loop, nd->remote_fd, nd->remote_event_status, \
-                    tcp_read_remote, tcp_write_remote, handle_transport_timeout, nd) < 0) { \
-                TCP_ERROR("REGISTER_REMOTE_EVENT"); \
-                CLEAR_ALL(); \
-            } \
-        } \
-    } while (0)
 
 static void
 handle_dns(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;
-    TCP_DEBUG("DNS success!");
+    TRANSPORT_DEBUG("DNS success!");
 
     char buffer[1024];
     // udp 不关心 remote 地址，用 read，否则用 recvfrom
     ssize_t n = read(fd, buffer, sizeof(buffer));
     if (n < 0) {
-        TCP_ERROR("recvfrom");
+        TRANSPORT_ERROR("recvfrom");
         return;
     }
 
@@ -128,7 +91,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     nd->remote_addr = addr_info;
 
     if (add_dns_to_lru_cache(nd, addr_info) < 0) {
-        TCP_ERROR("add_dns_to_lru_cache");
+        TRANSPORT_ERROR("add_dns_to_lru_cache");
         free(addr_info);
         CLEAR_ALL();
     }
@@ -136,18 +99,18 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     LOGGER_INFO("fd: %d, connecting %s:%d",
                  nd->client_fd, nd->remote_domain, nd->remote_port);
     if (handle_stage_handshake(nd) < 0) {
-        TCP_ERROR("handle_stage_handshake");
+        TRANSPORT_ERROR("handle_stage_handshake");
         CLEAR_ALL();
     }
 
     if (nd->client_buf->len == 0) {
         nd->client_event_status |= AE_IN;
-        REGISTER_CLIENT_EVENT();
+        TCP_REGISTER_CLIENT_EVENT();
         return;
     }
 
     nd->remote_event_status |= AE_OUT;
-    REGISTER_REMOTE_EVENT();
+    TCP_REGISTER_REMOTE_EVENT();
 }
 
 void
@@ -201,7 +164,7 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
         return;
     }
 
-    REGISTER_CLIENT_EVENT();
+    TCP_REGISTER_CLIENT_EVENT();
 }
 
 void
@@ -218,7 +181,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         memcpy(nd->iv, temp_buf, iv_len);
         nread -= iv_len;
         if (handle_stage_init(nd) < 0) {
-            TCP_ERROR("handle_stage_init");
+            TRANSPORT_ERROR("handle_stage_init");
             CLEAR_ALL();
         }
         if (nread == 0) {
@@ -231,21 +194,21 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
 
     if (nd->stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_STREAM) < 0) {
-            TCP_ERROR("handle_stage_header");
+            TRANSPORT_ERROR("handle_stage_header");
             CLEAR_ALL();
         }
     }
 
     if (nd->stage == STAGE_DNS) {
         if (handle_stage_dns(nd) < 0) {
-            TCP_ERROR("handle_stage_dns");
+            TRANSPORT_ERROR("handle_stage_dns");
             CLEAR_ALL();
         }
         if (nd->stage == STAGE_DNS) {  // 异步查询 dns
             REGISTER_DNS_EVENT(handle_dns);
             // 挂起 client 事件
             nd->client_event_status ^= AE_IN;
-            REGISTER_CLIENT_EVENT();
+            TCP_REGISTER_CLIENT_EVENT();
             return;
         }
     }
@@ -254,7 +217,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
         LOGGER_DEBUG("fd: %d, connecting %s:%d",
                 nd->client_fd, nd->remote_domain, nd->remote_port);
         if (handle_stage_handshake(nd) < 0) {
-            TCP_ERROR("handle_stage_handshake");
+            TRANSPORT_ERROR("handle_stage_handshake");
             CLEAR_ALL();
         }
     }
@@ -268,8 +231,8 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     // ae_register_event() 中有相应处理逻辑
     nd->client_event_status ^= AE_IN;
     nd->remote_event_status |= AE_OUT;
-    REGISTER_CLIENT_EVENT();
-    REGISTER_REMOTE_EVENT();
+    TCP_REGISTER_CLIENT_EVENT();
+    TCP_REGISTER_REMOTE_EVENT();
 }
 
 void
@@ -284,7 +247,7 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     ssize_t nwriten = WRITE(fd, cbuf->data+cbuf->idx, cbuf->len);
     cbuf->len -= nwriten;
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写
-        TCP_DEBUG("not completed!");
+        TRANSPORT_DEBUG("not completed!");
         cbuf->idx += nwriten;
         return;  // 没写完，不改变 AE_IN||AE_OUT 状态
     }
@@ -292,8 +255,8 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
 
     nd->client_event_status |= AE_IN;
     nd->remote_event_status ^= AE_OUT;
-    REGISTER_CLIENT_EVENT();
-    REGISTER_REMOTE_EVENT();
+    TCP_REGISTER_CLIENT_EVENT();
+    TCP_REGISTER_REMOTE_EVENT();
 }
 
 void
@@ -316,8 +279,8 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
 
     nd->client_event_status |= AE_OUT;
     nd->remote_event_status ^= AE_IN;
-    REGISTER_CLIENT_EVENT();
-    REGISTER_REMOTE_EVENT();
+    TCP_REGISTER_CLIENT_EVENT();
+    TCP_REGISTER_REMOTE_EVENT();
 }
 
 void
@@ -329,14 +292,14 @@ tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
     ssize_t nwriten = WRITE(fd, rbuf->data+rbuf->idx, rbuf->len);
     rbuf->len -= nwriten;
     if (rbuf->len > 0) {
-        TCP_DEBUG("not completed!");
+        TRANSPORT_DEBUG("not completed!");
         rbuf->idx += nwriten;
-        return;  // 没写完，不能改变状态，因为缓冲区可能被覆盖
+        return;
     }
     rbuf->idx = 0;
 
     nd->client_event_status ^= AE_OUT;
     nd->remote_event_status |= AE_IN;
-    REGISTER_CLIENT_EVENT();
-    REGISTER_REMOTE_EVENT();
+    TCP_REGISTER_CLIENT_EVENT();
+    TCP_REGISTER_REMOTE_EVENT();
 }

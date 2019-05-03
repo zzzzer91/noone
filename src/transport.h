@@ -8,8 +8,8 @@
 #include "cryptor.h"
 #include "ae.h"
 #include "buffer.h"
-#include "log.h"
 #include "lru.h"
+#include "error.h"
 #include "socket.h"
 #include "manager.h"
 #include <netdb.h>
@@ -85,6 +85,26 @@ void handle_transport_timeout(AeEventLoop *event_loop, int fd, void *data);
 
 int add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info);
 
+#define TRANSPORT_DEBUG(s, args...) \
+    do { \
+        if (nd->stage > STAGE_INIT) { \
+            LOGGER_DEBUG("fd: %d, %s:%d, %s: " s, \
+                    nd->client_fd, nd->remote_domain, nd->remote_port, __func__, ##args); \
+        } else { \
+            LOGGER_DEBUG("fd: %d, %s: " s, nd->client_fd, __func__, ##args); \
+        } \
+    } while (0)
+
+#define TRANSPORT_ERROR(s, args...) \
+    do { \
+        if (nd->stage > STAGE_INIT) { \
+            SYS_ERROR("fd: %d, %s:%d, %s -> " s, \
+                    nd->client_fd, nd->remote_domain, nd->remote_port, __func__, ##args); \
+        } else { \
+            SYS_ERROR("fd: %d, %s -> " s, nd->client_fd, __func__, ##args); \
+        } \
+    } while (0)
+
 #define UNREGISTER_CLIENT() \
     ae_unregister_event(event_loop, nd->client_fd)
 
@@ -131,12 +151,43 @@ int add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info);
         return; \
     } while (0)
 
+#define REGISTER_CLIENT_EVENT(rcallback, wcallback) \
+    do { \
+        if (nd->client_fd != -1) { \
+            if (ae_register_event(event_loop, nd->client_fd, nd->client_event_status, \
+                        rcallback, wcallback, handle_transport_timeout, nd) < 0) { \
+                TRANSPORT_ERROR("REGISTER_CLIENT_EVENT"); \
+                CLEAR_ALL(); \
+            } \
+        } \
+    } while (0)
+
+#define REGISTER_REMOTE_EVENT(rcallback, wcallback) \
+    do { \
+        if (nd->remote_fd != -1) { \
+            if (ae_register_event(event_loop, nd->remote_fd, nd->remote_event_status, \
+                    rcallback, wcallback, handle_transport_timeout, nd) < 0) { \
+                TRANSPORT_ERROR("REGISTER_REMOTE_EVENT"); \
+                CLEAR_ALL(); \
+            } \
+        } \
+    } while (0)
+
+#define REGISTER_DNS_EVENT(callback) \
+    do { \
+        if (ae_register_event(event_loop, nd->dns_fd, AE_IN, \
+                callback, NULL, handle_transport_timeout, nd) < 0) { \
+            TRANSPORT_ERROR("handle_stage_dns"); \
+            CLEAR_ALL(); \
+        } \
+    } while (0)
+
 #define ENCRYPT(pbuf, pbuf_len, cbuf) \
     do { \
         size_t ret = encrypt(nd->cipher_ctx->encrypt_ctx, \
                 (uint8_t *)(pbuf), (pbuf_len), (uint8_t *)(cbuf)); \
         if (ret == 0) { \
-            SYS_ERROR("ENCRYPT"); \
+            TRANSPORT_ERROR("ENCRYPT"); \
             CLEAR_ALL(); \
         } \
         nd->remote_buf->len = ret; \
@@ -147,19 +198,10 @@ int add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info);
         size_t ret = decrypt(nd->cipher_ctx->decrypt_ctx, \
                 (uint8_t *)(cbuf), (cbuf_len), (uint8_t *)(pbuf)); \
         if (ret == 0) { \
-            SYS_ERROR("DECRYPT"); \
+            TRANSPORT_ERROR("DECRYPT"); \
             CLEAR_ALL(); \
         } \
         nd->client_buf->len = ret; \
-    } while (0)
-
-#define REGISTER_DNS_EVENT(callback) \
-    do { \
-        if (ae_register_event(event_loop, nd->dns_fd, AE_IN, \
-                callback, NULL, handle_transport_timeout, nd) < 0) { \
-            LOGGER_ERROR("handle_stage_dns"); \
-            CLEAR_ALL(); \
-        } \
     } while (0)
 
 #endif  /* _NOONE_TRANSPORT_H_ */
