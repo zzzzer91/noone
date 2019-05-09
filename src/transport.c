@@ -225,7 +225,7 @@ handle_stage_dns(NetData *nd)
         LOGGER_DEBUG("fd: %d, %s:  DNS query!", nd->client_fd, domain_and_port);
         int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
         if (sockfd < 0) {
-            SYS_ERROR("socket");
+            TRANSPORT_ERROR("socket: %s", strerror(errno));
             return -1;
         }
         if (set_nonblock(sockfd) < 0) {
@@ -268,8 +268,9 @@ handle_stage_handshake(NetData *nd)
             char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
             snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
                      "%s:%d", nd->remote_domain, nd->remote_port);
+            // 移除缓存
             lru_cache_remove(nd->user_info->lru_cache, domain_and_port);
-            SYS_ERROR("connect");
+            TRANSPORT_ERROR("connect: %s", strerror(errno));
             return -1;
         }
         errno = 0;
@@ -289,19 +290,9 @@ handle_transport_timeout(AeEventLoop *event_loop, int fd, void *data)
 {
     NetData *nd = data;  // client 和 remote 共用 nd
     if (fd == nd->client_fd) {
-        if (nd->stage != STAGE_INIT) {
-            LOGGER_DEBUG("fd: %d, %s:%d, kill self",
-                         nd->client_fd, nd->remote_domain, nd->remote_port);
-        } else {
-            LOGGER_DEBUG("fd: %d, kill self", fd);
-        }
+        TRANSPORT_ERROR("kill self");
     } else {
-        if (nd->stage != STAGE_INIT) {
-            LOGGER_DEBUG("fd: %d, %s:%d, kill remote fd: %d",
-                         nd->client_fd, nd->remote_domain, nd->remote_port, fd);
-        } else {
-            LOGGER_DEBUG("fd: %d, kill remote fd: %d", nd->client_fd, fd);
-        }
+        TRANSPORT_ERROR("kill remote fd: %d", fd);
     }
     CLEAR_ALL();
 }

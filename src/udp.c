@@ -22,7 +22,7 @@
         ssize_t ret = recvfrom(sockfd, buf, buf_cap, 0, \
                 (struct sockaddr *)&(addr_p)->ai_addr, &(addr_p)->ai_addrlen); \
         if (ret < 0) { \
-            TRANSPORT_ERROR("recvfrom"); \
+            TRANSPORT_ERROR("recvfrom: %s", strerror(errno)); \
             CLEAR_ALL(); \
         } \
         ret; \
@@ -32,7 +32,7 @@
     do { \
         if (sendto(sockfd, buf, buf_len, 0, \
                 (struct sockaddr *)&(addr_p)->ai_addr, (addr_p)->ai_addrlen) < (buf_len)) {\
-            TRANSPORT_ERROR("sendto");\
+            TRANSPORT_ERROR("sendto: %s", strerror(errno));\
             CLEAR_ALL();\
         }\
     } while (0)
@@ -47,7 +47,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     char buffer[1024];
     ssize_t n = read(fd, buffer, sizeof(buffer));
     if (n < 0) {
-        TRANSPORT_ERROR("read");
+        TRANSPORT_ERROR("read: %s", strerror(errno));
         return;
     }
 
@@ -179,9 +179,10 @@ udp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     TRANSPORT_DEBUG("udp_read_remote");
 
     char plainbuf[REMOTE_BUF_CAPACITY+HEAD_PREFIX]; // 前面放头部信息
+    // 不关心远端 addr，用 read() 即可
     ssize_t nread = read(fd, plainbuf+HEAD_PREFIX, sizeof(plainbuf));
     if (nread < 0) {
-        TRANSPORT_ERROR("recvfrom");
+        TRANSPORT_ERROR("recvfrom: %s", strerror(errno));
         return;
     }
 

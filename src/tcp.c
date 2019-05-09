@@ -36,7 +36,7 @@
                     || errno == ETIMEDOUT || errno == EWOULDBLOCK) { \
                 return; \
             } \
-            TRANSPORT_ERROR("READ"); \
+            TRANSPORT_ERROR("READ: %s", strerror(errno)); \
             CLEAR_ALL(); \
         } \
         TRANSPORT_DEBUG("%ld", ret); \
@@ -53,7 +53,7 @@
             if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) { \
                 return; \
             } \
-            TRANSPORT_ERROR("WRITE"); \
+            TRANSPORT_ERROR("WRITE: %s", strerror(errno)); \
             CLEAR_ALL(); \
         } \
         TRANSPORT_DEBUG("%ld", ret); \
@@ -70,7 +70,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     // udp 不关心 remote 地址，用 read，否则用 recvfrom
     ssize_t n = read(fd, buffer, sizeof(buffer));
     if (n < 0) {
-        TRANSPORT_ERROR("read");
+        TRANSPORT_ERROR("read: %s", strerror(errno));
         return;
     }
 
