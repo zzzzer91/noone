@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <string.h>
 
+// 注意要在 errno 判断后使用，因为会清 0 errno
 #define SYS_ERROR(s, args...) \
     do { \
         if (errno != 0) { \

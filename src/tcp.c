@@ -16,8 +16,8 @@
 #include <sys/socket.h>  /* accept() */
 #include <netinet/in.h>  /* struct sockaddr_in */
 
-#define CLIENT_BUF_CAPACITY 16 * 1024
-#define REMOTE_BUF_CAPACITY 32 * 1024
+#define CLIENT_BUF_CAPACITY (16 * 1024)
+#define REMOTE_BUF_CAPACITY (32 * 1024)
 
 #define TCP_REGISTER_CLIENT_EVENT() \
     REGISTER_CLIENT_EVENT(tcp_read_client, tcp_write_client)
@@ -32,12 +32,11 @@
             TRANSPORT_DEBUG("close!"); \
             CLEAR_ALL(); \
         } else if (ret < 0) { \
-            TRANSPORT_ERROR("READ"); \
             if (errno == EINTR || errno == EAGAIN \
                     || errno == ETIMEDOUT || errno == EWOULDBLOCK) { \
-                errno = 0; \
                 return; \
             } \
+            TRANSPORT_ERROR("READ"); \
             CLEAR_ALL(); \
         } \
         TRANSPORT_DEBUG("%ld", ret); \
@@ -51,11 +50,10 @@
             TRANSPORT_DEBUG("close!"); \
             CLEAR_ALL(); \
         } else if (ret < 0) { \
-            TRANSPORT_ERROR("WRITE"); \
             if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) { \
-                errno = 0; \
                 return; \
             } \
+            TRANSPORT_ERROR("WRITE"); \
             CLEAR_ALL(); \
         } \
         TRANSPORT_DEBUG("%ld", ret); \
@@ -72,7 +70,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     // udp 不关心 remote 地址，用 read，否则用 recvfrom
     ssize_t n = read(fd, buffer, sizeof(buffer));
     if (n < 0) {
-        TRANSPORT_ERROR("recvfrom");
+        TRANSPORT_ERROR("read");
         return;
     }
 

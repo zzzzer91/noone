@@ -198,7 +198,7 @@ handle_stage_header(NetData *nd, int socktype)
 
         nd->stage = STAGE_HANDSHAKE;
     } else {
-        LOGGER_ERROR("ATYP error！Maybe wrong password or decryption method.");
+        TRANSPORT_ERROR("ATYP error！Maybe wrong password or decryption method.");
         return -1;
     }
 

@@ -11,8 +11,8 @@
 #include <arpa/inet.h>
 
 #define HEAD_PREFIX 128
-#define CLIENT_BUF_CAPACITY 8 * 1024
-#define REMOTE_BUF_CAPACITY 8 * 1024
+#define CLIENT_BUF_CAPACITY (8 * 1024)
+#define REMOTE_BUF_CAPACITY (8 * 1024)
 
 #define UDP_REGISTER_REMOTE_EVENT() \
     REGISTER_REMOTE_EVENT(udp_read_remote, NULL)
@@ -20,7 +20,7 @@
 #define RECVFROM(sockfd, buf, buf_cap, addr_p) \
     ({ \
         ssize_t ret = recvfrom(sockfd, buf, buf_cap, 0, \
-                (struct sockaddr *)&addr_p->ai_addr, &addr_p->ai_addrlen); \
+                (struct sockaddr *)&(addr_p)->ai_addr, &(addr_p)->ai_addrlen); \
         if (ret < 0) { \
             TRANSPORT_ERROR("recvfrom"); \
             CLEAR_ALL(); \
@@ -31,7 +31,7 @@
 #define SENDTO(sockfd, buf, buf_len, addr_p) \
     do { \
         if (sendto(sockfd, buf, buf_len, 0, \
-                (struct sockaddr *)&addr_p->ai_addr, addr_p->ai_addrlen) < buf_len) {\
+                (struct sockaddr *)&(addr_p)->ai_addr, (addr_p)->ai_addrlen) < (buf_len)) {\
             TRANSPORT_ERROR("sendto");\
             CLEAR_ALL();\
         }\
@@ -47,7 +47,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     char buffer[1024];
     ssize_t n = read(fd, buffer, sizeof(buffer));
     if (n < 0) {
-        TRANSPORT_ERROR("recvfrom");
+        TRANSPORT_ERROR("read");
         return;
     }
 

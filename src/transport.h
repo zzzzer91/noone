@@ -87,7 +87,7 @@ int add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info);
 
 #define TRANSPORT_DEBUG(s, args...) \
     do { \
-        if (nd->stage > STAGE_INIT) { \
+        if (nd->stage > STAGE_HEADER) { \
             LOGGER_DEBUG("fd: %d, %s:%d, %s: " s, \
                     nd->client_fd, nd->remote_domain, nd->remote_port, __func__, ##args); \
         } else { \
@@ -97,11 +97,11 @@ int add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info);
 
 #define TRANSPORT_ERROR(s, args...) \
     do { \
-        if (nd->stage > STAGE_INIT) { \
-            SYS_ERROR("fd: %d, %s:%d, %s -> " s, \
+        if (nd->stage > STAGE_HEADER) { \
+            LOGGER_ERROR("fd: %d, %s:%d, %s -> " s, \
                     nd->client_fd, nd->remote_domain, nd->remote_port, __func__, ##args); \
         } else { \
-            SYS_ERROR("fd: %d, %s -> " s, nd->client_fd, __func__, ##args); \
+            LOGGER_ERROR("fd: %d, %s -> " s, nd->client_fd, __func__, ##args); \
         } \
     } while (0)
 
