@@ -22,7 +22,7 @@
         ee.events = mask; \
         ee.data.ptr = NULL; \
         ee.data.fd = fd; \
-        epoll_ctl(event_loop->epfd, op, fd, &ee); \
+        epoll_ctl((event_loop)->epfd, op, fd, &ee); \
     })
 
 /*
@@ -30,7 +30,7 @@
  */
 #define AE_EPOLL_DEL_EVENT(event_loop, fd) \
     ({ \
-        epoll_ctl(event_loop->epfd, EPOLL_CTL_DEL, fd, NULL); \
+        epoll_ctl((event_loop)->epfd, EPOLL_CTL_DEL, fd, NULL); \
     })
 
 /*
@@ -38,8 +38,8 @@
  */
 #define AE_EPOLL_POLL(event_loop, timeout) \
     ({ \
-        epoll_wait(event_loop->epfd, event_loop->ready_events, \
-                event_loop->event_set_size, timeout); \
+        epoll_wait((event_loop)->epfd, (event_loop)->ready_events, \
+                (event_loop)->event_set_size, timeout); \
     })
 
 /*
@@ -48,7 +48,7 @@
 #define AE_CHECK_TIMEOUT(event_loop) \
     do { \
         time_t current_time = time(NULL); \
-        AeEvent *p = event_loop->list_tail; \
+        AeEvent *p = (event_loop)->list_tail; \
         while (p) { \
             if ((current_time - p->last_active) < AE_WAIT_SECONDS) { \
                 break; \
@@ -84,18 +84,11 @@ ae_process_events(AeEventLoop *event_loop, int timeout)
         int fd = event_loop->ready_events[i].data.fd;
         AeEvent *fe = &event_loop->events[fd];
         // LOGGER_DEBUG("fd: %d, fe_mask, %d, mask: %d", fd, fe->mask, mask);
-        if (fe->mask & mask & AE_ERR) {
-            LOGGER_DEBUG("fd: %d, EPOLLERR", fd);
-            // EPOLLERR 不需要另外注册，自带
-            // 会监控 socket 的错误，如 Connection reset by peer
-            fe->tcallback(event_loop, fd, fe->data);
-        } else {
-            if (fe->mask & mask & AE_IN) {
-                fe->rcallback(event_loop, fd, fe->data);
-            }
-            if (fe->mask & mask & AE_OUT) {
-                fe->wcallback(event_loop, fd, fe->data);
-            }
+        if (fe->mask & mask & AE_IN) {
+            fe->rcallback(event_loop, fd, fe->data);
+        }
+        if (fe->mask & mask & AE_OUT) {
+            fe->wcallback(event_loop, fd, fe->data);
         }
         processed++;
     }
@@ -139,7 +132,6 @@ ae_create_event_loop(int event_set_size)
         return NULL;
     }
 
-    // 设置数组大小
     event_loop->event_set_size = event_set_size;
     event_loop->stop = 0;
     event_loop->maxfd = -1;
