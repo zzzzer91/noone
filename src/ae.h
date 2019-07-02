@@ -91,16 +91,22 @@ struct AeEventLoop {
 
 /* Prototypes */
 AeEventLoop *ae_create_event_loop(int event_set_size);
+
 void ae_delete_event_loop(AeEventLoop *event_loop);
+
 void ae_run_loop(AeEventLoop *event_loop);
+
 void ae_stop_event_loop(AeEventLoop *event_loop);
+
 int ae_get_event_set_size(AeEventLoop *event_loop);
 
-int ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-        AeCallback *rcallback, AeCallback *wcallback, AeCallback *tcallback, void *data);
+int ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask, AeCallback *rcallback,
+                      AeCallback *wcallback, AeCallback *tcallback, void *data);
+
 int ae_unregister_event(AeEventLoop *event_loop, int fd);
 
 void ae_remove_event_from_list(AeEventLoop *event_loop, int fd);
+
 void ae_add_event_to_list(AeEventLoop *event_loop, int fd);
 
 #endif  /* _NOONE_AE_H_ */

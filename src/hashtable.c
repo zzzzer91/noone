@@ -5,13 +5,10 @@
 #include "hashtable.h"
 #include "dlist.h"
 #include <stdlib.h>
-#include <stddef.h>
 #include <assert.h>
 #include <string.h>
 
-HashTable *
-hashtable_init(size_t capacity)
-{
+HashTable *hashtable_init(size_t capacity) {
     assert(capacity > 0);
 
     HashTable *hash_table = malloc(sizeof(HashTable));
@@ -33,9 +30,7 @@ hashtable_init(size_t capacity)
     return hash_table;
 }
 
-void
-hashtable_destory(HashTable *ht)
-{
+void hashtable_destory(HashTable *ht) {
     assert(ht != NULL);
 
     hashtable_clear(ht);
@@ -46,9 +41,7 @@ hashtable_destory(HashTable *ht)
 /*
  * djb
  */
-size_t
-djb_hash(char *key)
-{
+size_t djb_hash(char *key) {
     /* 5381 和 33。说是经过大量实验，这两个的结果碰撞小，哈希结果分散 */
     register size_t hash = 5381;
 
@@ -62,9 +55,7 @@ djb_hash(char *key)
 /*
  * 失败返回 -1，表满返回 0，成功返回 hashtable 的大小
  */
-int
-hashtable_put(HashTable *ht, char *key, void *value)
-{
+int hashtable_put(HashTable *ht, char *key, void *value) {
     assert(ht != NULL && key != NULL);  // False 时触发
 
     size_t hashcode = djb_hash(key) % ht->capacity;
@@ -117,9 +108,7 @@ hashtable_put(HashTable *ht, char *key, void *value)
     return ht->size;
 }
 
-void *
-hashtable_get(HashTable *ht, char *key)
-{
+void *hashtable_get(HashTable *ht, char *key) {
     assert(ht != NULL && key != NULL);
 
     size_t hashcode = djb_hash(key) % ht->capacity;
@@ -136,9 +125,7 @@ hashtable_get(HashTable *ht, char *key)
     return NULL;
 }
 
-void *
-hashtable_remove(HashTable *ht, char *key)
-{
+void *hashtable_remove(HashTable *ht, char *key) {
     assert(ht != NULL && key != NULL);
 
     size_t hashcode = djb_hash(key) % ht->capacity;
@@ -147,7 +134,7 @@ hashtable_remove(HashTable *ht, char *key)
     Entry *p = ze->zipper_head;
     for (int i = 0; i < ze->entry_count; i++) {
         if (strncmp(p->key, key, MAX_HASH_KEY_LEN) == 0) {
-            void *v =  p->value;
+            void *v = p->value;
             // 从拉链中删除
             if (p->zipper_prev == NULL) { // 处于拉链头
                 ze->zipper_head = p->zipper_next;  // 更新头指针
@@ -176,9 +163,7 @@ hashtable_remove(HashTable *ht, char *key)
     return NULL;
 }
 
-void *
-hashtable_remove_oldest(HashTable *ht)
-{
+void *hashtable_remove_oldest(HashTable *ht) {
     assert(ht != NULL);
 
     if (ht->size == 0) {
@@ -190,14 +175,12 @@ hashtable_remove_oldest(HashTable *ht)
     return hashtable_remove(ht, p->key);
 }
 
-void
-hashtable_clear(HashTable *ht)
-{
+void hashtable_clear(HashTable *ht) {
     assert(ht != NULL);
 
-    int size = ht->size;
+    size_t size = ht->size;
     Entry *p = ht->list_head;
-    for (int i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++) {
         ht->zipper_entry[p->hashcode].entry_count--;
         ht->list_head = p->list_next;
         free(p);

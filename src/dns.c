@@ -14,8 +14,8 @@
 #define DNS_SERVER2 "8.8.4.4"
 #define DNS_SERVER3 "114.114.114.114"
 
-#define DNS_HOST			0x01
-#define DNS_CNAME			0x05
+#define DNS_HOST            0x01
+#define DNS_CNAME            0x05
 
 typedef struct dns_header {
     unsigned short id;
@@ -33,9 +33,7 @@ typedef struct dns_question {
     char *qname;
 } DnsQuestion;
 
-static int
-build_header(DnsHeader *header)
-{
+static int build_header(DnsHeader *header) {
     assert(header != NULL);
 
     memset(header, 0, sizeof(DnsHeader));
@@ -49,15 +47,11 @@ build_header(DnsHeader *header)
     return 0;
 }
 
-static void
-build_hostname(const char *hostname)
-{
+static void build_hostname(const char *hostname) {
     assert(hostname != NULL);
 }
 
-static int
-build_question(DnsQuestion *question, const char *hostname)
-{
+static int build_question(DnsQuestion *question, const char *hostname) {
     assert(question != NULL);
 
     memset(question, 0, sizeof(DnsQuestion));
@@ -84,9 +78,9 @@ build_question(DnsQuestion *question, const char *hostname)
         size_t len = strlen(token);
 
         *qname_p = len;
-        qname_p ++;
+        qname_p++;
 
-        strncpy(qname_p, token, len+1);
+        strncpy(qname_p, token, len + 1);
         qname_p += len;
 
         token = strtok(NULL, delim);
@@ -98,33 +92,29 @@ build_question(DnsQuestion *question, const char *hostname)
 
 }
 
-static int
-build_request(DnsHeader *header, DnsQuestion *question, char *request)
-{
+static int build_request(DnsHeader *header, DnsQuestion *question, char *request) {
     int header_s = sizeof(DnsHeader);
     int question_s = question->length + sizeof(question->qtype) + sizeof(question->qclass);
 
     int length = question_s + header_s;
 
     int offset = 0;
-    memcpy(request+offset, header, sizeof(DnsHeader));
+    memcpy(request + offset, header, sizeof(DnsHeader));
     offset += sizeof(DnsHeader);
 
-    memcpy(request+offset, question->qname, question->length);
+    memcpy(request + offset, question->qname, question->length);
     offset += question->length;
     free(question->qname);
 
-    memcpy(request+offset, &question->qtype, sizeof(question->qtype));
+    memcpy(request + offset, &question->qtype, sizeof(question->qtype));
     offset += sizeof(question->qtype);
 
-    memcpy(request+offset, &question->qclass, sizeof(question->qclass));
+    memcpy(request + offset, &question->qclass, sizeof(question->qclass));
 
     return length;
 }
 
-int
-dns_send_request(int sockfd, const char *domain)
-{
+int dns_send_request(int sockfd, const char *domain) {
 
     struct dns_header header;
     build_header(&header);
@@ -143,37 +133,26 @@ dns_send_request(int sockfd, const char *domain)
 
     // 主服务器，备用服务器各发一遍，增加稳定性
     dest.sin_addr.s_addr = inet_addr(DNS_SERVER1);
-    slen = sendto(sockfd, request, req_len, 0, (struct sockaddr*)&dest, sizeof(dest));
+    slen = sendto(sockfd, request, req_len, 0, (struct sockaddr *)&dest, sizeof(dest));
     if (slen < 0) {
         SYS_ERROR("sendto");
         return -1;
     }
     dest.sin_addr.s_addr = inet_addr(DNS_SERVER2);
-    slen = sendto(sockfd, request, req_len, 0, (struct sockaddr*)&dest, sizeof(dest));
+    slen = sendto(sockfd, request, req_len, 0, (struct sockaddr *)&dest, sizeof(dest));
     if (slen < 0) {
         SYS_ERROR("sendto");
         return -1;
     }
-//    dest.sin_addr.s_addr = inet_addr(DNS_SERVER3);
-//    slen = sendto(sockfd, request, req_len, 0, (struct sockaddr*)&dest, sizeof(dest));
-//    if (slen < 0) {
-//        SYS_ERROR("sendto");
-//        return -1;
-//    }
 
     return 0;
 }
 
-static int
-is_pointer(int in)
-{
+static inline int is_pointer(int in) {
     return ((in & 0xC0) == 0xC0);
 }
 
-static void
-dns_parse_name(unsigned char *chunk, unsigned char *ptr, char *out, int *len)
-{
-
+static void dns_parse_name(unsigned char *chunk, unsigned char *ptr, char *out, int *len) {
     int flag = 0, n = 0, alen = 0;
     char *pos = out + (*len);
 
@@ -191,7 +170,7 @@ dns_parse_name(unsigned char *chunk, unsigned char *ptr, char *out, int *len)
 
         } else {
 
-            ptr ++;
+            ptr++;
             memcpy(pos, ptr, flag);
             pos += flag;
             ptr += flag;
@@ -211,21 +190,19 @@ dns_parse_name(unsigned char *chunk, unsigned char *ptr, char *out, int *len)
 /*
  * 返回一个 ipv4 地址
  */
-unsigned int
-dns_parse_response(char *buf)
-{
+unsigned int dns_parse_response(char *buf) {
     int i = 0;
     unsigned char *ptr = (unsigned char *)buf;
 
     ptr += 4;
-    int querys = ntohs(*(unsigned short*)ptr);
+    int querys = ntohs(*(unsigned short *)ptr);
 
     ptr += 2;
-    int answers = ntohs(*(unsigned short*)ptr);
+    int answers = ntohs(*(unsigned short *)ptr);
 
     // 跳过 query 区域
     ptr += 6;
-    for (i = 0;i < querys;i ++) {
+    for (i = 0; i < querys; i++) {
         while (1) {
             int flag = (int)ptr[0];
             ptr += (flag + 1);
@@ -240,7 +217,7 @@ dns_parse_response(char *buf)
     char cname[128], aname[128];
     int len, type, ttl, datalen;
 
-    for (i = 0;i < answers;i ++) {
+    for (i = 0; i < answers; i++) {
 
         bzero(aname, sizeof(aname));
         len = 0;
@@ -248,13 +225,13 @@ dns_parse_response(char *buf)
         dns_parse_name((unsigned char *)buf, ptr, aname, &len);
         ptr += 2;
 
-        type = htons(*(unsigned short*)ptr);
+        type = htons(*(unsigned short *)ptr);
         ptr += 4;
 
-        ttl = htons(*(unsigned short*)ptr);
+        ttl = htons(*(unsigned short *)ptr);
         ptr += 4;
 
-        datalen = ntohs(*(unsigned short*)ptr);
+        datalen = ntohs(*(unsigned short *)ptr);
         ptr += 2;
 
         if (type == DNS_CNAME) {

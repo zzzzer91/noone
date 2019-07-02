@@ -8,9 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-void
-test_dns()
-{
+void test_dns() {
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         SYS_ERROR("socket");
@@ -21,7 +19,7 @@ test_dns()
     char buffer[1024] = {0};
     struct sockaddr_in addr;
     socklen_t addr_len = sizeof(addr);
-    int n = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addr_len);
+    ssize_t n = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&addr, &addr_len);
     if (n < 0) {
         SYS_ERROR("recvfrom");
         return;

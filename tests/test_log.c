@@ -4,9 +4,7 @@
 
 #include "log.h"
 
-static void
-test_logger()
-{
+static void test_logger() {
     LOGGER_PRINT("LOGGER_PRINT", "%s%d", "你好", 123);
     LOGGER_INFO("LOGGER_INFO");
     LOGGER_DEBUG("LOGGER_DEBUG");
@@ -14,8 +12,6 @@ test_logger()
     LOGGER_ERROR("LOGGER_ERROR");
 }
 
-void
-test_log()
-{
+void test_log() {
     test_logger();
 }

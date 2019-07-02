@@ -3,20 +3,12 @@
  */
 
 #include "transport.h"
-#include "log.h"
-#include "buffer.h"
-#include "socket.h"
-#include "error.h"
 #include "dns.h"
-#include <string.h>
-#include <errno.h>
 #include <unistd.h>
 #include <assert.h>
 #include <arpa/inet.h>   /* inet_ntoa() */
 
-NetData *
-init_net_data()
-{
+NetData *init_net_data() {
     NetData *nd = malloc(sizeof(NetData));
     if (nd == NULL) {
         return NULL;
@@ -37,9 +29,7 @@ init_net_data()
     return nd;
 }
 
-void
-free_net_data(NetData *nd)
-{
+void free_net_data(NetData *nd) {
     assert(nd != NULL);
 
     free_noone_cipher_ctx(nd->cipher_ctx);
@@ -55,9 +45,7 @@ free_net_data(NetData *nd)
     free(nd);
 }
 
-int
-create_remote_socket(NetData *nd)
-{
+int create_remote_socket(NetData *nd) {
     MyAddrInfo *remote_addr = nd->remote_addr;
     int fd = socket(remote_addr->ai_family, remote_addr->ai_socktype, 0);
     if (fd < 0) {
@@ -79,9 +67,7 @@ create_remote_socket(NetData *nd)
     return 0;
 }
 
-int
-handle_stage_init(NetData *nd)
-{
+int handle_stage_init(NetData *nd) {
     NooneCryptorInfo *ci = nd->user_info->cryptor_info;
 
     nd->cipher_ctx->decrypt_ctx = INIT_DECRYPT_CTX(ci->cipher_name, ci->key, nd->iv);
@@ -112,9 +98,7 @@ handle_stage_init(NetData *nd)
  *     ATYP == 0x04：16 个字节的 IPv6 地址
  *     DST.PORT 字段：目的服务器的端口
  */
-int
-handle_stage_header(NetData *nd, int socktype)
-{
+int handle_stage_header(NetData *nd, int socktype) {
     Buffer *buf = nd->client_buf;
     if (buf->len < 2) {
         return -1;
@@ -125,7 +109,7 @@ handle_stage_header(NetData *nd, int socktype)
     int atty = buf->data[header_len];
     header_len += 1;
     if (atty == ATYP_DOMAIN) {
-        size_t domain_len = buf->data[header_len];  // 域名长度
+        uint8_t domain_len = (uint8_t)buf->data[header_len];  // 域名长度
         if (domain_len > MAX_DOMAIN_LEN || domain_len < 4) {
             LOGGER_ERROR("domain_len error!");
             return -1;
@@ -137,13 +121,13 @@ handle_stage_header(NetData *nd, int socktype)
         }
 
         // 域名
-        memcpy(nd->remote_domain, buf->data+header_len, domain_len);
+        memcpy(nd->remote_domain, buf->data + header_len, domain_len);
         nd->remote_domain[domain_len] = 0;  // 加上 '\0'
         header_len += domain_len;
 
         // 端口
         uint16_t port;
-        memcpy(&port, buf->data+header_len, 2);
+        memcpy(&port, buf->data + header_len, 2);
         header_len += 2;
         nd->remote_port = ntohs(port);
 
@@ -160,12 +144,12 @@ handle_stage_header(NetData *nd, int socktype)
         addr_info->ai_addr.sin.sin_family = AF_INET;
 
         // 已经是网络字节序
-        inet_ntop(AF_INET, buf->data+header_len, nd->remote_domain, sizeof(nd->remote_domain));
-        memcpy(&addr_info->ai_addr.sin.sin_addr, buf->data+header_len, 4);
+        inet_ntop(AF_INET, buf->data + header_len, nd->remote_domain, sizeof(nd->remote_domain));
+        memcpy(&addr_info->ai_addr.sin.sin_addr, buf->data + header_len, 4);
         header_len += 4;
 
         uint16_t port;
-        memcpy(&port, buf->data+header_len, 2);
+        memcpy(&port, buf->data + header_len, 2);
         header_len += 2;
         addr_info->ai_addr.sin.sin_port = port;
         nd->remote_port = ntohs(port);
@@ -184,12 +168,12 @@ handle_stage_header(NetData *nd, int socktype)
         addr_info->ai_socktype = socktype;
         addr_info->ai_addr.sin6.sin6_family = AF_INET6;
 
-        inet_ntop(AF_INET6, buf->data+header_len, nd->remote_domain, sizeof(nd->remote_domain));
-        memcpy(&addr_info->ai_addr.sin6.sin6_addr, buf->data+header_len, 16);
+        inet_ntop(AF_INET6, buf->data + header_len, nd->remote_domain, sizeof(nd->remote_domain));
+        memcpy(&addr_info->ai_addr.sin6.sin6_addr, buf->data + header_len, 16);
         header_len += 16;
 
         uint16_t port;
-        memcpy(&port, buf->data+header_len, 2);
+        memcpy(&port, buf->data + header_len, 2);
         header_len += 2;
         addr_info->ai_addr.sin6.sin6_port = port;
         nd->remote_port = ntohs(port);
@@ -211,18 +195,16 @@ handle_stage_header(NetData *nd, int socktype)
     return 0;
 }
 
-int
-handle_stage_dns(NetData *nd)
-{
+int handle_stage_dns(NetData *nd) {
     LruCache *lc = nd->user_info->lru_cache;
 
-    char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
-    snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
-             "%s:%d", nd->remote_domain, nd->remote_port);
+    char domain_and_port[MAX_DOMAIN_LEN + MAX_PORT_LEN + 1];
+    snprintf(domain_and_port, MAX_DOMAIN_LEN + MAX_PORT_LEN, "%s:%d", nd->remote_domain,
+             nd->remote_port);
 
     MyAddrInfo *addr_info = lru_cache_get(lc, domain_and_port);
     if (addr_info == NULL) {
-        LOGGER_DEBUG("fd: %d, %s:  DNS query!", nd->client_fd, domain_and_port);
+        LOGGER_DEBUG("fd: %d, %s: DNS query!", nd->client_fd, domain_and_port);
         int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
         if (sockfd < 0) {
             TRANSPORT_ERROR("socket: %s", strerror(errno));
@@ -246,9 +228,7 @@ handle_stage_dns(NetData *nd)
     return 0;
 }
 
-int
-handle_stage_handshake(NetData *nd)
-{
+int handle_stage_handshake(NetData *nd) {
     if (create_remote_socket(nd) < 0) {
         return -1;
     }
@@ -258,16 +238,16 @@ handle_stage_handshake(NetData *nd)
     // 注意：当设置非阻塞 socket 后，tcp 三次握手会异步进行，
     // 所以可能会出现三次握手还未完成，就进行 write，
     // 此时 write 会把 errno 置为 EAGAIN
-    if (connect(nd->remote_fd, (struct sockaddr *)&remote_addr->ai_addr,
-                remote_addr->ai_addrlen) < 0) {
+    if (connect(nd->remote_fd, (struct sockaddr *)&remote_addr->ai_addr, remote_addr->ai_addrlen) <
+        0) {
         if (errno != EINPROGRESS) {  // 设为非阻塞后，连接会返回 EINPROGRESS
             close(nd->remote_fd);
             nd->remote_fd = -1;
             free(remote_addr);
             nd->remote_addr = NULL;
-            char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
-            snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
-                     "%s:%d", nd->remote_domain, nd->remote_port);
+            char domain_and_port[MAX_DOMAIN_LEN + MAX_PORT_LEN + 1];
+            snprintf(domain_and_port, MAX_DOMAIN_LEN + MAX_PORT_LEN, "%s:%d", nd->remote_domain,
+                     nd->remote_port);
             // 移除缓存
             lru_cache_remove(nd->user_info->lru_cache, domain_and_port);
             TRANSPORT_ERROR("connect: %s", strerror(errno));
@@ -285,9 +265,7 @@ handle_stage_handshake(NetData *nd)
  * 检查所有时间的最后激活时间，踢掉超时的时间
  * 更新时间的操作，在 ae_register_event() 中进行。
  */
-void
-handle_transport_timeout(AeEventLoop *event_loop, int fd, void *data)
-{
+void handle_transport_timeout(AeEventLoop *event_loop, int fd, void *data) {
     NetData *nd = data;  // client 和 remote 共用 nd
     if (fd == nd->client_fd) {
         TRANSPORT_ERROR("kill self");
@@ -297,12 +275,10 @@ handle_transport_timeout(AeEventLoop *event_loop, int fd, void *data)
     CLEAR_ALL();
 }
 
-int
-add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info)
-{
-    char domain_and_port[MAX_DOMAIN_LEN+MAX_PORT_LEN+1];
-    snprintf(domain_and_port, MAX_DOMAIN_LEN+MAX_PORT_LEN,
-            "%s:%d", nd->remote_domain, nd->remote_port);
+int add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info) {
+    char domain_and_port[MAX_DOMAIN_LEN + MAX_PORT_LEN + 1];
+    snprintf(domain_and_port, MAX_DOMAIN_LEN + MAX_PORT_LEN, "%s:%d", nd->remote_domain,
+             nd->remote_port);
     void *oldvalue;
     LruCache *lc = nd->user_info->lru_cache;
     if (lru_cache_put(lc, domain_and_port, addr_info, &oldvalue) < 0) {

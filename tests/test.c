@@ -3,17 +3,13 @@
  */
 
 #include "helper.h"
-#include "test_log.c"
-#include "test_error.c"
 #include "test_cryptor.c"
 #include "test_ae.c"
 #include "test_hashtable.c"
 #include "test_lru.c"
 #include "test_dns.c"
 
-int
-main(void)
-{
+int main(void) {
     // test_log();
     test_cryptor();
     test_ae();

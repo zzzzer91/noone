@@ -10,16 +10,9 @@
 #include "transport.h"
 #include "tcp.h"
 #include "udp.h"
-#include "dns.h"
-#include "cryptor.h"
-#include "lru.h"
-#include "manager.h"
-#include <unistd.h>
 #include <signal.h>
 
-int
-main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     LOGGER_INFO("Noone started!");
 
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
@@ -60,8 +53,8 @@ main(int argc, char *argv[])
         if (tcp_server_fd < 0) {
             PANIC("tcp_ipv4_server_fd_init");
         }
-        if (ae_register_event(ae_ev_loop, tcp_server_fd,
-                AE_IN, tcp_accept_conn, NULL, NULL, ui)  < 0) {
+        if (ae_register_event(ae_ev_loop, tcp_server_fd, AE_IN, tcp_accept_conn, NULL, NULL, ui) <
+            0) {
             PANIC("ae_register_event");
         }
         ui->tcp_server_fd = tcp_server_fd;
@@ -72,8 +65,8 @@ main(int argc, char *argv[])
         if (udp_server_fd < 0) {
             PANIC("udp_ipv4_server_fd_init");
         }
-        if (ae_register_event(ae_ev_loop, udp_server_fd,
-                AE_IN, udp_read_client, NULL, NULL, ui) < 0) {
+        if (ae_register_event(ae_ev_loop, udp_server_fd, AE_IN, udp_read_client, NULL, NULL, ui) <
+            0) {
             PANIC("ae_register_event");
         }
         ui->udp_server_fd = udp_server_fd;

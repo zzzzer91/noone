@@ -33,7 +33,7 @@ typedef enum TransportStage {
 
 typedef struct NetData {
 
-    char remote_domain[MAX_DOMAIN_LEN+1];
+    char remote_domain[MAX_DOMAIN_LEN + 1];
 
     uint16_t remote_port;
 

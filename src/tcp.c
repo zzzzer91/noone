@@ -4,17 +4,8 @@
 
 #include "tcp.h"
 #include "transport.h"
-#include "socket.h"
-#include "ae.h"
-#include "lru.h"
 #include "dns.h"
-#include <string.h>
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
 #include <unistd.h>      /* close() */
-#include <sys/socket.h>  /* accept() */
-#include <netinet/in.h>  /* struct sockaddr_in */
 
 #define CLIENT_BUF_CAPACITY (16 * 1024)
 #define REMOTE_BUF_CAPACITY (32 * 1024)
@@ -40,12 +31,12 @@
             CLEAR_ALL(); \
         } \
         TRANSPORT_DEBUG("%ld", ret); \
-        ret; \
+        (size_t)ret; \
     })
 
 #define WRITE(sockfd, buf, n) \
     ({ \
-        ssize_t ret = write(fd, buf, n); \
+        ssize_t ret = write(sockfd, buf, n); \
         if (ret == 0) { \
             TRANSPORT_DEBUG("close!"); \
             CLEAR_ALL(); \
@@ -57,12 +48,10 @@
             CLEAR_ALL(); \
         } \
         TRANSPORT_DEBUG("%ld", ret); \
-        ret; \
+        (size_t)ret; \
     })
 
-static void
-handle_dns(AeEventLoop *event_loop, int fd, void *data)
-{
+static void handle_dns(AeEventLoop *event_loop, int fd, void *data) {
     NetData *nd = data;
     TRANSPORT_DEBUG("DNS success!");
 
@@ -94,8 +83,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
         CLEAR_ALL();
     }
 
-    LOGGER_INFO("fd: %d, connecting %s:%d",
-                 nd->client_fd, nd->remote_domain, nd->remote_port);
+    LOGGER_INFO("fd: %d, connecting %s:%d", nd->client_fd, nd->remote_domain, nd->remote_port);
     if (handle_stage_handshake(nd) < 0) {
         TRANSPORT_ERROR("handle_stage_handshake");
         CLEAR_ALL();
@@ -111,9 +99,7 @@ handle_dns(AeEventLoop *event_loop, int fd, void *data)
     TCP_REGISTER_REMOTE_EVENT();
 }
 
-void
-tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
-{
+void tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data) {
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
     int client_fd = accept(fd, (struct sockaddr *)&client_addr, &client_addr_len);
@@ -147,14 +133,14 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
     memcpy(&nd->client_addr.ai_addr, &client_addr, client_addr_len);
     nd->client_addr.ai_addrlen = client_addr_len;
     // 多出来的给 iv 分配，和防止加密后长度变化导致溢出
-    nd->client_buf = init_buffer(CLIENT_BUF_CAPACITY+128);
+    nd->client_buf = init_buffer(CLIENT_BUF_CAPACITY + 128);
     if (nd->client_buf == NULL) {
         SYS_ERROR("init_buffer");
         close(client_fd);
         free_net_data(nd);
         return;
     }
-    nd->remote_buf = init_buffer(REMOTE_BUF_CAPACITY+128);
+    nd->remote_buf = init_buffer(REMOTE_BUF_CAPACITY + 128);
     if (nd->remote_buf == NULL) {
         SYS_ERROR("init_buffer");
         close(client_fd);
@@ -165,15 +151,13 @@ tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data)
     TCP_REGISTER_CLIENT_EVENT();
 }
 
-void
-tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
-{
+void tcp_read_client(AeEventLoop *event_loop, int fd, void *data) {
     NetData *nd = data;
 
     char temp_buf[CLIENT_BUF_CAPACITY];
-    ssize_t nread = READ(fd, temp_buf, sizeof(temp_buf));
+    size_t nread = READ(fd, temp_buf, sizeof(temp_buf));
 
-    int iv_len = 0;
+    uint8_t iv_len = 0;
     if (nd->stage == STAGE_INIT) {
         iv_len = nd->user_info->cryptor_info->iv_len;
         memcpy(nd->iv, temp_buf, iv_len);
@@ -188,7 +172,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     Buffer *cbuf = nd->client_buf;
-    DECRYPT(temp_buf+iv_len, nread, cbuf->data);
+    DECRYPT(temp_buf + iv_len, nread, cbuf->data);
 
     if (nd->stage == STAGE_HEADER) {
         if (handle_stage_header(nd, SOCK_STREAM) < 0) {
@@ -212,8 +196,7 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     }
 
     if (nd->stage == STAGE_HANDSHAKE) {
-        LOGGER_DEBUG("fd: %d, connecting %s:%d",
-                nd->client_fd, nd->remote_domain, nd->remote_port);
+        LOGGER_DEBUG("fd: %d, connecting %s:%d", nd->client_fd, nd->remote_domain, nd->remote_port);
         if (handle_stage_handshake(nd) < 0) {
             TRANSPORT_ERROR("handle_stage_handshake");
             CLEAR_ALL();
@@ -233,16 +216,14 @@ tcp_read_client(AeEventLoop *event_loop, int fd, void *data)
     TCP_REGISTER_REMOTE_EVENT();
 }
 
-void
-tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
-{
+void tcp_write_remote(AeEventLoop *event_loop, int fd, void *data) {
     NetData *nd = data;
 
     Buffer *cbuf = nd->client_buf;
     // 这里缓冲区要加上索引
     // 1.是可能解析完头部，索引有偏移
     // 2.是可能上一次没写完
-    ssize_t nwriten = WRITE(fd, cbuf->data+cbuf->idx, cbuf->len);
+    size_t nwriten = WRITE(fd, cbuf->data + cbuf->idx, cbuf->len);
     cbuf->len -= nwriten;
     if (cbuf->len > 0) {  // 没有写完，不能改变事件，要继续写
         TRANSPORT_DEBUG("not completed!");
@@ -257,22 +238,20 @@ tcp_write_remote(AeEventLoop *event_loop, int fd, void *data)
     TCP_REGISTER_REMOTE_EVENT();
 }
 
-void
-tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
-{
+void tcp_read_remote(AeEventLoop *event_loop, int fd, void *data) {
     NetData *nd = data;
 
     char temp_buf[REMOTE_BUF_CAPACITY];
-    ssize_t nread = READ(fd, temp_buf, sizeof(temp_buf));
+    size_t nread = READ(fd, temp_buf, sizeof(temp_buf));
 
     Buffer *rbuf = nd->remote_buf;
-    int iv_len = 0;
+    uint8_t iv_len = 0;
     if (nd->is_iv_send == 0) {
         iv_len = nd->user_info->cryptor_info->iv_len;
         memcpy(rbuf->data, nd->iv, iv_len);
         nd->is_iv_send = 1;
     }
-    ENCRYPT(temp_buf, nread, rbuf->data+iv_len);
+    ENCRYPT(temp_buf, nread, rbuf->data + iv_len);
     rbuf->len += iv_len;
 
     nd->client_event_status |= AE_OUT;
@@ -281,13 +260,11 @@ tcp_read_remote(AeEventLoop *event_loop, int fd, void *data)
     TCP_REGISTER_REMOTE_EVENT();
 }
 
-void
-tcp_write_client(AeEventLoop *event_loop, int fd, void *data)
-{
+void tcp_write_client(AeEventLoop *event_loop, int fd, void *data) {
     NetData *nd = data;
 
     Buffer *rbuf = nd->remote_buf;
-    ssize_t nwriten = WRITE(fd, rbuf->data+rbuf->idx, rbuf->len);
+    size_t nwriten = WRITE(fd, rbuf->data + rbuf->idx, rbuf->len);
     rbuf->len -= nwriten;
     if (rbuf->len > 0) {
         TRANSPORT_DEBUG("not completed!");

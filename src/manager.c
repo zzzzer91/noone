@@ -5,9 +5,7 @@
 #include "manager.h"
 #include <assert.h>
 
-NooneManager *
-init_manager(int user_count)
-{
+NooneManager *init_manager(int user_count) {
     assert(user_count > 0);
 
     NooneManager *m = malloc(sizeof(NooneManager));
@@ -15,7 +13,7 @@ init_manager(int user_count)
         return NULL;
     }
 
-    m->users_info = malloc(user_count*sizeof(NooneUserInfo));
+    m->users_info = malloc(user_count * sizeof(NooneUserInfo));
     if (m->users_info == NULL) {
         free(m);
         return NULL;

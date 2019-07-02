@@ -5,11 +5,8 @@
 #include "lru.h"
 #include <assert.h>
 #include <stdlib.h>
-#include <string.h>
 
-LruCache *
-lru_cache_init(size_t capacity)
-{
+LruCache *lru_cache_init(size_t capacity) {
     assert(capacity > 0);
 
     LruCache *lc = malloc(sizeof(LruCache));
@@ -30,9 +27,7 @@ lru_cache_init(size_t capacity)
     return lc;
 }
 
-void
-lru_cache_destory(LruCache *lc)
-{
+void lru_cache_destory(LruCache *lc) {
     assert(lc != NULL);
 
     lru_cache_clear(lc);
@@ -43,9 +38,7 @@ lru_cache_destory(LruCache *lc)
 /*
  * 传出过期元素的 value，用于调用者释放
  */
-int
-lru_cache_put(LruCache *lc, char *key, void *value, void **oldvalue)
-{
+int lru_cache_put(LruCache *lc, char *key, void *value, void **oldvalue) {
     assert(lc != NULL && key != NULL);
 
     *oldvalue = NULL;
@@ -70,17 +63,13 @@ lru_cache_put(LruCache *lc, char *key, void *value, void **oldvalue)
     return ret;
 }
 
-void *
-lru_cache_get(LruCache *lc, char *key)
-{
+void *lru_cache_get(LruCache *lc, char *key) {
     assert(lc != NULL && key != NULL);
 
     return hashtable_get(lc->hash_table, key);
 }
 
-void *
-lru_cache_remove(LruCache *lc, char *key)
-{
+void *lru_cache_remove(LruCache *lc, char *key) {
     assert(lc != NULL && key != NULL);
 
     void *v = hashtable_remove(lc->hash_table, key);
@@ -91,9 +80,7 @@ lru_cache_remove(LruCache *lc, char *key)
     return v;
 }
 
-void
-lru_cache_clear(LruCache *lc)
-{
+void lru_cache_clear(LruCache *lc) {
     assert(lc != NULL);
 
     hashtable_clear(lc->hash_table);

@@ -3,11 +3,9 @@
  */
 
 #include "ae.h"
-#include "log.h"
 #include "dlist.h"
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/epoll.h>
 
 /*
  * 关联给定事件到 fd
@@ -16,50 +14,46 @@
  *
  * 如果已经关联了某个/某些事件，那么这是一个 MOD 操作。
  */
-#define AE_EPOLL_ADD_EVENT(event_loop, fd, mask, op) \
+#define AE_EPOLL_ADD_EVENT(fd, mask, op) \
     ({ \
         struct epoll_event ee; \
         ee.events = mask; \
         ee.data.ptr = NULL; \
         ee.data.fd = fd; \
-        epoll_ctl((event_loop)->epfd, op, fd, &ee); \
+        epoll_ctl(event_loop->epfd, op, fd, &ee); \
     })
 
 /*
  * 删除事件
  */
-#define AE_EPOLL_DEL_EVENT(event_loop, fd) \
-    ({ \
-        epoll_ctl((event_loop)->epfd, EPOLL_CTL_DEL, fd, NULL); \
-    })
+#define AE_EPOLL_DEL_EVENT(fd) \
+    epoll_ctl(event_loop->epfd, EPOLL_CTL_DEL, fd, NULL)
 
 /*
  * 获取可执行事件，timeout 单位毫秒
  */
-#define AE_EPOLL_POLL(event_loop, timeout) \
-    ({ \
-        epoll_wait((event_loop)->epfd, (event_loop)->ready_events, \
-                (event_loop)->event_set_size, timeout); \
-    })
+#define AE_EPOLL_POLL(timeout) \
+    epoll_wait(event_loop->epfd, event_loop->ready_events, \
+               event_loop->event_set_size, timeout)
 
 /*
  * 从双向链表尾部向前循环，按时间排序，尾部是最旧的事件
  */
-#define AE_CHECK_TIMEOUT(event_loop) \
-    do { \
-        time_t current_time = time(NULL); \
-        AeEvent *p = (event_loop)->list_tail; \
-        while (p) { \
-            if ((current_time - p->last_active) < AE_WAIT_SECONDS) { \
-                break; \
-            } \
-            if (p->tcallback != NULL) { \
-                int fd = p->fd; \
-                p->tcallback(event_loop, fd, p->data); \
-            } \
-            p = p->list_prev; \
-        } \
-    } while (0)
+static inline void ae_check_timeout(AeEventLoop *event_loop) {
+    time_t current_time = time(NULL);
+
+    AeEvent *p = event_loop->list_tail;
+    while (p) {
+        if ((current_time - p->last_active) < AE_WAIT_SECONDS) {
+            break;
+        }
+        if (p->tcallback != NULL) {
+            int fd = p->fd;
+            p->tcallback(event_loop, fd, p->data);
+        }
+        p = p->list_prev;
+    }
+}
 
 /* Process every pending time event, then every pending file event
  * (that may be registered by time event callbacks just processed).
@@ -73,11 +67,9 @@
  * event removed an element that fired and we still didn't
  * processed, so we check if the event is still valid.
  */
-static int
-ae_process_events(AeEventLoop *event_loop, int timeout)
-{
+static int ae_process_events(AeEventLoop *event_loop, int timeout) {
     int processed = 0;
-    int numevents = AE_EPOLL_POLL(event_loop, timeout * 1000);
+    int numevents = AE_EPOLL_POLL(timeout * 1000);
     // LOGGER_DEBUG("numevents: %d", numevents);
     for (int i = 0; i < numevents; i++) {
         uint32_t mask = event_loop->ready_events[i].events;
@@ -99,9 +91,7 @@ ae_process_events(AeEventLoop *event_loop, int timeout)
 /*
  * 创建事件处理器
  */
-AeEventLoop *
-ae_create_event_loop(int event_set_size)
-{
+AeEventLoop *ae_create_event_loop(int event_set_size) {
     AeEventLoop *event_loop = malloc(sizeof(AeEventLoop));
     if (event_loop == NULL) {
         return NULL;
@@ -124,7 +114,7 @@ ae_create_event_loop(int event_set_size)
     }
 
     // 初始化事件槽空间，放置 epoll_wait() 已就绪事件
-    event_loop->ready_events = malloc(event_set_size*sizeof(struct epoll_event));
+    event_loop->ready_events = malloc(event_set_size * sizeof(struct epoll_event));
     if (event_loop->ready_events == NULL) {
         close(event_loop->epfd);
         free(event_loop->events);
@@ -146,9 +136,7 @@ ae_create_event_loop(int event_set_size)
 /*
  * 删除事件处理器
  */
-void
-ae_delete_event_loop(AeEventLoop *event_loop)
-{
+void ae_delete_event_loop(AeEventLoop *event_loop) {
     close(event_loop->epfd);
     free(event_loop->events);
     free(event_loop->ready_events);
@@ -158,27 +146,21 @@ ae_delete_event_loop(AeEventLoop *event_loop)
 /*
  * 停止事件处理器
  */
-void
-ae_stop_event_loop(AeEventLoop *event_loop)
-{
+void ae_stop_event_loop(AeEventLoop *event_loop) {
     event_loop->stop = 1;
 }
 
 /*
  * 返回当前事件槽大小。
  */
-int
-ae_get_event_set_size(AeEventLoop *event_loop)
-{
+int ae_get_event_set_size(AeEventLoop *event_loop) {
     return event_loop->event_set_size;
 }
 
 /*
  * 事件处理器的主循环
  */
-void
-ae_run_loop(AeEventLoop *event_loop)
-{
+void ae_run_loop(AeEventLoop *event_loop) {
     event_loop->stop = 0;
 
     int count = 0;
@@ -187,11 +169,11 @@ ae_run_loop(AeEventLoop *event_loop)
         int proc = ae_process_events(event_loop, AE_WAIT_SECONDS);
 
         if (proc == 0) {  // epoll_wait() 超时返回，直接回调超时函数
-            AE_CHECK_TIMEOUT(event_loop);
+            ae_check_timeout(event_loop);
         } else {
             count += proc;
             if (count == 2048) {  // 执行一定数量事件后再回调超时函数，提高性能
-                AE_CHECK_TIMEOUT(event_loop);
+                ae_check_timeout(event_loop);
                 count = 0;
             }
         }
@@ -201,10 +183,8 @@ ae_run_loop(AeEventLoop *event_loop)
 /*
  * 注册 fd
  */
-int
-ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
-        AeCallback *rcallback, AeCallback *wcallback, AeCallback *tcallback, void *data)
-{
+int ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask, AeCallback *rcallback,
+                      AeCallback *wcallback, AeCallback *tcallback, void *data) {
     if (fd < 0 || fd >= event_loop->event_set_size || mask == AE_NONE) {
         return -1;
     }
@@ -218,7 +198,7 @@ ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
         int op = fe_mask == AE_NONE ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
         // 监听指定 fd 的指定事件
-        if (AE_EPOLL_ADD_EVENT(event_loop, fd, mask, op) == -1) {
+        if (AE_EPOLL_ADD_EVENT(fd, mask, op) == -1) {
             return -1;
         }
 
@@ -260,9 +240,7 @@ ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask,
 /*
  * 将 fd 从监听队列中删除
  */
-int
-ae_unregister_event(AeEventLoop *event_loop, int fd)
-{
+int ae_unregister_event(AeEventLoop *event_loop, int fd) {
     if (fd < 0 || fd >= event_loop->event_set_size) {
         return -1;
     }
@@ -278,7 +256,7 @@ ae_unregister_event(AeEventLoop *event_loop, int fd)
     if (fd == event_loop->maxfd) {
         /* Update the max fd */
         int j;
-        for (j = event_loop->maxfd-1; j >= 0; j--) {
+        for (j = event_loop->maxfd - 1; j >= 0; j--) {
             if (event_loop->events[j].mask != AE_NONE) {
                 break;
             }
@@ -292,7 +270,7 @@ ae_unregister_event(AeEventLoop *event_loop, int fd)
     // 从队列中删除
     DLIST_DEL(event_loop->list_head, event_loop->list_tail, fe);
 
-    return AE_EPOLL_DEL_EVENT(event_loop, fd);
+    return AE_EPOLL_DEL_EVENT(fd);
 }
 
 /*
@@ -301,16 +279,12 @@ ae_unregister_event(AeEventLoop *event_loop, int fd)
  * 即时再次调用 ae_register_event()，也不会再将该事件加入队列，
  * 除非调用 ae_add_event_to_list（）。
  */
-void
-ae_remove_event_from_list(AeEventLoop *event_loop, int fd)
-{
+void ae_remove_event_from_list(AeEventLoop *event_loop, int fd) {
     AeEvent *fe = &event_loop->events[fd];
     DLIST_DEL(event_loop->list_head, event_loop->list_tail, fe);
 }
 
-void
-ae_add_event_to_list(AeEventLoop *event_loop, int fd)
-{
+void ae_add_event_to_list(AeEventLoop *event_loop, int fd) {
     AeEvent *fe = &event_loop->events[fd];
     DLIST_ADD_HEAD(event_loop->list_head, event_loop->list_tail, fe);
 }
