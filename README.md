@@ -6,7 +6,7 @@ Noone：Shadowsocks 服务端纯 C 实现，基于 epoll，高性能，低占用
 
 - openssl
 
-## 安装
+## 编译
 
 ```bash
 make
