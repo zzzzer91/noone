@@ -10,12 +10,6 @@
 #define CLIENT_BUF_CAPACITY (16 * 1024)
 #define REMOTE_BUF_CAPACITY (32 * 1024)
 
-#define TCP_REGISTER_CLIENT_EVENT() \
-    REGISTER_CLIENT_EVENT(tcp_read_client, tcp_write_client)
-
-#define TCP_REGISTER_REMOTE_EVENT() \
-    REGISTER_REMOTE_EVENT(tcp_read_remote, tcp_write_remote)
-
 #define READ(sockfd, buf, cap) \
     ({ \
         ssize_t ret = read(sockfd, buf, cap); \
@@ -91,12 +85,12 @@ static void handle_dns(AeEventLoop *event_loop, int fd, void *data) {
 
     if (nd->client_buf->len == 0) {
         nd->client_event_status |= AE_IN;
-        TCP_REGISTER_CLIENT_EVENT();
+        REGISTER_CLIENT_EVENT(tcp_read_client, tcp_write_client);
         return;
     }
 
     nd->remote_event_status |= AE_OUT;
-    TCP_REGISTER_REMOTE_EVENT();
+    REGISTER_REMOTE_EVENT(tcp_read_remote, tcp_write_remote);
 }
 
 void tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data) {
@@ -148,7 +142,7 @@ void tcp_accept_conn(AeEventLoop *event_loop, int fd, void *data) {
         return;
     }
 
-    TCP_REGISTER_CLIENT_EVENT();
+    REGISTER_CLIENT_EVENT(tcp_read_client, tcp_write_client);
 }
 
 void tcp_read_client(AeEventLoop *event_loop, int fd, void *data) {
@@ -190,7 +184,7 @@ void tcp_read_client(AeEventLoop *event_loop, int fd, void *data) {
             REGISTER_DNS_EVENT(handle_dns);
             // 挂起 client 事件
             nd->client_event_status ^= AE_IN;
-            TCP_REGISTER_CLIENT_EVENT();
+            REGISTER_CLIENT_EVENT(tcp_read_client, tcp_write_client);
             return;
         }
     }
@@ -212,8 +206,8 @@ void tcp_read_client(AeEventLoop *event_loop, int fd, void *data) {
     // ae_register_event() 中有相应处理逻辑
     nd->client_event_status ^= AE_IN;
     nd->remote_event_status |= AE_OUT;
-    TCP_REGISTER_CLIENT_EVENT();
-    TCP_REGISTER_REMOTE_EVENT();
+    REGISTER_CLIENT_EVENT(tcp_read_client, tcp_write_client);
+    REGISTER_REMOTE_EVENT(tcp_read_remote, tcp_write_remote);
 }
 
 void tcp_write_remote(AeEventLoop *event_loop, int fd, void *data) {
@@ -234,8 +228,8 @@ void tcp_write_remote(AeEventLoop *event_loop, int fd, void *data) {
 
     nd->client_event_status |= AE_IN;
     nd->remote_event_status ^= AE_OUT;
-    TCP_REGISTER_CLIENT_EVENT();
-    TCP_REGISTER_REMOTE_EVENT();
+    REGISTER_CLIENT_EVENT(tcp_read_client, tcp_write_client);
+    REGISTER_REMOTE_EVENT(tcp_read_remote, tcp_write_remote);
 }
 
 void tcp_read_remote(AeEventLoop *event_loop, int fd, void *data) {
@@ -256,8 +250,8 @@ void tcp_read_remote(AeEventLoop *event_loop, int fd, void *data) {
 
     nd->client_event_status |= AE_OUT;
     nd->remote_event_status ^= AE_IN;
-    TCP_REGISTER_CLIENT_EVENT();
-    TCP_REGISTER_REMOTE_EVENT();
+    REGISTER_CLIENT_EVENT(tcp_read_client, tcp_write_client);
+    REGISTER_REMOTE_EVENT(tcp_read_remote, tcp_write_remote);
 }
 
 void tcp_write_client(AeEventLoop *event_loop, int fd, void *data) {
@@ -275,6 +269,6 @@ void tcp_write_client(AeEventLoop *event_loop, int fd, void *data) {
 
     nd->client_event_status ^= AE_OUT;
     nd->remote_event_status |= AE_IN;
-    TCP_REGISTER_CLIENT_EVENT();
-    TCP_REGISTER_REMOTE_EVENT();
+    REGISTER_CLIENT_EVENT(tcp_read_client, tcp_write_client);
+    REGISTER_REMOTE_EVENT(tcp_read_remote, tcp_write_remote);
 }

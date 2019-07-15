@@ -14,27 +14,28 @@
  *
  * 如果已经关联了某个/某些事件，那么这是一个 MOD 操作。
  */
-#define AE_EPOLL_ADD_EVENT(fd, mask, op) \
-    ({ \
-        struct epoll_event ee; \
-        ee.events = mask; \
-        ee.data.ptr = NULL; \
-        ee.data.fd = fd; \
-        epoll_ctl(event_loop->epfd, op, fd, &ee); \
-    })
+static inline int ae_epoll_add_event(AeEventLoop *event_loop, int fd, int mask, int op) {
+    struct epoll_event ee;
+    ee.events = mask;
+    ee.data.ptr = NULL;
+    ee.data.fd = fd;
+    return epoll_ctl(event_loop->epfd, op, fd, &ee);
+}
 
 /*
  * 删除事件
  */
-#define AE_EPOLL_DEL_EVENT(fd) \
-    epoll_ctl(event_loop->epfd, EPOLL_CTL_DEL, fd, NULL)
+static inline int ae_epoll_del_event(AeEventLoop *event_loop, int fd) {
+    return epoll_ctl(event_loop->epfd, EPOLL_CTL_DEL, fd, NULL);
+}
 
 /*
  * 获取可执行事件，timeout 单位毫秒
  */
-#define AE_EPOLL_POLL(timeout) \
-    epoll_wait(event_loop->epfd, event_loop->ready_events, \
-               event_loop->event_set_size, timeout)
+static inline int ae_epoll_poll(AeEventLoop *event_loop, int timeout) {
+    return epoll_wait(event_loop->epfd, event_loop->ready_events,
+            event_loop->event_set_size, timeout);
+}
 
 /*
  * 从双向链表尾部向前循环，按时间排序，尾部是最旧的事件
@@ -55,21 +56,14 @@ static inline void ae_check_timeout(AeEventLoop *event_loop) {
     }
 }
 
-/* Process every pending time event, then every pending file event
- * (that may be registered by time event callbacks just processed).
+/*
+ * 处理所有已到达事件。
  *
- * 处理所有已到达的时间事件，以及所有已就绪的文件事件。
- *
- * The function returns the number of events processed.
  * 函数的返回值为已处理事件的数量
- *
- * note the fe->mask & mask & ... code: maybe an already processed
- * event removed an element that fired and we still didn't
- * processed, so we check if the event is still valid.
  */
 static int ae_process_events(AeEventLoop *event_loop, int timeout) {
     int processed = 0;
-    int numevents = AE_EPOLL_POLL(timeout * 1000);
+    int numevents = ae_epoll_poll(event_loop, timeout * 1000);
     // LOGGER_DEBUG("numevents: %d", numevents);
     for (int i = 0; i < numevents; i++) {
         uint32_t mask = event_loop->ready_events[i].events;
@@ -195,10 +189,10 @@ int ae_register_event(AeEventLoop *event_loop, int fd, uint32_t mask, AeCallback
 
     if (fe_mask != mask) {
         // 判断是注册还是修改
-        int op = fe_mask == AE_NONE ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
+        int op = (fe_mask == AE_NONE ? EPOLL_CTL_ADD : EPOLL_CTL_MOD);
 
         // 监听指定 fd 的指定事件
-        if (AE_EPOLL_ADD_EVENT(fd, mask, op) == -1) {
+        if (ae_epoll_add_event(event_loop, fd, mask, op) == -1) {
             return -1;
         }
 
@@ -270,7 +264,7 @@ int ae_unregister_event(AeEventLoop *event_loop, int fd) {
     // 从队列中删除
     DLIST_DEL(event_loop->list_head, event_loop->list_tail, fe);
 
-    return AE_EPOLL_DEL_EVENT(fd);
+    return ae_epoll_del_event(event_loop, fd);
 }
 
 /*

@@ -12,9 +12,6 @@
 #define CLIENT_BUF_CAPACITY (8 * 1024)
 #define REMOTE_BUF_CAPACITY (8 * 1024)
 
-#define UDP_REGISTER_REMOTE_EVENT() \
-    REGISTER_REMOTE_EVENT(udp_read_remote, NULL)
-
 #define RECVFROM(sockfd, buf, buf_cap, addr_p) \
     ({ \
         ssize_t ret = recvfrom(sockfd, buf, buf_cap, 0, \
@@ -75,12 +72,12 @@ static void handle_dns(AeEventLoop *event_loop, int fd, void *data) {
     free_buffer(cbuf);
     nd->client_buf = NULL;
 
-    UDP_REGISTER_REMOTE_EVENT();
+    REGISTER_REMOTE_EVENT(udp_read_remote, NULL);
 }
 
-static int build_send_header(char *buf, MyAddrInfo *remote_addr) {
+static uint8_t build_send_header(char *buf, MyAddrInfo *remote_addr) {
     char temp_buf[HEAD_PREFIX];
-    int header_len = 1;  // 1 留给 atty
+    uint8_t header_len = 1;  // 1 留给 atty
     char atty;
     if (remote_addr->ai_addrlen != 16) {  // 是 ipv6
         atty = 0x03;
@@ -160,7 +157,7 @@ void udp_read_client(AeEventLoop *event_loop, int fd, void *data) {
     free_buffer(nd->client_buf);
     nd->client_buf = NULL;
 
-    UDP_REGISTER_REMOTE_EVENT();
+    REGISTER_REMOTE_EVENT(udp_read_remote, NULL);
 }
 
 void udp_read_remote(AeEventLoop *event_loop, int fd, void *data) {
@@ -176,7 +173,7 @@ void udp_read_remote(AeEventLoop *event_loop, int fd, void *data) {
         return;
     }
 
-    int header_len = build_send_header(plainbuf, nd->remote_addr);
+    uint8_t header_len = build_send_header(plainbuf, nd->remote_addr);
     nread += header_len;
 
     Buffer *rbuf = init_buffer(REMOTE_BUF_CAPACITY + 128);
