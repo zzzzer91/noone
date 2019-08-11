@@ -23,13 +23,13 @@ typedef struct ZipperEntry {
 } ZipperEntry;
 
 typedef struct HashTable {
-    size_t size;      // 表当前大小
-    size_t capacity;  // 表容量
+    int size;      // 表当前大小
+    int capacity;  // 表容量
     ZipperEntry *zipper_entry;  // 指向拉链
     Entry *list_head, *list_tail; // head 指向最近插入的元素
 } HashTable;
 
-HashTable *hashtable_init(size_t capacity);
+HashTable *hashtable_init(int capacity);
 
 void hashtable_destory(HashTable *ht);
 

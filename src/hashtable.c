@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <string.h>
 
-HashTable *hashtable_init(size_t capacity) {
+HashTable *hashtable_init(int capacity) {
     assert(capacity > 0);
 
     HashTable *hash_table = malloc(sizeof(HashTable));
@@ -16,7 +16,7 @@ HashTable *hashtable_init(size_t capacity) {
         return NULL;
     }
 
-    hash_table->zipper_entry = calloc(capacity, sizeof(ZipperEntry));
+    hash_table->zipper_entry = calloc((size_t)capacity, sizeof(ZipperEntry));
     if (hash_table->zipper_entry == NULL) {
         free(hash_table);
         return NULL;
@@ -178,9 +178,8 @@ void *hashtable_remove_oldest(HashTable *ht) {
 void hashtable_clear(HashTable *ht) {
     assert(ht != NULL);
 
-    size_t size = ht->size;
     Entry *p = ht->list_head;
-    for (size_t i = 0; i < size; i++) {
+    for (int i = 0, size = ht->size; i < size; i++) {
         ht->zipper_entry[p->hashcode].entry_count--;
         ht->list_head = p->list_next;
         free(p);

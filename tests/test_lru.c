@@ -7,7 +7,7 @@
 #include "log.h"
 
 void test_lru() {
-    size_t capacity = 4;
+    int capacity = 4;
     LruCache *lc = lru_cache_init(capacity);
 
     char s1[] = "rm.api.weibo.com";

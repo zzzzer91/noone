@@ -7,8 +7,8 @@
 #include "log.h"
 #include <stdlib.h>
 
-void test_hash_key() {
-    size_t capacity = 1024 * 16;
+static void test_hash_key() {
+    size_t capacity = 1024 * 4;
     char *table = malloc(sizeof(char) * capacity);
     memset(table, 0, sizeof(char) * capacity);
 
@@ -33,14 +33,14 @@ void test_hash_key() {
             }
         }
     }
-    LOGGER_INFO("test_lru, table 大小：%ld，key 数：%d，碰撞数：%d，碰撞率：%f", capacity, key_count, collisions,
-                collisions / (float)key_count);
+    LOGGER_INFO("test_lru, table 大小：%ld，key 数：%d，碰撞数：%d，碰撞率：%3.2f%%",
+                capacity, key_count, collisions, collisions / (float)key_count * 100);
 
     free(table);
 }
 
-void test_table() {
-    size_t capacity = 4;
+static void test_table() {
+    int capacity = 4;
     HashTable *ht = hashtable_init(capacity);
     char s1[] = "rm.api.weibo.com";
     char s2[] = "clients4.google.com";
@@ -54,7 +54,7 @@ void test_table() {
     EXPECT_EQ_INT(4, hashtable_put(ht, s4, (void *)5L));
     EXPECT_EQ_INT(0, hashtable_put(ht, s5, (void *)6L));  // 表满，set 返回 0
     EXPECT_EQ_INT(4, hashtable_put(ht, s1, (void *)2L));  // 更新 s1
-    EXPECT_EQ_LONG(4L, ht->size);
+    EXPECT_EQ_INT(4, ht->size);
 
     EXPECT_EQ_LONG(2L, (long)hashtable_get(ht, s1));
     EXPECT_EQ_LONG(3L, (long)hashtable_get(ht, s2));
@@ -66,7 +66,7 @@ void test_table() {
     EXPECT_EQ_LONG(4L, (long)hashtable_remove(ht, s3));
     EXPECT_EQ_POINTER(NULL, hashtable_remove(ht, s3));
     EXPECT_EQ_POINTER(NULL, hashtable_get(ht, s3));
-    EXPECT_EQ_LONG(3L, ht->size);
+    EXPECT_EQ_INT(3, ht->size);
 
     // 测试时间优先队列
     Entry *p = ht->list_head;

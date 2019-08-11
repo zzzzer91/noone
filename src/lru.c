@@ -6,7 +6,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
-LruCache *lru_cache_init(size_t capacity) {
+LruCache *lru_cache_init(int capacity) {
     assert(capacity > 0);
 
     LruCache *lc = malloc(sizeof(LruCache));
@@ -14,8 +14,8 @@ LruCache *lru_cache_init(size_t capacity) {
         return NULL;
     }
 
-    // hashcode 表比例 8
-    lc->hash_table = hashtable_init(capacity * 8);
+    // 装载因子 0.5
+    lc->hash_table = hashtable_init(capacity * 2);
     if (lc->hash_table == NULL) {
         free(lc);
         return NULL;

@@ -9,11 +9,11 @@
 
 typedef struct LruCache {
     HashTable *hash_table;
-    size_t capacity;
-    size_t size;
+    int capacity;
+    int size;
 } LruCache;
 
-LruCache *lru_cache_init(size_t capacity);
+LruCache *lru_cache_init(int capacity);
 
 void lru_cache_destory(LruCache *lc);
 
