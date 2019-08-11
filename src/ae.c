@@ -14,7 +14,7 @@
  *
  * 如果已经关联了某个/某些事件，那么这是一个 MOD 操作。
  */
-static inline int ae_epoll_add_event(AeEventLoop *event_loop, int fd, int mask, int op) {
+static inline int ae_epoll_add_event(AeEventLoop *event_loop, int fd, uint32_t mask, int op) {
     struct epoll_event ee;
     ee.events = mask;
     ee.data.ptr = NULL;
@@ -33,8 +33,8 @@ static inline int ae_epoll_del_event(AeEventLoop *event_loop, int fd) {
  * 获取可执行事件，timeout 单位毫秒
  */
 static inline int ae_epoll_poll(AeEventLoop *event_loop, int timeout) {
-    return epoll_wait(event_loop->epfd, event_loop->ready_events,
-            event_loop->event_set_size, timeout);
+    return epoll_wait(event_loop->epfd, event_loop->ready_events, event_loop->event_set_size,
+                      timeout);
 }
 
 /*
@@ -100,7 +100,7 @@ AeEventLoop *ae_create_event_loop(int event_set_size) {
 
     // 初始化文件事件结构
     // Events with mask == AE_NONE are not set.
-    event_loop->events = calloc(event_set_size, sizeof(AeEvent));
+    event_loop->events = calloc((size_t)event_set_size, sizeof(AeEvent));
     if (event_loop->events == NULL) {
         close(event_loop->epfd);
         free(event_loop);
