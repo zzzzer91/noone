@@ -11,8 +11,7 @@
 
 // 是否显示 debug 信息
 #define NOONE_DEBUG 1
-
-// log 信息是否显示时间，log多时貌似挺费性能的
+// log 信息是否显示时间，log 多时貌似挺费性能的
 #define NOONE_LOGGER_DISPLAY_TIME 1
 
 #if NOONE_LOGGER_DISPLAY_TIME
