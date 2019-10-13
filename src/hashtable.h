@@ -7,10 +7,11 @@
 
 #include <stddef.h>
 
+// 作为 key 的字符串的最大长度
 #define MAX_HASH_KEY_LEN 80
 
 typedef struct Entry {
-    char key[MAX_HASH_KEY_LEN];
+    char key[MAX_HASH_KEY_LEN + 1];
     void *value;
     size_t hashcode;
     struct Entry *zipper_prev, *zipper_next;  // 采用拉链法

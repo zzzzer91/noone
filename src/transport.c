@@ -198,8 +198,8 @@ int handle_stage_header(NetData *nd, int socktype) {
 int handle_stage_dns(NetData *nd) {
     LruCache *lc = nd->user_info->lru_cache;
 
-    char domain_and_port[MAX_DOMAIN_LEN + MAX_PORT_LEN + 1];
-    snprintf(domain_and_port, MAX_DOMAIN_LEN + MAX_PORT_LEN, "%s:%d", nd->remote_domain,
+    char domain_and_port[MAX_DOMAIN_LEN + MAX_PORT_LEN + 2];
+    snprintf(domain_and_port, MAX_DOMAIN_LEN + MAX_PORT_LEN + 2, "%s:%d", nd->remote_domain,
              nd->remote_port);
 
     MyAddrInfo *addr_info = lru_cache_get(lc, domain_and_port);
@@ -245,8 +245,8 @@ int handle_stage_handshake(NetData *nd) {
             nd->remote_fd = -1;
             free(remote_addr);
             nd->remote_addr = NULL;
-            char domain_and_port[MAX_DOMAIN_LEN + MAX_PORT_LEN + 1];
-            snprintf(domain_and_port, MAX_DOMAIN_LEN + MAX_PORT_LEN, "%s:%d", nd->remote_domain,
+            char domain_and_port[MAX_DOMAIN_LEN + MAX_PORT_LEN + 2];
+            snprintf(domain_and_port, MAX_DOMAIN_LEN + MAX_PORT_LEN + 2, "%s:%d", nd->remote_domain,
                      nd->remote_port);
             // 移除缓存
             lru_cache_remove(nd->user_info->lru_cache, domain_and_port);
@@ -276,8 +276,8 @@ void handle_transport_timeout(AeEventLoop *event_loop, int fd, void *data) {
 }
 
 int add_dns_to_lru_cache(NetData *nd, MyAddrInfo *addr_info) {
-    char domain_and_port[MAX_DOMAIN_LEN + MAX_PORT_LEN + 1];
-    snprintf(domain_and_port, MAX_DOMAIN_LEN + MAX_PORT_LEN, "%s:%d", nd->remote_domain,
+    char domain_and_port[MAX_DOMAIN_LEN + MAX_PORT_LEN + 2];
+    snprintf(domain_and_port, MAX_DOMAIN_LEN + MAX_PORT_LEN + 2, "%s:%d", nd->remote_domain,
              nd->remote_port);
     void *oldvalue;
     LruCache *lc = nd->user_info->lru_cache;
