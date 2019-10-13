@@ -1,7 +1,7 @@
 TARGET=noone
 
 CC=gcc # 指定编译器
-STD=gnu99  # centos7 上的 gcc 只支持 gnu99
+STD=gnu11  # centos7 上的 gcc 只支持 gnu99
 CFLAGS=-O3 -std=$(STD) -Wall
 SRCS=$(wildcard src/*.c) # 查找指定目录下所有 .c 文件，返回字符串
 OBJS=$(patsubst src/%.c, build/%.o, $(SRCS)) # 把字符串中的 src/*.c 替换 build/*.o，返回字符串

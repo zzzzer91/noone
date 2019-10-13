@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 project(noone C)
 
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_FLAGS "-std=gnu99")
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_FLAGS "-std=gnu11")
 
 # 添加头文件目录
 include_directories(./src)
